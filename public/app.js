@@ -517,3 +517,101 @@ function patchFunctionalNavigation(){
   return {rf,rd,rn};
 }
 window.__orbitFunctionalReady = true;
+
+
+/* Activate the functional layer after all declarations are initialized. */
+patchFunctionalNavigation();
+openPollComposer = openPollComposerFunctional;
+
+$("#attach")?.addEventListener("click", () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*,video/*,audio/*,.pdf,.zip,.txt,.doc,.docx";
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    if (file.size > 1500000) {
+      orbitToast("File too large", "Guest mode supports files up to 1.5 MB.", "error");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const upload = await api("/api/uploads", {
+          method: "POST",
+          body: JSON.stringify({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            data: String(reader.result)
+          })
+        });
+        if (socket && currentChannel) {
+          socket.emit("message:send", {
+            channelId: currentChannel.id,
+            content: "📎 " + file.name,
+            attachment: upload.file
+          });
+          orbitToast("File sent", file.name, "success");
+        }
+      } catch (err) {
+        orbitToast("Upload failed", err.message, "error");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+});
+
+$("#poll-btn")?.addEventListener("click", () => openPollComposerFunctional());
+
+/* Make threads use the persisted backend thread instead of local-only state. */
+openThreadFromElement = async function(el) {
+  const messageId = el?.dataset?.messageId;
+  if (!messageId) return;
+  try {
+    const d = await api("/api/messages/" + encodeURIComponent(messageId) + "/thread");
+    $("#thread-panel").classList.remove("hidden");
+    $("#thread-panel").dataset.messageId = messageId;
+    $("#thread-root").innerHTML =
+      '<div class="content-card"><strong>' +
+      escapeHtml(el.querySelector(".msg-head strong")?.textContent || "Message") +
+      '</strong><p>' +
+      escapeHtml(el.querySelector(".msg-body")?.textContent || "") +
+      '</p></div>';
+    $("#thread-meta").textContent = (d.thread.replies?.length || 0) + " replies";
+    $("#thread-messages").innerHTML = (d.thread.replies || []).map(r =>
+      '<div class="message"><div class="avatar">' + avatar(r.username) +
+      '</div><div><div class="msg-head"><strong>' + escapeHtml(r.username) +
+      '</strong><time>now</time></div><div class="msg-body">' + escapeHtml(r.content) +
+      '</div></div></div>'
+    ).join("");
+  } catch (err) {
+    orbitToast("Thread failed", err.message, "error");
+  }
+};
+
+$("#thread-composer")?.addEventListener("submit", async e => {
+  e.preventDefault();
+  const messageId = $("#thread-panel").dataset.messageId;
+  const content = $("#thread-input").value.trim();
+  if (!messageId || !content) return;
+  try {
+    const d = await api("/api/messages/" + encodeURIComponent(messageId) + "/thread", {
+      method: "POST",
+      body: JSON.stringify({ content })
+    });
+    const r = d.reply;
+    $("#thread-messages").insertAdjacentHTML(
+      "beforeend",
+      '<div class="message"><div class="avatar">' + avatar(r.username) +
+      '</div><div><div class="msg-head"><strong>' + escapeHtml(r.username) +
+      '</strong><time>now</time></div><div class="msg-body">' + escapeHtml(r.content) +
+      '</div></div></div>'
+    );
+    $("#thread-input").value = "";
+    $("#thread-meta").textContent = (d.thread.replies?.length || 0) + " replies";
+  } catch (err) {
+    orbitToast("Reply failed", err.message, "error");
+  }
+});

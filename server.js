@@ -718,7 +718,7 @@ io.on("connection", socket => {
     });
   });
 
-  socket.on("message:send", ({ channelId, content, replyToId }) => {
+  socket.on("message:send", ({ channelId, content, replyToId, attachment }) => {
     const channel = memory.channels.get(String(channelId));
     if (!channel || !member(channel.serverId, socket.user.id)) return;
     const text = String(content || "").trim().slice(0, 4000);
@@ -731,7 +731,8 @@ io.on("connection", socket => {
       reply_to_id: replyToId || null,
       created_at: now(),
       user_id: socket.user.id,
-      username: socket.user.username
+      username: socket.user.username,
+      attachment: attachment || null
     };
     const list = memory.messages.get(channel.id) || [];
     list.push(message);
