@@ -443,7 +443,6 @@ async function startCall(mode = "video") {
     startCallTelemetry();
     updateVoiceDock();
     updateCallMeta();
-    orbitCallSounds?.join?.();
   } catch (err) {
     leaveCall();
     showError(err.name === "NotAllowedError" ? "Permission denied. Allow your camera/microphone in the browser." : err.message);
@@ -1512,75 +1511,4 @@ applyAccentTheme(localStorage.getItem("orbit_theme")||"purple");
     console.error("Orbit boot failed",err);
     showError(err.message||"Unable to start Orbit");
   }
-})();
-
-/* Orbit call audio feedback */
-(function installOrbitCallSounds(){
-  let audioCtx=null;
-  let ringTimer=null;
-  let pulseTimer=null;
-  const callPanel=document.getElementById("call-panel");
-  const incoming=document.getElementById("incoming-call");
-
-  function getCtx(){
-    if(!audioCtx){
-      const AC=window.AudioContext||window.webkitAudioContext;
-      if(!AC)return null;
-      try{audioCtx=new AC()}catch{return null}
-    }
-    if(audioCtx.state==="suspended") audioCtx.resume().catch(()=>{});
-    return audioCtx;
-  }
-  function tone(freq,duration=.12,when=0,gainValue=.035,type="sine"){
-    const ctx=getCtx(); if(!ctx)return;
-    const now=ctx.currentTime+when;
-    const osc=ctx.createOscillator(), gain=ctx.createGain();
-    osc.type=type; osc.frequency.setValueAtTime(freq,now);
-    gain.gain.setValueAtTime(0.0001,now);
-    gain.gain.exponentialRampToValueAtTime(gainValue,now+0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001,now+duration);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(now); osc.stop(now+duration+0.02);
-  }
-  function join(){
-    clearTimeout(pulseTimer);
-    tone(523,.11,0,.03); tone(659,.11,.085,.028); tone(784,.17,.17,.032);
-    pulseTimer=setTimeout(()=>callPanel?.classList.remove("call-entering"),650);
-    callPanel?.classList.add("call-entering");
-  }
-  function ringOnce(){
-    tone(660,.16,0,.028,"sine"); tone(880,.16,.21,.026,"sine");
-  }
-  function startRingtone(){
-    stopRingtone();
-    ringOnce();
-    ringTimer=setInterval(ringOnce,1600);
-  }
-  function stopRingtone(){
-    if(ringTimer){clearInterval(ringTimer);ringTimer=null}
-  }
-  window.orbitCallSounds={join,startRingtone,stopRingtone,getCtx};
-
-  if(callPanel){
-    const obs=new MutationObserver(()=>{
-      const open=!callPanel.classList.contains("hidden");
-      if(open)join();
-    });
-    obs.observe(callPanel,{attributes:true,attributeFilter:["class"]});
-  }
-  if(incoming){
-    const obs=new MutationObserver(()=>{
-      const open=!incoming.classList.contains("hidden");
-      if(open)startRingtone(); else stopRingtone();
-    });
-    obs.observe(incoming,{attributes:true,attributeFilter:["class"]});
-  }
-  document.addEventListener("click",e=>{
-    if(e.target.closest("#incoming-accept,#incoming-decline,#hangup-btn,#close-call,#dock-leave")){
-      stopRingtone();
-    }
-    if(e.target.closest("#incoming-accept,#voice-call-btn,#video-call-btn,#dock-screen,#dock-mic,#share-btn")){
-      getCtx();
-    }
-  });
 })();
