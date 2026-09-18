@@ -15,6 +15,8 @@ const io = new Server(server, {
 
 const PORT = Number(process.env.PORT || 8080);
 const JWT_SECRET = process.env.JWT_SECRET || "orbit-guest-dev-secret";
+const ADMIN_CONTROL_KEY = String(process.env.ADMIN_CONTROL_KEY || "").trim();
+const adminKeyAttempts = new Map();
 
 const memory = {
   users: new Map(),
@@ -309,6 +311,35 @@ function member(serverId, userId) {
 }
 function canManage(role) {
   return ["owner", "admin", "moderator"].includes(role);
+}
+function adminTokenFor(user, serverId, role) {
+  return jwt.sign(
+    { admin: true, userId: String(user.id), serverId: String(serverId), role },
+    JWT_SECRET,
+    { expiresIn: "8h" }
+  );
+}
+function hasAdminToken(req, serverId) {
+  const raw = String(req.headers["x-admin-token"] || "").trim();
+  if (!raw) return false;
+  try {
+    const payload = jwt.verify(raw, JWT_SECRET);
+    return Boolean(payload?.admin) &&
+      String(payload.userId) === String(req.user?.id) &&
+      String(payload.serverId) === String(serverId);
+  } catch {
+    return false;
+  }
+}
+function requireAdminToken(req, res, serverId) {
+  if (!hasAdminToken(req, serverId)) {
+    res.status(401).json({ error: "Admin key session expired or missing" });
+    return false;
+  }
+  return true;
+}
+function adminAttemptKey(req) {
+  return String(req.ip || req.headers["x-forwarded-for"] || "unknown") + ":" + String(req.user?.id || "unknown");
 }
 function publicUser(user) {
   return {
@@ -659,7 +690,17 @@ app.patch("/api/messages/:id", auth, (req, res) => {
 app.delete("/api/messages/:id", auth, (req, res) => {
   const found = findMessage(req.params.id);
   if (!found) return res.status(404).json({ error: "Message not found" });
-  if (!canEditMessage(found, req.user)) return res.status(403).json({ error: "Permission denied" });
+  const channel = memory.channels.get(found.channelId);
+  if (!channel) return res.status(404).json({ error: "Channel not found" });
+  const access = member(channel.serverId, req.user.id);
+  const ownMessage = String(found.message.user_id) === String(req.user.id);
+  if (!ownMessage) {
+    if (!canManage(access?.role) || !hasAdminToken(req, channel.serverId)) {
+      return res.status(403).json({ error: "Admin key required to moderate another user's message" });
+    }
+  } else if (!canEditMessage(found, req.user)) {
+    return res.status(403).json({ error: "Permission denied" });
+  }
   const [deleted] = found.list.splice(found.index, 1);
   io.to("channel:" + found.channelId).emit("message:delete", { messageId: deleted.id });
   audit(req.user.id, "MESSAGE_DELETE", deleted.id, { serverId: channel.serverId });
@@ -694,6 +735,41 @@ app.post("/api/polls/:id/vote", auth, (req, res) => {
   poll.options.forEach(o=>o.votes.delete(String(req.user.id)));
   for(const idValue of optionIds){const option=poll.options.find(o=>String(o.id)===idValue);if(option)option.votes.add(String(req.user.id));}
   res.json({poll:{...poll,options:poll.options.map(o=>({id:o.id,text:o.text,votes:o.votes.size}))}});
+});
+
+app.post("/api/servers/:id/admin/auth", auth, (req, res) => {
+  const serverId = String(req.params.id);
+  const access = member(serverId, req.user.id);
+  if (!access || !canManage(access.role)) return res.status(403).json({ error: "Permission denied" });
+  if (!ADMIN_CONTROL_KEY) return res.status(503).json({ error: "Admin control key is not configured" });
+
+  const attemptKey = adminAttemptKey(req);
+  const nowMs = Date.now();
+  const history = adminKeyAttempts.get(attemptKey) || { count: 0, resetAt: nowMs + 10 * 60 * 1000 };
+  if (nowMs > history.resetAt) {
+    history.count = 0;
+    history.resetAt = nowMs + 10 * 60 * 1000;
+  }
+  if (history.count >= 8) return res.status(429).json({ error: "Too many key attempts. Try again later." });
+
+  const provided = String(req.body?.key || "").trim();
+  if (provided !== ADMIN_CONTROL_KEY) {
+    history.count += 1;
+    adminKeyAttempts.set(attemptKey, history);
+    audit(req.user.id, "ADMIN_KEY_FAILED", serverId, { serverId });
+    return res.status(401).json({ error: "Invalid admin key" });
+  }
+
+  adminKeyAttempts.delete(attemptKey);
+  const adminToken = adminTokenFor(req.user, serverId, access.role);
+  audit(req.user.id, "ADMIN_KEY_AUTH", serverId, { serverId, role: access.role });
+  res.json({
+    ok: true,
+    token: adminToken,
+    expiresIn: 8 * 60 * 60,
+    role: access.role,
+    server: { id: access.server.id, name: access.server.name }
+  });
 });
 
 app.get("/api/servers/:id/audit", auth, (req, res) => {
