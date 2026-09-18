@@ -95,9 +95,9 @@ async function enterAsGuest() {
   guestName = data.user.username;
   me = data.user;
   saveGuest();
-  $("#me-name").textContent = me.username;
+  $("#me-name").textContent = me.display_name || me.username;
   $("#me-avatar").textContent = avatar(me.username);
-  $("#me-status").textContent = "online · guest";
+  $("#me-status").textContent = "online · @" + (me.username || "guest");
   connectRealtime();
   await loadServers();
 }
@@ -1290,9 +1290,28 @@ function renderSettingsPage(section="appearance"){
     $("#accent-color").onchange=e=>{document.documentElement.style.setProperty("--accent",e.target.value);document.documentElement.style.setProperty("--accent2",e.target.value);orbitUI.profile.accent=e.target.value;localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));document.querySelectorAll("[data-accent-theme]").forEach(b=>b.classList.remove("active"));};
     document.querySelectorAll("[data-accent-theme]").forEach(b=>b.onclick=()=>applyAccentTheme(b.dataset.accentTheme));
   }else if(section==="profile"){
-    card.innerHTML='<h3>Profile</h3><p>Guest mode keeps signup optional while allowing local customization.</p><input id="profile-name" value="'+escapeHtml(orbitUI.profile.displayName||me?.username||"Guest")+'" placeholder="Display name"><textarea id="profile-bio" placeholder="Bio">'+escapeHtml(orbitUI.profile.bio||"")+'</textarea><select id="profile-status"><option>Online</option><option>Idle</option><option>Do Not Disturb</option><option>Invisible</option></select><button class="primary" id="save-profile">Save profile</button>';
+    card.innerHTML='<h3>Profile</h3><p>Your username is your unique Orbit identity. Friends can find you with it.</p>'+
+      '<div class="username-field"><span>@</span><input id="profile-username" value="'+escapeHtml(me?.username||"")+'" maxlength="20" placeholder="username"><button id="check-username" type="button">Check</button></div>'+
+      '<div id="username-status" class="field-note">Use 4–20 letters, numbers, dots, underscores or dashes.</div>'+
+      '<input id="profile-name" value="'+escapeHtml(orbitUI.profile.displayName||me?.display_name||me?.username||"Guest")+'" placeholder="Display name">'+
+      '<textarea id="profile-bio" placeholder="Bio">'+escapeHtml(orbitUI.profile.bio||"")+'</textarea><select id="profile-status"><option>Online</option><option>Idle</option><option>Do Not Disturb</option><option>Invisible</option></select><button class="primary" id="save-profile">Save profile</button>';
     $("#profile-status").value=orbitUI.profile.status||"Online";
-    $("#save-profile").onclick=()=>{orbitUI.profile.displayName=$("#profile-name").value.trim()||me?.username||"Guest";orbitUI.profile.bio=$("#profile-bio").value.trim();orbitUI.profile.status=$("#profile-status").value;localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));$("#me-name").textContent=orbitUI.profile.displayName;$("#me-status").textContent=orbitUI.profile.status.toLowerCase()+" · guest";orbitToast("Profile updated","Saved locally.","success")};
+    $("#check-username").onclick=async()=>{try{const name=$("#profile-username").value.trim();if(!name)return;const r=await api("/api/search?q="+encodeURIComponent(name));const exact=(r.users||[]).find(u=>u.username.toLowerCase()===name.replace(/^@/,"").toLowerCase()&&String(u.id)!==String(me?.id));$("#username-status").textContent=exact?"Username is taken.":"Username looks available.";$("#username-status").classList.toggle("is-good",!exact);$("#username-status").classList.toggle("is-bad",!!exact)}catch{}};
+    $("#save-profile").onclick=async()=>{try{
+      const username=$("#profile-username").value.trim().replace(/^@+/,"").toLowerCase();
+      const displayName=$("#profile-name").value.trim()||username||"Guest";
+      const bio=$("#profile-bio").value.trim();
+      const status=$("#profile-status").value;
+      const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({username,displayName})});
+      me=updated.user; guestName=me.username; saveGuest();
+      orbitUI.profile.displayName=displayName;orbitUI.profile.bio=bio;orbitUI.profile.status=status;
+      localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));
+      $("#me-name").textContent=displayName;$("#me-status").textContent=status.toLowerCase()+" · @"+me.username;
+      orbitToast("Profile updated","Your unique @"+me.username+" is saved.","success");
+    }catch(err){
+      if(err.message==="Username is already taken"&&err.suggested) $("#username-status").textContent="Taken. Try @"+err.suggested;
+      else orbitToast("Profile update failed",err.message,"error");
+    }}
   }else if(section==="voice"){
     card.innerHTML='<h3>Voice & Video</h3><p>Configure live media capture.</p>'+setting("Noise suppression","Reduce keyboard and room noise.",true,"voice-ns")+setting("Echo cancellation","Reduce feedback.",true,"voice-ec")+setting("Auto gain","Normalize microphone volume.",true,"voice-gain")+'<div class="setting-row"><div><strong>Preferred quality</strong><span>Used for video capture.</span></div><select id="preferred-quality"><option>480p</option><option selected>720p</option><option>1080p</option><option>1080p60</option><option>1440p</option></select></div>';
     $("#preferred-quality").onchange=e=>callState.settings.quality=e.target.value;
@@ -1342,20 +1361,46 @@ function runCommand(item){
   if(a==="voice")return goChat(),startCall("voice");
   if(a==="video")return goChat(),startCall("video");
   if(a==="share")return goChat(),callState.active?toggleScreenShare():startCall("video");
-  if(a==="search")return runGlobalSearch("");
+  if(a==="search")return openSearchModal("");
 }
 async function runGlobalSearch(q){
   const query=String(q||"").trim();
-  if(!query){openCommandPalette();return}
+  if(!query){openSearchModal("");return}
   try{
     const d=await api("/api/search?q="+encodeURIComponent(query));
-    openModal("Search results",'<div class="list-card">'+
-      (d.users||[]).map(u=>'<div class="list-row"><div class="avatar">'+avatar(u.username)+'</div><div><strong>'+escapeHtml(u.username)+'</strong><span>User · '+u.status+'</span></div></div>').join("")+
-      (d.servers||[]).map(s=>'<div class="list-row"><div class="chip">◈</div><div><strong>'+escapeHtml(s.name)+'</strong><span>Server · '+s.memberCount+' members</span></div></div>').join("")+
-      (d.channels||[]).map(c=>'<div class="list-row"><div class="chip">'+(c.type==="voice"?"◉":"#")+'</div><div><strong>'+escapeHtml(c.name)+'</strong><span>Channel · '+c.type+'</span></div></div>').join("")+
-      (d.messages||[]).map(m=>'<div class="list-row"><div class="chip">◫</div><div><strong>'+escapeHtml(m.username)+'</strong><span>'+escapeHtml(m.content)+'</span></div></div>').join("")+
-      '</div>');
+    const users=d.users||[], serversFound=d.servers||[], channelsFound=d.channels||[], messages=d.messages||[];
+    const empty='<div class="search-empty"><div class="search-empty-icon">⌕</div><strong>No results</strong><span>Try another word, username or channel.</span></div>';
+    const section=(title,count,body,cls="")=>'<section class="search-section '+cls+'"><div class="search-section-head"><strong>'+title+'</strong><span>'+count+'</span></div>'+(body||empty)+'</section>';
+    const bodyUsers=users.map(u=>'<button class="search-result user-result" data-search-user="'+escapeHtml(u.username)+'"><div class="avatar">'+avatar(u.username)+'</div><div><strong>'+escapeHtml(u.display_name||u.username)+'</strong><span>'+escapeHtml(u.handle||("@"+u.username))+' · '+escapeHtml(u.status)+'</span></div><b>Profile</b></button>').join("");
+    const bodyServers=serversFound.map(x=>'<div class="search-result"><div class="search-type-icon">◈</div><div><strong>'+escapeHtml(x.name)+'</strong><span>'+x.memberCount+' members</span></div></div>').join("");
+    const bodyChannels=channelsFound.map(x=>'<div class="search-result"><div class="search-type-icon">'+(x.type==="voice"?"◉":"#")+'</div><div><strong>'+escapeHtml(x.name)+'</strong><span>'+escapeHtml(x.type)+' channel</span></div></div>').join("");
+    const bodyMessages=messages.map(m=>'<div class="search-result"><div class="search-type-icon">◫</div><div><strong>'+escapeHtml(m.username)+'</strong><span>'+escapeHtml(m.content)+'</span></div></div>').join("");
+    openModal("Search Orbit",'<div class="search-shell"><label class="search-input-box"><span>⌕</span><input id="global-search-input" value="'+escapeHtml(query)+'" placeholder="Search users, servers, channels, messages..."><kbd>Enter</kbd></label><div id="global-search-results">'+
+      section("People",users.length,bodyUsers,"people")+
+      section("Servers",serversFound.length,bodyServers)+
+      section("Channels",channelsFound.length,bodyChannels)+
+      section("Messages",messages.length,bodyMessages)+
+      '</div></div>');
+    const input=$("#global-search-input");
+    input?.focus();
+    input?.setSelectionRange(query.length,query.length);
+    input?.addEventListener("keydown",e=>{if(e.key==="Enter")runGlobalSearch(input.value)});
+    document.querySelectorAll("[data-search-user]").forEach(btn=>btn.onclick=()=>openDMForUsername(btn.dataset.searchUser));
   }catch(e){orbitToast("Search failed",e.message,"error")}
+}
+function openSearchModal(seed=""){
+  openModal("Search Orbit",
+    '<div class="search-shell"><label class="search-input-box"><span>⌕</span><input id="global-search-input" value="'+escapeHtml(seed)+'" placeholder="Search users, servers, channels, messages..."><kbd>Enter</kbd></label><div id="global-search-results"><div class="search-empty"><div class="search-empty-icon">⌕</div><strong>Search everything in Orbit</strong><span>People, servers, channels and messages.</span></div></div></div>');
+  const input=$("#global-search-input");
+  input?.focus();
+  input?.addEventListener("keydown",e=>{if(e.key==="Enter")runGlobalSearch(input.value)});
+}
+async function openDMForUsername(username){
+  try{
+    await api("/api/dms",{method:"POST",body:JSON.stringify({username})});
+    closeModal(); setView("dms"); renderDMPage();
+    orbitToast("Conversation ready","Direct message with @"+username+".","success");
+  }catch(e){orbitToast("Could not open DM",e.message,"error")}
 }
 
 function wireEnhancedControls() {
@@ -1408,7 +1453,9 @@ function bindPremiumNavigation(){
   });
   $("#settings-nav")?.addEventListener("click",()=>setView("settings"));
   $("#profile-card-btn")?.addEventListener("click",()=>{setView("settings");renderSettingsPage("profile")});
-  $("#sidebar-search")?.addEventListener("click",openCommandPalette);
+  $("#sidebar-search")?.addEventListener("click",()=>openSearchModal($("#quick-search")?.value||""));
+$("#quick-search")?.addEventListener("focus",()=>$("#sidebar-search")?.classList.add("focused"));
+$("#quick-search")?.addEventListener("blur",()=>$("#sidebar-search")?.classList.remove("focused"));
   $("#quick-search")?.addEventListener("keydown",e=>{if(e.key==="Enter")runGlobalSearch(e.target.value)});
   $("#join-server")?.addEventListener("click",()=>openModal("Join server",'<input id="invite-code" placeholder="Invite code or full invite URL"><button class="primary" id="join-by-invite">Join community</button>'));
   $("#command-input")?.addEventListener("input",e=>renderCommandResults(e.target.value));
