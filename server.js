@@ -239,6 +239,11 @@ function audit(userId, action, target, details = {}) {
   memory.audit = memory.audit.slice(0, 500);
 }
 function socketRoom(kind, idValue) { return kind + ":" + String(idValue); }
+function emitToUser(userId, event, payload) {
+  for (const connected of io.sockets.sockets.values()) {
+    if (String(connected.user?.id) === String(userId)) connected.emit(event, payload);
+  }
+}
 
 app.get("/api/friends", auth, (req, res) => {
   const userId = String(req.user.id);
@@ -272,6 +277,7 @@ app.post("/api/friends/request", auth, (req, res) => {
   const request = { id: id("friendreq"), from: req.user.id, to: target.id, status: "pending", created_at: now() };
   memory.friendRequests.set(request.id, request);
   notify(target.id, { type: "friend_request", title: "Friend request", body: req.user.username + " sent you a friend request", actorId: req.user.id, requestId: request.id });
+  emitToUser(target.id, "friend:request", { request: { ...request, fromUser: publicUser(req.user) } });
   audit(req.user.id, "FRIEND_REQUEST_CREATE", target.id);
   res.status(201).json({ request });
 });
@@ -283,6 +289,8 @@ app.post("/api/friends/request/:id/accept", auth, (req, res) => {
   memory.friendships.add(pairKey(request.from, request.to));
   const from = memory.users.get(request.from);
   notify(request.from, { type: "friend_request", title: "Friend request accepted", body: req.user.username + " accepted your request", actorId: req.user.id });
+  emitToUser(request.from, "friend:accepted", { friend: publicUser(req.user), requestId: request.id });
+  emitToUser(request.to, "friend:accepted", { friend: from ? publicUser(from) : null, requestId: request.id });
   audit(req.user.id, "FRIEND_REQUEST_ACCEPT", request.from);
   res.json({ ok: true, friend: from ? publicUser(from) : null });
 });
@@ -765,6 +773,7 @@ io.on("connection", socket => {
 
     socket.to("channel:" + channel.id).emit("call:incoming", {
       ...callParticipant(socket),
+      serverId: channel.serverId,
       channelId: channel.id,
       mode,
       roomId: room,
