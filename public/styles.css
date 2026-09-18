@@ -1598,3 +1598,18 @@ body[data-avatar-motion="off"] .orbit-avatar-preview{animation:none!important}
 @media(prefers-reduced-motion:reduce){
   .avatar[data-avatar-decoration]::before,.avatar[data-avatar-decoration]::after{animation:none!important}
 }
+
+.dm-message-avatar{overflow:visible}
+.dm-message-avatar .avatar{width:28px;height:28px;border-radius:9px;font-size:8px;margin:0}
+.orbit-avatar-preview[data-avatar-decoration]{position:relative;isolation:isolate}
+.orbit-avatar-preview[data-avatar-decoration]::before,
+.orbit-avatar-preview[data-avatar-decoration]::after{content:"";position:absolute;pointer-events:none;z-index:3}
+.orbit-avatar-preview[data-avatar-decoration="halo"]::before{inset:-5px;border:2px solid #a78bfa;border-radius:inherit;box-shadow:0 0 10px #8b5cf6}
+.orbit-avatar-preview[data-avatar-decoration="crown"]::before{content:"♛";top:-14px;left:50%;transform:translateX(-50%);color:#ffd86a;font-size:18px;text-shadow:0 0 8px #ffb300}
+.orbit-avatar-preview[data-avatar-decoration="orbit"]::before{inset:-4px;border:2px solid #60e9ff;border-radius:50%;transform:rotate(18deg)}
+.orbit-avatar-preview[data-avatar-decoration="spark"]::before{content:"✦";top:-5px;right:-5px;color:#fff;font-size:14px}
+.orbit-avatar-preview[data-avatar-decoration="fire"]::before{inset:-5px;border:2px solid #ff7a45;border-radius:inherit;box-shadow:0 0 18px #ff5a2288}
+.orbit-avatar-preview[data-avatar-decoration="ice"]::before{inset:-5px;border:2px solid #7dd3fc;border-radius:inherit;box-shadow:0 0 18px #22d3ee77}
+.orbit-avatar-preview[data-avatar-decoration="cyber"]::before{inset:-4px;border:2px solid #00e5ff;border-radius:12px;box-shadow:0 0 12px #00e5ff55}
+.orbit-avatar-preview[data-avatar-decoration="royal"]::before{inset:-5px;border:2px solid #f5d77a;border-radius:inherit;box-shadow:0 0 0 3px #8b5cf633}
+.orbit-avatar-preview.has-decoration-image::before{inset:-13%;background:var(--avatar-decoration-image) center/contain no-repeat;filter:drop-shadow(0 3px 6px #0008)}
