@@ -70,46 +70,15 @@ function api(url, opts = {}) {
 }
 function fmt(ts) { return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
 function avatar(name) { return (name || "G").slice(0, 1).toUpperCase(); }
-const avatarDecorationNames={none:"None",halo:"Halo",crown:"Crown",orbit:"Orbit Ring",spark:"Sparkles",fire:"Fire",ice:"Ice",cyber:"Cyber Frame",royal:"Royal",dragon:"Dragon Flame"};
-const knownAvatarUsers=new Map();
-function rememberAvatarUser(user){
-  if(user?.id) knownAvatarUsers.set(String(user.id),user);
-  return user;
-}
-function rememberAvatarUsers(list){(Array.isArray(list)?list:[]).forEach(rememberAvatarUser);}
 function avatarImageUrl(user){
   return user?.avatar_url ? String(user.avatar_url) : "";
-}
-function avatarDecorationUrl(user){
-  return user?.avatar_decoration_url ? String(user.avatar_decoration_url) : "";
-}
-function avatarDecoration(user){
-  return String(user?.avatar_decoration||"none").toLowerCase();
-}
-function applyAvatarNode(node,user,nameOverride=""){
-  if(!node)return;
-  const u=typeof user==="object"&&user?rememberAvatarUser(user):(knownAvatarUsers.get(String(user))||{username:user||nameOverride});
-  const name=u?.username||nameOverride||"G";
-  const image=avatarImageUrl(u);
-  node.innerHTML=image?'<img src="'+escapeHtml(image)+'" alt="">':'<span>'+escapeHtml(avatar(name))+'</span>';
-  node.classList.toggle("has-image",Boolean(image));
-  const decoration=avatarDecoration(u);
-  const decorationImage=avatarDecorationUrl(u);
-  node.dataset.avatarDecoration=decoration;
-  node.dataset.avatarDecorationUrl=decorationImage;
-  node.classList.toggle("has-decoration-image",Boolean(decorationImage));
-  if(decorationImage) node.style.setProperty("--avatar-decoration-image",'url("'+decorationImage.replace(/"/g,"%22")+'")');
-  else node.style.removeProperty("--avatar-decoration-image");
-}
-function avatarHtml(userOrName,className=""){
-  const u=typeof userOrName==="object"&&userOrName?rememberAvatarUser(userOrName):(knownAvatarUsers.get(String(userOrName))||{username:userOrName||"G"});
-  const image=avatarImageUrl(u),deco=avatarDecoration(u),decoUrl=avatarDecorationUrl(u);
-  return '<div class="avatar '+escapeHtml(className)+' '+(image?"has-image ":"")+(decoUrl?"has-decoration-image":"")+'" data-avatar-decoration="'+escapeHtml(deco)+'" data-avatar-decoration-url="'+escapeHtml(decoUrl)+'"'+(decoUrl?' style="--avatar-decoration-image:url('+escapeHtml(decoUrl)+')"':'')+'>'+(image?'<img src="'+escapeHtml(image)+'" alt="">':'<span>'+escapeHtml(avatar(u.username||"G"))+'</span>')+'</div>';
 }
 function renderOwnAvatar(){
   const node=$("#me-avatar");
   if(!node) return;
-  applyAvatarNode(node,me);
+  const url=avatarImageUrl(me);
+  node.innerHTML=url?'<img src="'+escapeHtml(url)+'" alt="">':escapeHtml(avatar(me?.username||"G"));
+  node.classList.toggle("has-image",Boolean(url));
 }
 
 function escapeHtml(x) {
@@ -208,7 +177,7 @@ function connectRealtime() {
     const incomingChannel = channels.find(c => String(c.id) === String(call.channelId));
     $("#incoming-title").textContent = (call.username || "Guest") + " is calling";
     $("#incoming-subtitle").textContent = (call.mode === "voice" ? "Voice call" : "Video call") + " · " + (incomingChannel ? "#" + incomingChannel.name : "Orbit room");
-    applyAvatarNode($("#incoming-avatar"),knownAvatarUsers.get(String(call.userId))||{id:call.userId,username:call.username||"G"});
+    $("#incoming-avatar").textContent = avatar(call.username || "G");
     box.classList.remove("hidden");
   });
 
@@ -391,9 +360,8 @@ async function selectChannel(channel) {
 function appendMessage(m) {
   const el = document.createElement("article");
   el.className = "message";
-  rememberAvatarUser(knownAvatarUsers.get(String(m.user_id))||{id:m.user_id,username:m.username});
   el.innerHTML =
-    avatarHtml(knownAvatarUsers.get(String(m.user_id))||{id:m.user_id,username:m.username}) +
+    '<div class="avatar">' + escapeHtml(avatar(m.username)) + '</div>' +
     '<div><div class="msg-head"><strong>' + escapeHtml(m.username) + '</strong><time>' +
     fmt(m.created_at) + '</time></div><div class="msg-body">' + escapeHtml(m.content) + "</div></div>";
   $("#messages").appendChild(el);
@@ -452,10 +420,9 @@ document.addEventListener("click", async e => {
 async function loadMembers() {
   if (!currentServer) return;
   const data = await api("/api/servers/" + currentServer.id + "/members");
-  rememberAvatarUsers(data.members);
   $("#member-list").innerHTML = data.members.map(m =>
     '<div class="member" data-user="' + m.id + '">' +
-    avatarHtml(m) +
+    '<div class="avatar">' + escapeHtml(avatar(m.username)) + '</div>' +
     '<div class="member-info"><strong>' + escapeHtml(m.username) + '</strong>' +
     '<span class="presence">' + m.status + " · " + m.role + "</span></div></div>"
   ).join("");
@@ -1261,7 +1228,6 @@ function pulseUserCard(user){
 function renderPulse(){
   const panel=$("#pulse-panel");
   if(!panel)return;
-  rememberAvatarUsers(pulseState.users);
   const liveUsers=pulseState.users.filter(u=>(u.status||"online")!=="offline");
   const calls=pulseState.calls||[];
   const activities=pulseState.activity||[];
@@ -1307,7 +1273,7 @@ async function openPulseProfile(userId){
   const activity=user.activity||user.status||"Online";
   openModal("Profile",
     '<div class="pulse-profile-modal">'+
-      '<div class="pulse-profile-top"><div class="pulse-big-avatar">'+avatarHtml(user,'pulse-profile-avatar')+'</div><div><strong>'+escapeHtml(user.display_name||user.username)+'</strong><span>'+escapeHtml(user.handle||("@"+user.username))+'</span><em>'+escapeHtml(activity)+'</em></div></div>'+
+      '<div class="pulse-profile-top"><div class="pulse-big-avatar">'+escapeHtml(avatar(user.username))+'</div><div><strong>'+escapeHtml(user.display_name||user.username)+'</strong><span>'+escapeHtml(user.handle||("@"+user.username))+'</span><em>'+escapeHtml(activity)+'</em></div></div>'+
       '<div class="pulse-profile-actions"><button class="primary" id="pulse-message-user">Message</button><button id="pulse-add-user">Add friend</button></div>'+
     '</div>');
   $("#pulse-message-user").onclick=async()=>{
@@ -1389,7 +1355,7 @@ function saveDMDraft(){
 function dmMessageMarkup(m){
   const own=String(m.user_id)===String(me?.id);
   return '<article class="dm-message '+(own?"own":"")+'" data-dm-message-id="'+escapeHtml(m.id)+'">'+
-    (!own?'<div class="dm-message-avatar">'+avatarHtml(knownAvatarUsers.get(String(m.user_id))||{id:m.user_id,username:m.username})+'</div>':"")+
+    (!own?'<div class="dm-message-avatar">'+escapeHtml(avatar(m.username))+'</div>':"")+
     '<div class="dm-message-stack"><div class="dm-message-bubble">'+escapeHtml(m.content)+'</div>'+
     '<div class="dm-message-meta">'+escapeHtml(formatDMTime(m.created_at))+(own&&m.seen_at?' · Seen':"")+(m.edited_at?' · edited':"")+'</div></div></article>';
 }
@@ -1407,13 +1373,12 @@ function renderDMList(){
     const u=dm.otherUser||{};
     return !q||String(u.username||"").toLowerCase().includes(q)||String(u.display_name||"").toLowerCase().includes(q);
   });
-  rememberAvatarUsers(rows.map(dm=>dm.otherUser).filter(Boolean));
   root.innerHTML=rows.length?rows.map(dm=>{
     const u=dm.otherUser||{},active=String(dm.id)===String(dmState.activeId),unread=Number(dm.unreadCount||0);
     const preview=dm.lastMessage?.content||"No messages yet";
     const online=dmUserStatus(u)==="Online";
     return '<button class="dm-conversation '+(active?"active":"")+'" data-dm-open="'+escapeHtml(dm.id)+'">'+
-      '<div class="dm-list-avatar">'+avatarHtml(u)+'<i class="'+(online?"online":"offline")+'"></i></div>'+
+      '<div class="dm-list-avatar"><div class="avatar">'+escapeHtml(avatar(u.username))+'</div><i class="'+(online?"online":"offline")+'"></i></div>'+
       '<div class="dm-list-copy"><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>@'+escapeHtml(u.username||"guest")+'</span><p>'+escapeHtml(preview)+'</p></div>'+
       '<div class="dm-list-meta">'+(dm.lastMessage?.created_at?'<time>'+escapeHtml(formatDMTime(dm.lastMessage.created_at))+'</time>':"")+(unread?'<b>'+unread+'</b>':"")+'</div></button>';
   }).join(""):'<div class="dm-list-empty"><div class="dm-empty-icon">◌</div><strong>No conversations</strong><span>Start a private chat with a friend.</span></div>';
@@ -1509,18 +1474,15 @@ async function renderFriendsPage(){
   $("#refresh-friends-page").onclick=renderFriendsPage;
   try{
     const d=await api("/api/friends");
-    rememberAvatarUsers(d.friends);
-    rememberAvatarUsers(d.incoming.map(x=>x.fromUser).filter(Boolean));
-    rememberAvatarUsers(d.outgoing.map(x=>x.toUser).filter(Boolean));
     $("#page-body").innerHTML=
       '<div class="section-block"><div class="section-heading"><h3>Friends</h3><span>'+d.friends.length+'</span></div><div class="list-card">'+
-      (d.friends.length?d.friends.map(u=>'<div class="list-row">'+avatarHtml(u)+'<div><strong>'+escapeHtml(u.username)+'</strong><span>'+escapeHtml(u.status)+'</span></div><button data-dm-friend="'+escapeHtml(u.username)+'">Message</button></div>').join(""):'<div class="content-card"><h4>No friends yet</h4><p>Send a request to another guest.</p></div>')+
+      (d.friends.length?d.friends.map(u=>'<div class="list-row"><div class="avatar">'+avatar(u.username)+'</div><div><strong>'+escapeHtml(u.username)+'</strong><span>'+escapeHtml(u.status)+'</span></div><button data-dm-friend="'+escapeHtml(u.username)+'">Message</button></div>').join(""):'<div class="content-card"><h4>No friends yet</h4><p>Send a request to another guest.</p></div>')+
       '</div></div>'+
       '<div class="section-block"><div class="section-heading"><h3>Requests</h3><span>'+d.incoming.length+' incoming</span></div><div class="list-card">'+
-      d.incoming.map(r=>'<div class="list-row">'+avatarHtml(r.fromUser||{username:r.fromUser?.username||"Guest"})+'<div><strong>'+escapeHtml(r.fromUser?.username||"Guest")+'</strong><span>Friend request · incoming</span></div><div class="row-actions"><button data-accept="'+r.id+'">Accept</button><button data-reject="'+r.id+'">Decline</button></div></div>').join("")+
+      d.incoming.map(r=>'<div class="list-row"><div class="avatar">'+avatar(r.fromUser?.username)+'</div><div><strong>'+escapeHtml(r.fromUser?.username||"Guest")+'</strong><span>Friend request · incoming</span></div><div class="row-actions"><button data-accept="'+r.id+'">Accept</button><button data-reject="'+r.id+'">Decline</button></div></div>').join("")+
       '</div></div>'+
       '<div class="section-block"><div class="section-heading"><h3>Outgoing</h3><span>'+d.outgoing.length+' pending</span></div><div class="list-card">'+
-      (d.outgoing.length?d.outgoing.map(r=>'<div class="list-row">'+avatarHtml(r.toUser||{username:r.toUser?.username||"Guest"})+'<div><strong>'+escapeHtml(r.toUser?.username||"Guest")+'</strong><span>Friend request · waiting</span></div><span class="chip">Pending</span></div>').join(""):'<div class="content-card"><p>No pending outgoing requests.</p></div>')+
+      (d.outgoing.length?d.outgoing.map(r=>'<div class="list-row"><div class="avatar">'+avatar(r.toUser?.username)+'</div><div><strong>'+escapeHtml(r.toUser?.username||"Guest")+'</strong><span>Friend request · waiting</span></div><span class="chip">Pending</span></div>').join(""):'<div class="content-card"><p>No pending outgoing requests.</p></div>')+
       '</div></div>';
     document.querySelectorAll("[data-accept]").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request/"+encodeURIComponent(b.dataset.accept)+"/accept",{method:"POST",body:"{}"});orbitToast("Friend added","Request accepted.","success");renderFriendsPage()}catch(err){orbitToast("Request failed",err.message,"error")}});
     document.querySelectorAll("[data-reject]").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request/"+encodeURIComponent(b.dataset.reject)+"/reject",{method:"POST",body:"{}"});orbitToast("Request declined","The request was rejected.","");renderFriendsPage()}catch(err){orbitToast("Request failed",err.message,"error")}});
@@ -1682,22 +1644,6 @@ function renderSettingsPage(section="appearance"){
       '<button type="button" class="avatar-style-card" data-avatar-style="neon"><span class="style-preview style-neon"></span><strong>Neon Pulse</strong><small>Cyber glow</small></button>'+
       '<button type="button" class="avatar-style-card" data-avatar-style="energy"><span class="style-preview style-energy"></span><strong>Energy Ring</strong><small>Power wave</small></button>'+
       '<button type="button" class="avatar-style-card" data-avatar-style="off"><span class="style-preview style-off"></span><strong>Static</strong><small>No animation</small></button>'+
-      '</div>'+
-      '<div class="avatar-decoration-panel">'+
-      '<div class="avatar-section-title"><strong>Avatar decoration</strong><span>Wear a frame, crown, aura or your own transparent artwork.</span></div>'+
-      '<div class="decoration-grid">'+
-      '<button type="button" class="decoration-card" data-decoration="none"><span class="decoration-preview decoration-none"></span><strong>None</strong></button>'+
-      '<button type="button" class="decoration-card" data-decoration="halo"><span class="decoration-preview decoration-halo"></span><strong>Halo</strong></button>'+
-      '<button type="button" class="decoration-card" data-decoration="crown"><span class="decoration-preview decoration-crown">♛</span><strong>Crown</strong></button>'+
-      '<button type="button" class="decoration-card" data-decoration="orbit"><span class="decoration-preview decoration-orbit"></span><strong>Orbit Ring</strong></button>'+
-      '<button type="button" class="decoration-card" data-decoration="spark"><span class="decoration-preview decoration-spark">✦</span><strong>Sparkles</strong></button>'+
-      '<button type="button" class="decoration-card" data-decoration="fire"><span class="decoration-preview decoration-fire"></span><strong>Fire</strong></button>'+
-      '<button type="button" class="decoration-card" data-decoration="ice"><span class="decoration-preview decoration-ice"></span><strong>Ice</strong></button>'+
-      '<button type="button" class="decoration-card" data-decoration="cyber"><span class="decoration-preview decoration-cyber"></span><strong>Cyber</strong></button>'+
-      '<button type="button" class="decoration-card" data-decoration="royal"><span class="decoration-preview decoration-royal">◆</span><strong>Royal</strong></button>'+
-      '<button type="button" class="decoration-card decoration-card-dragon" data-decoration="dragon"><span class="decoration-preview decoration-dragon"></span><strong>Dragon</strong><small>Animated flame frame</small></button>'+
-      '</div>'+
-      '<div class="decoration-upload-row"><div class="orbit-avatar-preview decoration-live-preview" id="avatar-decoration-preview"><span>'+escapeHtml(avatar(me?.username||"G"))+'</span></div><div><strong>Custom decoration</strong><span>Upload a transparent PNG/WebP/GIF up to 1 MB.</span></div><button type="button" id="decoration-upload-btn">Upload decoration</button><button type="button" id="decoration-remove-btn">Remove</button></div>'+
       '</div></div>'+
       '<input id="profile-name" value="'+escapeHtml(orbitUI.profile.displayName||me?.display_name||me?.username||"Guest")+'" placeholder="Display name">'+
       '<textarea id="profile-bio" placeholder="Bio">'+escapeHtml(orbitUI.profile.bio||"")+'</textarea>'+
@@ -1749,56 +1695,7 @@ function renderSettingsPage(section="appearance"){
         applyAvatarMotion();
         document.querySelectorAll("[data-avatar-style]").forEach(x=>x.classList.toggle("active",x===b));
       };
-    });    const selectedDecoration=String(me?.avatar_decoration||orbitUI.profile.avatarDecoration||"none");
-    document.querySelectorAll("[data-decoration]").forEach(b=>{
-      b.classList.toggle("active",b.dataset.decoration===selectedDecoration && !me?.avatar_decoration_url);
-      b.onclick=async()=>{
-        try{
-          const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({avatarDecoration:b.dataset.decoration,avatarDecorationUrl:""})});
-          me=updated.user; saveGuest(); renderOwnAvatar();
-          orbitUI.profile.avatarDecoration=b.dataset.decoration; delete orbitUI.profile.avatarDecorationUrl;
-          localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));
-          document.querySelectorAll("[data-decoration]").forEach(x=>x.classList.toggle("active",x===b));
-          const p=$("#avatar-decoration-preview"); if(p) applyAvatarNode(p,me);
-          orbitToast("Decoration applied",avatarDecorationNames[b.dataset.decoration]||b.dataset.decoration,"success");
-        }catch(err){orbitToast("Decoration failed",err.message,"error")}
-      };
     });
-    const decorationPreview=$("#avatar-decoration-preview");
-    if(decorationPreview) applyAvatarNode(decorationPreview,me);
-    $("#decoration-upload-btn").onclick=()=>{
-      const input=document.createElement("input"); input.type="file"; input.accept="image/png,image/webp,image/gif";
-      input.onchange=async()=>{
-        const file=input.files?.[0]; if(!file)return;
-        if(file.size>1_000_000){orbitToast("Decoration","Decoration must be 1 MB or smaller.","error");return;}
-        const fr=new FileReader();
-        fr.onload=async()=>{
-          try{
-            const up=await api("/api/uploads",{method:"POST",body:JSON.stringify({name:file.name,type:file.type,size:file.size,data:String(fr.result),purpose:"avatar-decoration"})});
-            const url="/api/avatar/"+encodeURIComponent(up.file.id);
-            const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({avatarDecoration:"none",avatarDecorationUrl:url})});
-            me=updated.user; saveGuest(); renderOwnAvatar();
-            orbitUI.profile.avatarDecoration="none"; orbitUI.profile.avatarDecorationUrl=url;
-            localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));
-            document.querySelectorAll("[data-decoration]").forEach(x=>x.classList.remove("active"));
-            if(decorationPreview) applyAvatarNode(decorationPreview,me);
-            orbitToast("Custom decoration uploaded","Your artwork is now your avatar decoration.","success");
-          }catch(err){orbitToast("Decoration upload failed",err.message,"error")}
-        }; fr.readAsDataURL(file);
-      }; input.click();
-    };
-    $("#decoration-remove-btn").onclick=async()=>{
-      try{
-        const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({avatarDecoration:"none",avatarDecorationUrl:""})});
-        me=updated.user; saveGuest(); renderOwnAvatar();
-        delete orbitUI.profile.avatarDecorationUrl; orbitUI.profile.avatarDecoration="none";
-        localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));
-        document.querySelectorAll("[data-decoration]").forEach(x=>x.classList.toggle("active",x.dataset.decoration==="none"));
-        if(decorationPreview) applyAvatarNode(decorationPreview,me);
-        orbitToast("Decoration removed","Your avatar frame is back to normal.","success");
-      }catch(err){orbitToast("Decoration remove failed",err.message,"error")}
-    };
-
     $("#check-username").onclick=async()=>{try{const name=$("#profile-username").value.trim();if(!name)return;const r=await api("/api/search?q="+encodeURIComponent(name));const exact=(r.users||[]).find(u=>u.username.toLowerCase()===name.replace(/^@/,"").toLowerCase()&&String(u.id)!==String(me?.id));$("#username-status").textContent=exact?"Username is taken.":"Username looks available.";$("#username-status").classList.toggle("is-good",!exact);$("#username-status").classList.toggle("is-bad",!!exact)}catch{}};
     $("#save-profile").onclick=async()=>{try{
       const username=$("#profile-username").value.trim().replace(/^@+/,"").toLowerCase();
@@ -1874,8 +1771,7 @@ async function runGlobalSearch(q){
     const users=d.users||[], serversFound=d.servers||[], channelsFound=d.channels||[], messages=d.messages||[];
     const empty='<div class="search-empty"><div class="search-empty-icon">⌕</div><strong>No results</strong><span>Try another word, username or channel.</span></div>';
     const section=(title,count,body,cls="")=>'<section class="search-section '+cls+'"><div class="search-section-head"><strong>'+title+'</strong><span>'+count+'</span></div>'+(body||empty)+'</section>';
-    rememberAvatarUsers(users);
-    const bodyUsers=users.map(u=>'<button class="search-result user-result" data-search-user="'+escapeHtml(u.username)+'">'+avatarHtml(u)+'<div><strong>'+escapeHtml(u.display_name||u.username)+'</strong><span>'+escapeHtml(u.handle||("@"+u.username))+' · '+escapeHtml(u.status)+'</span></div><b>Profile</b></button>').join("");
+    const bodyUsers=users.map(u=>'<button class="search-result user-result" data-search-user="'+escapeHtml(u.username)+'"><div class="avatar">'+avatar(u.username)+'</div><div><strong>'+escapeHtml(u.display_name||u.username)+'</strong><span>'+escapeHtml(u.handle||("@"+u.username))+' · '+escapeHtml(u.status)+'</span></div><b>Profile</b></button>').join("");
     const bodyServers=serversFound.map(x=>'<div class="search-result"><div class="search-type-icon">◈</div><div><strong>'+escapeHtml(x.name)+'</strong><span>'+x.memberCount+' members</span></div></div>').join("");
     const bodyChannels=channelsFound.map(x=>'<div class="search-result"><div class="search-type-icon">'+(x.type==="voice"?"◉":"#")+'</div><div><strong>'+escapeHtml(x.name)+'</strong><span>'+escapeHtml(x.type)+' channel</span></div></div>').join("");
     const bodyMessages=messages.map(m=>'<div class="search-result"><div class="search-type-icon">◫</div><div><strong>'+escapeHtml(m.username)+'</strong><span>'+escapeHtml(m.content)+'</span></div></div>').join("");
@@ -2081,13 +1977,12 @@ async function openThread(el){
     $("#thread-panel").classList.remove("hidden");$("#thread-panel").dataset.messageId=idValue;
     $("#thread-root").innerHTML='<div class="content-card"><strong>'+escapeHtml(el.querySelector(".msg-head strong")?.textContent||"Message")+'</strong><p>'+escapeHtml(el.querySelector(".msg-body")?.textContent||"")+'</p></div>';
     $("#thread-meta").textContent=(d.thread.replies?.length||0)+" replies";
-    rememberAvatarUsers(d.thread.replies||[]);
-    $("#thread-messages").innerHTML=(d.thread.replies||[]).map(r=>'<div class="message">'+avatarHtml(knownAvatarUsers.get(String(r.user_id))||{id:r.user_id,username:r.username})+'<div><div class="msg-head"><strong>'+escapeHtml(r.username)+'</strong><time>now</time></div><div class="msg-body">'+escapeHtml(r.content)+'</div></div></div>').join("");
+    $("#thread-messages").innerHTML=(d.thread.replies||[]).map(r=>'<div class="message"><div class="avatar">'+avatar(r.username)+'</div><div><div class="msg-head"><strong>'+escapeHtml(r.username)+'</strong><time>now</time></div><div class="msg-body">'+escapeHtml(r.content)+'</div></div></div>').join("");
   }catch(e){orbitToast("Thread failed",e.message,"error")}
 }
 $("#thread-composer")?.addEventListener("submit",async e=>{
   e.preventDefault();const idValue=$("#thread-panel").dataset.messageId,content=$("#thread-input").value.trim();if(!idValue||!content)return;
-  try{const d=await api("/api/messages/"+encodeURIComponent(idValue)+"/thread",{method:"POST",body:JSON.stringify({content})});const r=d.reply;$("#thread-messages").insertAdjacentHTML("beforeend",'<div class="message">'+avatarHtml(knownAvatarUsers.get(String(r.user_id))||{id:r.user_id,username:r.username})+'<div><div class="msg-head"><strong>'+escapeHtml(r.username)+'</strong><time>now</time></div><div class="msg-body">'+escapeHtml(r.content)+'</div></div></div>');$("#thread-input").value="";$("#thread-meta").textContent=(d.thread.replies?.length||0)+" replies"}catch(err){orbitToast("Reply failed",err.message,"error")}
+  try{const d=await api("/api/messages/"+encodeURIComponent(idValue)+"/thread",{method:"POST",body:JSON.stringify({content})});const r=d.reply;$("#thread-messages").insertAdjacentHTML("beforeend",'<div class="message"><div class="avatar">'+avatar(r.username)+'</div><div><div class="msg-head"><strong>'+escapeHtml(r.username)+'</strong><time>now</time></div><div class="msg-body">'+escapeHtml(r.content)+'</div></div></div>');$("#thread-input").value="";$("#thread-meta").textContent=(d.thread.replies?.length||0)+" replies"}catch(err){orbitToast("Reply failed",err.message,"error")}
 });
 function openMessageMore(el){
   openModal("Message actions",'<div class="list-card"><button class="list-row" id="msg-edit-action"><span>✎ Edit message</span></button><button class="list-row" id="msg-delete-action"><span>× Delete message</span></button></div>');
