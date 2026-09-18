@@ -78,10 +78,25 @@ function avatarFrameName(user){
   const value=String(user?.avatar_decoration||"none").toLowerCase();
   return allowed.has(value)?value:"none";
 }
-function setAvatarFrame(node, frame){
+function avatarCustomFrameUrl(user){
+  return user?.avatar_decoration_url ? String(user.avatar_decoration_url) : "";
+}
+function setAvatarFrame(node, frame, customUrl=""){
   if(!node) return;
   [...node.classList].filter(c=>c.startsWith("orbit-frame-")).forEach(c=>node.classList.remove(c));
+  node.querySelectorAll(".orbit-custom-frame").forEach(x=>x.remove());
   const safe=avatarFrameName({avatar_decoration:frame});
+  if(customUrl){
+    node.classList.add("orbit-frame-custom");
+    const overlay=document.createElement("img");
+    overlay.className="orbit-custom-frame";
+    overlay.src=customUrl;
+    overlay.alt="";
+    overlay.setAttribute("aria-hidden","true");
+    node.appendChild(overlay);
+    node.dataset.avatarFrame="custom";
+    return;
+  }
   node.classList.add("orbit-frame-"+safe);
   node.dataset.avatarFrame=safe;
 }
@@ -91,7 +106,7 @@ function renderOwnAvatar(){
   const url=avatarImageUrl(me);
   node.innerHTML=url?'<img src="'+escapeHtml(url)+'" alt="">':escapeHtml(avatar(me?.username||"G"));
   node.classList.toggle("has-image",Boolean(url));
-  setAvatarFrame(node,avatarFrameName(me));
+  setAvatarFrame(node,avatarFrameName(me),avatarCustomFrameUrl(me));
 }
 
 function escapeHtml(x) {
@@ -1670,7 +1685,9 @@ function renderSettingsPage(section="appearance"){
       '<button type="button" class="avatar-frame-card" data-avatar-frame="ice"><span class="frame-preview frame-ice">A</span><strong>Ice</strong></button>'+
       '<button type="button" class="avatar-frame-card" data-avatar-frame="cyber"><span class="frame-preview frame-cyber">A</span><strong>Cyber</strong></button>'+
       '<button type="button" class="avatar-frame-card" data-avatar-frame="royal"><span class="frame-preview frame-royal">A</span><strong>Royal</strong></button>'+
-      '<button type="button" class="avatar-frame-card" data-avatar-frame="dragon"><span class="frame-preview frame-dragon">A</span><strong>Dragon</strong></button>'+      '</div></div></div>'+
+      '<button type="button" class="avatar-frame-card" data-avatar-frame="dragon"><span class="frame-preview frame-dragon">A</span><strong>Dragon</strong></button>'+
+      '<button type="button" class="avatar-frame-card avatar-frame-upload-card" id="avatar-frame-upload-btn"><span class="frame-preview frame-upload">＋</span><strong>Upload</strong></button>'+
+      '</div></div></div>'+
       '<input id="profile-name" value="'+escapeHtml(orbitUI.profile.displayName||me?.display_name||me?.username||"Guest")+'" placeholder="Display name">'+
       '<textarea id="profile-bio" placeholder="Bio">'+escapeHtml(orbitUI.profile.bio||"")+'</textarea>'+
       '<select id="profile-status"><option>Online</option><option>Idle</option><option>Do Not Disturb</option><option>Invisible</option></select>'+
@@ -1723,19 +1740,74 @@ function renderSettingsPage(section="appearance"){
       };
     });
     const currentAvatarFrame=avatarFrameName(me);
+    const currentCustomFrame=avatarCustomFrameUrl(me);
     document.querySelectorAll("[data-avatar-frame]").forEach(b=>{
-      b.classList.toggle("active",b.dataset.avatarFrame===currentAvatarFrame);
+      b.classList.toggle("active",!currentCustomFrame && b.dataset.avatarFrame===currentAvatarFrame);
       b.onclick=async()=>{
         try{
-          const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({avatarDecoration:b.dataset.avatarFrame})});
+          const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({
+            avatarDecoration:b.dataset.avatarFrame,
+            avatarDecorationUrl:""
+          })});
           me=updated.user; saveGuest(); renderOwnAvatar();
           document.querySelectorAll("[data-avatar-frame]").forEach(x=>x.classList.toggle("active",x===b));
           const previewFrame=$("#avatar-upload-preview");
-          if(previewFrame) setAvatarFrame(previewFrame,avatarFrameName(me));
+          if(previewFrame){
+            const purl=avatarImageUrl(me);
+            previewFrame.innerHTML=purl?'<img src="'+escapeHtml(purl)+'" alt="">':'<span>'+escapeHtml(avatar(me?.username||"G"))+'</span>';
+            setAvatarFrame(previewFrame,avatarFrameName(me),avatarCustomFrameUrl(me));
+          }
           orbitToast("Frame updated","Your new avatar frame is active.","success");
         }catch(err){orbitToast("Frame update failed",err.message,"error")}
       };
     });
+    const uploadFrame=$("#avatar-frame-upload-btn");
+    if(uploadFrame) uploadFrame.onclick=()=>{
+      const input=document.createElement("input");
+      input.type="file";
+      input.accept="image/png,image/jpeg,image/webp,image/gif,image/avif";
+      input.onchange=async()=>{
+        const file=input.files?.[0];
+        if(!file) return;
+        if(file.size>1_000_000){
+          orbitToast("Frame upload","Frame image must be 1 MB or smaller.","error");
+          return;
+        }
+        if(!file.type.startsWith("image/")){
+          orbitToast("Frame upload","Please choose an image file.","error");
+          return;
+        }
+        const fr=new FileReader();
+        fr.onload=async()=>{
+          try{
+            const up=await api("/api/uploads",{method:"POST",body:JSON.stringify({
+              name:file.name,
+              type:file.type,
+              size:file.size,
+              data:String(fr.result),
+              purpose:"avatar-decoration"
+            })});
+            const avatarDecorationUrl="/api/avatar/"+encodeURIComponent(up.file.id);
+            const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({
+              avatarDecoration:"none",
+              avatarDecorationUrl
+            })});
+            me=updated.user; saveGuest(); renderOwnAvatar();
+            document.querySelectorAll("[data-avatar-frame]").forEach(x=>x.classList.remove("active"));
+            uploadFrame.classList.add("active");
+            const previewFrame=$("#avatar-upload-preview");
+            if(previewFrame){
+              const purl=avatarImageUrl(me);
+              previewFrame.innerHTML=purl?'<img src="'+escapeHtml(purl)+'" alt="">':'<span>'+escapeHtml(avatar(me?.username||"G"))+'</span>';
+              setAvatarFrame(previewFrame,avatarFrameName(me),avatarCustomFrameUrl(me));
+            }
+            orbitToast("Custom frame uploaded","Your uploaded frame is now active.","success");
+          }catch(err){orbitToast("Frame upload failed",err.message,"error")}
+        };
+        fr.readAsDataURL(file);
+      };
+      input.click();
+    };
     $("#check-username").onclick=async()=>{try{const name=$("#profile-username").value.trim();if(!name)return;const r=await api("/api/search?q="+encodeURIComponent(name));const exact=(r.users||[]).find(u=>u.username.toLowerCase()===name.replace(/^@/,"").toLowerCase()&&String(u.id)!==String(me?.id));$("#username-status").textContent=exact?"Username is taken.":"Username looks available.";$("#username-status").classList.toggle("is-good",!exact);$("#username-status").classList.toggle("is-bad",!!exact)}catch{}};
     $("#save-profile").onclick=async()=>{try{
       const username=$("#profile-username").value.trim().replace(/^@+/,"").toLowerCase();
