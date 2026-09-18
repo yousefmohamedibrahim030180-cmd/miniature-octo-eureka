@@ -113,6 +113,16 @@ function connectRealtime() {
     document.querySelectorAll("[data-user='" + x.userId + "'] .presence").forEach(n => n.textContent = x.status);
   });
 
+  socket.on("call:incoming", call => {
+    if (callState.active) return;
+    pendingIncomingCall = call;
+    const box = $("#incoming-call");
+    $("#incoming-title").textContent = (call.username || "Guest") + " is calling";
+    $("#incoming-subtitle").textContent = (call.mode === "voice" ? "Voice call" : "Video call") + " in #" + (currentChannel?.name || "channel");
+    $("#incoming-avatar").textContent = avatar(call.username || "G");
+    box.classList.remove("hidden");
+  });
+
   socket.on("call:participants", participants => {
     participants.forEach(p => createPeer(p.socketId, true, p));
     updateCallMeta();
@@ -126,6 +136,10 @@ function connectRealtime() {
   socket.on("call:participant-left", ({ socketId }) => {
     removePeer(socketId);
     updateCallMeta();
+  });
+
+  socket.on("call:declined", ({ username }) => {
+    orbitToast("Call declined", (username || "Participant") + " declined the call.");
   });
 
   socket.on("call:media-state", ({ socketId, muted, cameraOff, screenShare }) => {
@@ -178,6 +192,13 @@ function connectRealtime() {
       }
       await item.pc.addIceCandidate(candidate);
     } catch (err) { console.error("ICE candidate", err); }
+  });
+
+  socket.on("call:decline", ({ channelId, callerSocketId }) => {
+    const channel = memory.channels.get(String(channelId));
+    if (!channel || !member(channel.serverId, socket.user.id)) return;
+    const caller = io.sockets.sockets.get(String(callerSocketId));
+    if (caller) caller.emit("call:declined", { userId: socket.user.id, username: socket.user.username });
   });
 
   socket.on("disconnect", () => {
@@ -354,6 +375,8 @@ async function loadMembers() {
 /* ============================
    WebRTC Call System
    ============================ */
+let pendingIncomingCall = null;
+
 let realtimeIceServers = [
   { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
   { urls: "stun:stun.cloudflare.com:3478" }
@@ -529,6 +552,8 @@ function addRemoteStream(socketId, stream, info = {}) {
   if (!tile) return;
   const video = tile.querySelector("video");
   video.srcObject = stream;
+  video.onloadedmetadata = () => video.play().catch(() => {});
+  video.play?.().catch(() => {});
   tile.classList.remove("connecting");
   tile.querySelector(".remote-placeholder")?.classList.add("hidden");
   bindSpeaker(video);
@@ -818,6 +843,24 @@ function updateCallDuration() {}
 
 $("#voice-call-btn").onclick = () => startCall("voice");
 $("#video-call-btn").onclick = () => startCall("video");
+
+function closeIncomingCall() {
+  pendingIncomingCall = null;
+  $("#incoming-call").classList.add("hidden");
+}
+$("#incoming-accept").onclick = async () => {
+  const pending = pendingIncomingCall;
+  closeIncomingCall();
+  if (!pending || !currentChannel || String(currentChannel.id) !== String(pending.channelId)) {
+    return showError("Open the calling channel and try again.");
+  }
+  await startCall(pending.mode || "video");
+};
+$("#incoming-decline").onclick = () => {
+  const pending = pendingIncomingCall;
+  closeIncomingCall();
+  if (pending && socket) socket.emit("call:decline", { channelId: pending.channelId, callerSocketId: pending.socketId });
+};
 $("#hangup-btn").onclick = leaveCall;
 $("#close-call").onclick = leaveCall;
 $("#minimize-call").onclick = () => {
