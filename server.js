@@ -349,6 +349,8 @@ function publicUser(user) {
     handle: "@" + user.username,
     display_name: user.displayName || user.username,
     avatar_url: user.avatarUrl || null,
+    avatar_decoration: user.avatarDecoration || "none",
+    avatar_decoration_url: user.avatarDecorationUrl || null,
     status: user.status || "online",
     guest: true
   };
