@@ -73,12 +73,25 @@ function avatar(name) { return (name || "G").slice(0, 1).toUpperCase(); }
 function avatarImageUrl(user){
   return user?.avatar_url ? String(user.avatar_url) : "";
 }
+function avatarFrameName(user){
+  const allowed=new Set(["none","halo","crown","orbit","spark","fire","ice","cyber","royal","dragon"]);
+  const value=String(user?.avatar_decoration||"none").toLowerCase();
+  return allowed.has(value)?value:"none";
+}
+function setAvatarFrame(node, frame){
+  if(!node) return;
+  [...node.classList].filter(c=>c.startsWith("orbit-frame-")).forEach(c=>node.classList.remove(c));
+  const safe=avatarFrameName({avatar_decoration:frame});
+  node.classList.add("orbit-frame-"+safe);
+  node.dataset.avatarFrame=safe;
+}
 function renderOwnAvatar(){
   const node=$("#me-avatar");
   if(!node) return;
   const url=avatarImageUrl(me);
   node.innerHTML=url?'<img src="'+escapeHtml(url)+'" alt="">':escapeHtml(avatar(me?.username||"G"));
   node.classList.toggle("has-image",Boolean(url));
+  setAvatarFrame(node,avatarFrameName(me));
 }
 
 function escapeHtml(x) {
@@ -1644,7 +1657,20 @@ function renderSettingsPage(section="appearance"){
       '<button type="button" class="avatar-style-card" data-avatar-style="neon"><span class="style-preview style-neon"></span><strong>Neon Pulse</strong><small>Cyber glow</small></button>'+
       '<button type="button" class="avatar-style-card" data-avatar-style="energy"><span class="style-preview style-energy"></span><strong>Energy Ring</strong><small>Power wave</small></button>'+
       '<button type="button" class="avatar-style-card" data-avatar-style="off"><span class="style-preview style-off"></span><strong>Static</strong><small>No animation</small></button>'+
-      '</div></div>'+
+      '</div>'+\
+      '<div class="avatar-frame-section">'+
+      '<div class="avatar-frame-head"><div><strong>Avatar frames</strong><span>Choose a live frame for your profile avatar.</span></div></div>'+
+      '<div class="avatar-frame-grid">'+
+      '<button type="button" class="avatar-frame-card" data-avatar-frame="none"><span class="frame-preview frame-none">A</span><strong>None</strong></button>'+
+      '<button type="button" class="avatar-frame-card" data-avatar-frame="halo"><span class="frame-preview frame-halo">A</span><strong>Halo</strong></button>'+
+      '<button type="button" class="avatar-frame-card" data-avatar-frame="crown"><span class="frame-preview frame-crown">A</span><strong>Crown</strong></button>'+
+      '<button type="button" class="avatar-frame-card" data-avatar-frame="orbit"><span class="frame-preview frame-orbit">A</span><strong>Orbit</strong></button>'+
+      '<button type="button" class="avatar-frame-card" data-avatar-frame="spark"><span class="frame-preview frame-spark">A</span><strong>Spark</strong></button>'+
+      '<button type="button" class="avatar-frame-card" data-avatar-frame="fire"><span class="frame-preview frame-fire">A</span><strong>Inferno</strong></button>'+
+      '<button type="button" class="avatar-frame-card" data-avatar-frame="ice"><span class="frame-preview frame-ice">A</span><strong>Ice</strong></button>'+
+      '<button type="button" class="avatar-frame-card" data-avatar-frame="cyber"><span class="frame-preview frame-cyber">A</span><strong>Cyber</strong></button>'+
+      '<button type="button" class="avatar-frame-card" data-avatar-frame="royal"><span class="frame-preview frame-royal">A</span><strong>Royal</strong></button>'+
+      '<button type="button" class="avatar-frame-card" data-avatar-frame="dragon"><span class="frame-preview frame-dragon">A</span><strong>Dragon</strong></button>'+      '</div></div></div>'+
       '<input id="profile-name" value="'+escapeHtml(orbitUI.profile.displayName||me?.display_name||me?.username||"Guest")+'" placeholder="Display name">'+
       '<textarea id="profile-bio" placeholder="Bio">'+escapeHtml(orbitUI.profile.bio||"")+'</textarea>'+
       '<select id="profile-status"><option>Online</option><option>Idle</option><option>Do Not Disturb</option><option>Invisible</option></select>'+
@@ -1694,6 +1720,20 @@ function renderSettingsPage(section="appearance"){
         orbitUI.profile.avatarMotion=b.dataset.avatarStyle;
         applyAvatarMotion();
         document.querySelectorAll("[data-avatar-style]").forEach(x=>x.classList.toggle("active",x===b));
+      };
+    });
+    const currentAvatarFrame=avatarFrameName(me);
+    document.querySelectorAll("[data-avatar-frame]").forEach(b=>{
+      b.classList.toggle("active",b.dataset.avatarFrame===currentAvatarFrame);
+      b.onclick=async()=>{
+        try{
+          const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({avatarDecoration:b.dataset.avatarFrame})});
+          me=updated.user; saveGuest(); renderOwnAvatar();
+          document.querySelectorAll("[data-avatar-frame]").forEach(x=>x.classList.toggle("active",x===b));
+          const previewFrame=$("#avatar-upload-preview");
+          if(previewFrame) setAvatarFrame(previewFrame,avatarFrameName(me));
+          orbitToast("Frame updated","Your new avatar frame is active.","success");
+        }catch(err){orbitToast("Frame update failed",err.message,"error")}
       };
     });
     $("#check-username").onclick=async()=>{try{const name=$("#profile-username").value.trim();if(!name)return;const r=await api("/api/search?q="+encodeURIComponent(name));const exact=(r.users||[]).find(u=>u.username.toLowerCase()===name.replace(/^@/,"").toLowerCase()&&String(u.id)!==String(me?.id));$("#username-status").textContent=exact?"Username is taken.":"Username looks available.";$("#username-status").classList.toggle("is-good",!exact);$("#username-status").classList.toggle("is-bad",!!exact)}catch{}};
