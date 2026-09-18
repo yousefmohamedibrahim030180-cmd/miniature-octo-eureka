@@ -1273,6 +1273,38 @@ function applyAccentTheme(nameOrHex){
   if(orbitUI?.profile){orbitUI.profile.accent=theme.accent;localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));}
   document.querySelectorAll("[data-accent-theme]").forEach(b=>b.classList.toggle("active",b.dataset.accentTheme===name));
 }
+const ORBIT_BACKGROUNDS = {
+  midnight: "linear-gradient(135deg,#05070c 0%,#0b1020 48%,#171026 100%)",
+  aurora: "radial-gradient(circle at 18% 18%,rgba(90,160,255,.24),transparent 28%),radial-gradient(circle at 82% 12%,rgba(161,88,255,.24),transparent 30%),linear-gradient(135deg,#05070c,#0d1420 52%,#171026)",
+  violet: "radial-gradient(circle at 70% 20%,rgba(144,89,255,.25),transparent 32%),linear-gradient(140deg,#07070d,#1c1235 55%,#0b0d16)",
+  ocean: "radial-gradient(circle at 18% 25%,rgba(40,164,255,.24),transparent 30%),linear-gradient(145deg,#041017,#071b2a 58%,#09131d)",
+  emerald: "radial-gradient(circle at 78% 28%,rgba(58,210,150,.20),transparent 30%),linear-gradient(145deg,#06100e,#0d2119 58%,#0a1011)",
+  sunset: "radial-gradient(circle at 76% 18%,rgba(255,120,80,.20),transparent 28%),linear-gradient(145deg,#12090b,#29131f 48%,#0d0c15)"
+};
+function applyOrbitBackground(kind, value){
+  const root=document.documentElement;
+  const type=kind==="image"?"image":"preset";
+  if(type==="image"){
+    const safe=String(value||"").replace(/'/g,"\\'");
+    root.style.setProperty("--orbit-wallpaper","url('"+safe+"')");
+    localStorage.setItem("orbit_background_type","image");
+    localStorage.setItem("orbit_background_value",String(value||""));
+  }else{
+    const bg=ORBIT_BACKGROUNDS[value]||ORBIT_BACKGROUNDS.midnight;
+    root.style.setProperty("--orbit-wallpaper",bg);
+    localStorage.setItem("orbit_background_type","preset");
+    localStorage.setItem("orbit_background_value",value||"midnight");
+  }
+  document.querySelectorAll("[data-bg-preset]").forEach(b=>b.classList.toggle("active",type==="preset"&&b.dataset.bgPreset===(value||"midnight")));
+}
+function applySavedOrbitBackground(){
+  const type=localStorage.getItem("orbit_background_type")||"preset";
+  const value=localStorage.getItem("orbit_background_value")||"midnight";
+  if(type==="image"&&value){applyOrbitBackground("image",value)}
+  else{applyOrbitBackground("preset",value)}
+  const opacity=localStorage.getItem("orbit_bg_overlay")||"72";
+  document.documentElement.style.setProperty("--orbit-overlay-opacity",(Number(opacity)||72)/100);
+}
 function renderSettingsPage(section="appearance"){
   const sections=[["appearance","Appearance"],["profile","Profile"],["privacy","Privacy"],["voice","Voice & Video"],["notifications","Notifications"],["accessibility","Accessibility"],["performance","Performance"],["security","Security"],["advanced","Advanced"]];
   $("#page-actions").innerHTML="";
@@ -1281,14 +1313,31 @@ function renderSettingsPage(section="appearance"){
   const card=$("#settings-card");
   if(section==="appearance"){
     const reduced=localStorage.getItem("orbit_motion")==="reduced",compact=localStorage.getItem("orbit_density")==="compact";
-    card.innerHTML='<h3>Appearance</h3><p>Customize Orbit without affecting your data.</p>'+
+    const bgType=localStorage.getItem("orbit_background_type")||"preset";
+    const bgValue=localStorage.getItem("orbit_background_value")||"midnight";
+    const bgOverlay=Math.round((Number(localStorage.getItem("orbit_bg_overlay")||"72")/100)*100);
+    card.innerHTML='<h3>Appearance</h3><p>Customize Orbit colors, spacing and the background of the whole app.</p>'+
       setting("Reduced motion","Reduce transitions and animation.",reduced,"appearance-motion")+
       setting("Compact density","Tighter chat and navigation spacing.",compact,"appearance-density")+
       '<div class="setting-row"><div><strong>Theme color</strong><span>Choose an Orbit accent.</span></div></div>'+
       '<div class="accent-palette">'+Object.entries(ORBIT_ACCENTS).map(([name,t])=>'<button type="button" class="accent-swatch '+((localStorage.getItem("orbit_theme")||"purple")===name?"active":"")+'" data-accent-theme="'+name+'" style="--swatch:'+t.accent+'"><span></span><strong>'+name+'</strong></button>').join("")+'</div>'+
-      '<div class="setting-row"><div><strong>Custom color</strong><span>For a custom accent.</span></div><input id="accent-color" type="color" value="'+escapeHtml(orbitUI.profile.accent)+'" style="width:42px;height:30px"></div>';
+      '<div class="setting-row"><div><strong>Custom accent</strong><span>Choose any color.</span></div><input id="accent-color" type="color" value="'+escapeHtml(orbitUI.profile.accent)+'" style="width:42px;height:30px"></div>'+
+      '<div class="appearance-divider"></div>'+
+      '<div class="setting-row"><div><strong>Background</strong><span>Pick a preset or use your own image.</span></div></div>'+
+      '<div class="background-palette">'+Object.entries(ORBIT_BACKGROUNDS).map(([name])=>'<button type="button" class="background-swatch '+(bgType==="preset"&&bgValue===name?"active":"")+'" data-bg-preset="'+name+'" style="--bg-sample:'+ORBIT_BACKGROUNDS[name]+'"><strong>'+name+'</strong></button>').join("")+'</div>'+
+      '<div class="background-tools"><label class="background-url"><span>Image URL</span><input id="bg-url" placeholder="https://example.com/background.jpg" value="'+(bgType==="image"?escapeHtml(bgValue):"")+'"></label><button type="button" id="bg-apply-url">Use image</button><button type="button" id="bg-upload">Upload</button><button type="button" id="bg-reset">Reset</button></div>'+
+      '<div class="setting-row bg-opacity-row"><div><strong>Background darkness</strong><span>More darkness keeps text easy to read.</span></div><input id="bg-overlay" type="range" min="35" max="90" value="'+bgOverlay+'"><b id="bg-overlay-value">'+bgOverlay+'%</b></div>';
     $("#accent-color").onchange=e=>{document.documentElement.style.setProperty("--accent",e.target.value);document.documentElement.style.setProperty("--accent2",e.target.value);orbitUI.profile.accent=e.target.value;localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));document.querySelectorAll("[data-accent-theme]").forEach(b=>b.classList.remove("active"));};
     document.querySelectorAll("[data-accent-theme]").forEach(b=>b.onclick=()=>applyAccentTheme(b.dataset.accentTheme));
+    document.querySelectorAll("[data-bg-preset]").forEach(b=>b.onclick=()=>applyOrbitBackground("preset",b.dataset.bgPreset));
+    $("#bg-apply-url").onclick=()=>{const url=$("#bg-url").value.trim();if(!/^https?:\/\//i.test(url))return orbitToast("Background","Enter a valid image URL.","error");applyOrbitBackground("image",url);orbitToast("Background updated","Custom image applied.","success");renderSettingsPage("appearance");};
+    $("#bg-reset").onclick=()=>{applyOrbitBackground("preset","midnight");localStorage.removeItem("orbit_background_type");localStorage.removeItem("orbit_background_value");renderSettingsPage("appearance");orbitToast("Background reset","Orbit's default background is back.","success");};
+    $("#bg-overlay").oninput=e=>{const v=Number(e.target.value);document.documentElement.style.setProperty("--orbit-overlay-opacity",v/100);localStorage.setItem("orbit_bg_overlay",String(v));$("#bg-overlay-value").textContent=v+"%";};
+    $("#bg-upload").onclick=()=>{
+      const input=document.createElement("input");input.type="file";input.accept="image/*";
+      input.onchange=()=>{const file=input.files?.[0];if(!file)return;if(file.size>1500000)return orbitToast("Background","Image must be 1.5 MB or smaller.","error");const fr=new FileReader();fr.onload=()=>{applyOrbitBackground("image",String(fr.result));renderSettingsPage("appearance");orbitToast("Background updated","Your image is now the Orbit background.","success")};fr.readAsDataURL(file)};
+      input.click();
+    };
   }else if(section==="profile"){
     card.innerHTML='<h3>Profile</h3><p>Your username is your unique Orbit identity. Friends can find you with it.</p>'+
       '<div class="username-field"><span>@</span><input id="profile-username" value="'+escapeHtml(me?.username||"")+'" maxlength="20" placeholder="username"><button id="check-username" type="button">Check</button></div>'+
@@ -1606,6 +1655,7 @@ wireEnhancedControls();
 updateVoiceDock();
 
 applyAccentTheme(localStorage.getItem("orbit_theme")||"purple");
+applySavedOrbitBackground();
 
 (async()=>{
   try{
