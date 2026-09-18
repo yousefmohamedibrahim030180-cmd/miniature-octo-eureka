@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orbit — Server Control Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/admin.css?v=orbit-admin-20260918-2">
+</head>
+<body>
+<div class="admin-app">
+  <header class="admin-topbar">
+    <div class="brand"><span class="brand-mark">◈</span><div><strong>ORBIT</strong><span>SERVER CONTROL CENTER</span></div></div>
+    <div class="server-ident"><span class="live-dot"></span><div><strong id="server-name">Loading…</strong><span id="server-meta">Checking permissions</span></div></div>
+    <div class="top-actions"><span id="refresh-state" class="status-pill">SYNC</span><button id="refresh-btn">↻ Refresh</button><button id="back-btn">Back to server</button></div>
+  </header>
+  <div id="denied" class="state-card hidden"><div class="state-icon">⛔</div><h2>Access denied</h2><p>You need server management permissions to open this control center.</p><button id="denied-back">Return</button></div>
+  <main id="dashboard" class="dashboard hidden">
+    <aside class="admin-nav">
+      <button class="admin-tab active" data-tab="overview">Overview<span>Live server pulse</span></button>
+      <button class="admin-tab" data-tab="members">Members<span>Roles, moderation, bans</span></button>
+      <button class="admin-tab" data-tab="channels">Channels<span>Structure and cleanup</span></button>
+      <button class="admin-tab" data-tab="messages">Messages<span>Server-wide moderation</span></button>
+      <button class="admin-tab" data-tab="calls">Calls<span>Live voice & video</span></button>
+      <button class="admin-tab" data-tab="audit">Audit log<span>Administrative actions</span></button>
+      <button class="admin-tab" data-tab="security">Security<span>Lock, slowmode, verification</span></button>
+    </aside>
+    <section class="admin-main">
+      <div id="tab-overview" class="tab-panel active"></div>
+      <div id="tab-members" class="tab-panel"></div>
+      <div id="tab-channels" class="tab-panel"></div>
+      <div id="tab-messages" class="tab-panel"></div>
+      <div id="tab-calls" class="tab-panel"></div>
+      <div id="tab-audit" class="tab-panel"></div>
+      <div id="tab-security" class="tab-panel"></div>
+    </section>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="/admin.js?v=orbit-admin-20260918-2"></script>
+</body>
+</html>
