@@ -728,3 +728,51 @@ body{
 /* Keep call floating overlays absolutely positioned above the stage */
 .call-panel > #call-popover,
 .call-panel > #call-toast{position:absolute}
+
+
+/* Functional polish: modals, friend picker, theme colors */
+.modal-body{display:block}
+.modal-body>input,
+.modal-body>select,
+.modal-body>textarea{
+  display:block;
+  width:100%;
+  margin:0 0 10px;
+  padding:0 12px;
+}
+.modal-body>textarea{padding:11px 12px;min-height:100px;resize:vertical}
+.modal-body>.primary{
+  display:block;
+  width:100%;
+  margin-top:8px;
+  text-align:center;
+}
+.modal-body .hint{margin:0 0 12px;color:#7e899b;font-size:10px;line-height:1.6}
+.compact-picker{margin:0 0 10px;max-height:210px;overflow:auto}
+.compact-picker .list-row{cursor:pointer;width:100%;text-align:left}
+.row-actions{display:flex;gap:6px;align-items:center}
+.row-actions button{min-height:34px;padding:0 10px;border-radius:9px;background:#151e29;border:1px solid #2b3745;color:#dce3eb}
+.row-actions button:hover{background:#202b38}
+.row-actions button[data-reject]{color:#ffacb6}
+.friend-pick{border:0}
+.friend-pick:hover{background:#17202b}
+.accent-palette{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 8px}
+.accent-swatch{
+  min-height:58px;
+  display:flex;align-items:center;gap:8px;padding:9px 10px;
+  border-radius:11px;background:#111821;border:1px solid #263240;color:#dfe5ed;
+}
+.accent-swatch:hover{background:#18212c;border-color:#384657}
+.accent-swatch.active{border-color:var(--swatch);box-shadow:0 0 0 2px color-mix(in srgb,var(--swatch) 18%,transparent),inset 0 0 0 1px var(--swatch)}
+.accent-swatch span{width:20px;height:20px;border-radius:7px;background:var(--swatch);box-shadow:0 5px 14px color-mix(in srgb,var(--swatch) 28%,transparent)}
+.accent-swatch strong{text-transform:capitalize;font-size:9px}
+.composer .send,
+.hero-card .hero-action,
+.modal-body .primary{
+  background:linear-gradient(135deg,var(--accent2),var(--accent));
+  border-color:color-mix(in srgb,var(--accent) 65%,#fff);
+}
+.rail-nav.active:before{background:var(--accent2)}
+.primary-soft{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 34%,#171c28),color-mix(in srgb,var(--accent) 22%,#111721));border-color:color-mix(in srgb,var(--accent) 60%,#303848)}
+.call-empty-icon{background:radial-gradient(circle at 35% 30%,var(--accent2),var(--accent) 70%)}
+@media(max-width:560px){.accent-palette{grid-template-columns:1fr 1fr}}
