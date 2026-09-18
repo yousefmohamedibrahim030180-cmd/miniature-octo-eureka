@@ -34,6 +34,10 @@ const memory = {
   threads: new Map(),
   polls: new Map(),
   uploads: new Map(),
+  events: new Map(),
+  projects: new Map(),
+  aiConversations: new Map(),
+  liveSessions: new Map(),
   audit: []
 };
 
@@ -70,6 +74,10 @@ function serializeMemory() {
     threads: [...memory.threads.entries()],
     polls: [...memory.polls.entries()],
     uploads: [...memory.uploads.entries()],
+    events: [...memory.events.entries()],
+    projects: [...memory.projects.entries()],
+    aiConversations: [...memory.aiConversations.entries()],
+    liveSessions: [...memory.liveSessions.entries()],
     audit: memory.audit
   };
 }
@@ -83,6 +91,7 @@ function hydrateMemory(data) {
   memory.friendships = new Set(data.friendships || []);
   restoreMap("dms"); restoreMap("dmMessages"); restoreMap("dmReads"); restoreMap("notifications");
   restoreMap("threads"); restoreMap("polls"); restoreMap("uploads");
+  restoreMap("events"); restoreMap("projects"); restoreMap("aiConversations"); restoreMap("liveSessions");
   memory.audit = Array.isArray(data.audit) ? data.audit : [];
 }
 
@@ -535,6 +544,94 @@ function emitToUser(userId, event, payload) {
     if (String(connected.user?.id) === String(userId)) connected.emit(event, payload);
   }
 }
+function emitToServer(serverId, event, payload) {
+  for (const connected of io.sockets.sockets.values()) {
+    if (member(serverId, connected.user?.id)) connected.emit(event, payload);
+  }
+}
+function canAccessServer(serverId, userId) {
+  return Boolean(member(serverId, userId));
+}
+function findEvent(eventId) {
+  return memory.events.get(String(eventId)) || null;
+}
+function findProject(projectId) {
+  return memory.projects.get(String(projectId)) || null;
+}
+function sanitizeEvent(event, viewerId) {
+  return {
+    id: event.id,
+    serverId: event.serverId,
+    title: event.title,
+    description: event.description,
+    type: event.type,
+    when: event.when,
+    creatorId: event.creatorId,
+    creator: publicUser(memory.users.get(event.creatorId) || {}),
+    createdAt: event.createdAt,
+    updatedAt: event.updatedAt,
+    rsvpCount: Array.isArray(event.rsvps) ? event.rsvps.length : 0,
+    going: Array.isArray(event.rsvps) && event.rsvps.includes(String(viewerId))
+  };
+}
+function sanitizeProject(project, viewerId) {
+  return {
+    id: project.id,
+    serverId: project.serverId,
+    name: project.name,
+    description: project.description,
+    creatorId: project.creatorId,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+    taskCount: Array.isArray(project.tasks) ? project.tasks.length : 0,
+    openTaskCount: Array.isArray(project.tasks) ? project.tasks.filter(t => t.status !== "done").length : 0,
+    tasks: (project.tasks || []).map(task => ({
+      ...task,
+      assignee: task.assigneeId ? publicUser(memory.users.get(task.assigneeId) || {}) : null
+    }))
+  };
+}
+function sanitizeLive(session) {
+  const room = callRoomFor(session.channelId);
+  const participants = [...(io.sockets.adapter.rooms.get(room) || [])]
+    .map(socketId => io.sockets.sockets.get(socketId))
+    .filter(Boolean)
+    .map(callParticipant);
+  return {
+    ...session,
+    host: publicUser(memory.users.get(session.hostUserId) || {}),
+    viewers: participants.length,
+    participants
+  };
+}
+function localOrbitReply(message) {
+  const q = String(message || "").trim().toLowerCase();
+  if (!q) return "Tell me what you want to do in Orbit.";
+  if (q.includes("open settings")) return "Opening Settings.";
+  if (q.includes("show files")) return "Opening Files.";
+  if (q.includes("open calls") || q === "calls") return "Opening Calls.";
+  if (q.includes("open events") || q === "events") return "Opening Events.";
+  if (q.includes("open projects") || q === "projects") return "Opening Projects.";
+  if (q.includes("open communities") || q.includes("communities")) return "Opening Communities.";
+  if (q.includes("open live") || q === "live") return "Opening Live.";
+  if (q.startsWith("search ")) return "Opening global search for: " + String(message).trim().slice(7);
+  return "I can navigate and organize Orbit locally. Add an AI provider on the server to enable full generative answers, summaries, translations and document analysis.";
+}
+async function requestOrbitModel(messages) {
+  const url=String(process.env.ORBIT_AI_API_URL || "").trim();
+  const key=String(process.env.ORBIT_AI_API_KEY || "").trim();
+  const model=String(process.env.ORBIT_AI_MODEL || "orbit").trim();
+  if(!url || !key) return null;
+  const response=await fetch(url,{
+    method:"POST",
+    headers:{"content-type":"application/json","authorization:"Bearer "+key},
+    body:JSON.stringify({model,messages})
+  });
+  if(!response.ok) throw new Error("AI provider returned HTTP "+response.status);
+  const data=await response.json();
+  const content=data?.choices?.[0]?.message?.content;
+  return typeof content==="string"&&content.trim()?content.trim():null;
+}
 
 app.get("/api/friends", auth, (req, res) => {
   const userId = String(req.user.id);
@@ -965,6 +1062,242 @@ app.get("/api/files", auth, (req,res)=>{
     .slice(0,limit)
     .map(file=>({id:file.id,name:file.name,type:file.type,size:file.size,created_at:file.created_at,download_url:"/api/uploads/"+encodeURIComponent(file.id)}));
   res.json({files});
+});
+
+
+/* ===== Orbit Social OS backend ===== */
+app.get("/api/servers/:id/events", auth, (req,res)=>{
+  if(!canAccessServer(req.params.id,req.user.id)) return res.status(403).json({error:"Not a member"});
+  const nowMs=Date.now();
+  const events=[...memory.events.values()]
+    .filter(e=>String(e.serverId)===String(req.params.id))
+    .filter(e=>!req.query.upcoming || new Date(e.when).getTime()>=nowMs-86400000)
+    .sort((a,b)=>new Date(a.when)-new Date(b.when))
+    .slice(0,100)
+    .map(e=>sanitizeEvent(e,req.user.id));
+  res.json({events});
+});
+app.post("/api/servers/:id/events", auth, (req,res)=>{
+  const access=member(req.params.id,req.user.id);
+  if(!access) return res.status(403).json({error:"Not a member"});
+  const title=String(req.body?.title||"").trim().slice(0,140);
+  const when=String(req.body?.when||"").trim();
+  if(!title||!when||Number.isNaN(new Date(when).getTime())) return res.status(400).json({error:"Valid title and date/time are required"});
+  const event={
+    id:id("event"),
+    serverId:access.server.id,
+    title,
+    description:String(req.body?.description||"").trim().slice(0,800),
+    type:["Community","Gaming","Class","Meeting","Watch party","Voice","Video"].includes(req.body?.type)?req.body.type:"Community",
+    when:new Date(when).toISOString(),
+    creatorId:req.user.id,
+    createdAt:now(),
+    updatedAt:now(),
+    rsvps:[String(req.user.id)]
+  };
+  memory.events.set(event.id,event);
+  audit(req.user.id,"EVENT_CREATE",event.id,{serverId:event.serverId,title:event.title});
+  const result=sanitizeEvent(event,req.user.id);
+  emitToServer(event.serverId,"event:created",{event:result});
+  res.status(201).json({event:result});
+});
+app.patch("/api/events/:id", auth, (req,res)=>{
+  const event=findEvent(req.params.id);
+  if(!event) return res.status(404).json({error:"Event not found"});
+  const access=member(event.serverId,req.user.id);
+  if(!access) return res.status(403).json({error:"Not a member"});
+  if(String(event.creatorId)!==String(req.user.id) && !canManage(access.role)) return res.status(403).json({error:"Permission denied"});
+  if(req.body?.title!==undefined) event.title=String(req.body.title||"").trim().slice(0,140);
+  if(req.body?.description!==undefined) event.description=String(req.body.description||"").trim().slice(0,800);
+  if(req.body?.type!==undefined && ["Community","Gaming","Class","Meeting","Watch party","Voice","Video"].includes(req.body.type)) event.type=req.body.type;
+  if(req.body?.when!==undefined){
+    const d=new Date(String(req.body.when));
+    if(Number.isNaN(d.getTime())) return res.status(400).json({error:"Invalid event date"});
+    event.when=d.toISOString();
+  }
+  event.updatedAt=now();
+  schedulePersist();
+  const result=sanitizeEvent(event,req.user.id);
+  emitToServer(event.serverId,"event:updated",{event:result});
+  res.json({event:result});
+});
+app.delete("/api/events/:id", auth, (req,res)=>{
+  const event=findEvent(req.params.id);
+  if(!event) return res.status(404).json({error:"Event not found"});
+  const access=member(event.serverId,req.user.id);
+  if(!access) return res.status(403).json({error:"Not a member"});
+  if(String(event.creatorId)!==String(req.user.id) && !canManage(access.role)) return res.status(403).json({error:"Permission denied"});
+  memory.events.delete(event.id);
+  emitToServer(event.serverId,"event:deleted",{eventId:event.id});
+  res.json({ok:true});
+});
+app.post("/api/events/:id/rsvp", auth, (req,res)=>{
+  const event=findEvent(req.params.id);
+  if(!event) return res.status(404).json({error:"Event not found"});
+  if(!canAccessServer(event.serverId,req.user.id)) return res.status(403).json({error:"Not a member"});
+  const going=req.body?.going!==false;
+  event.rsvps=Array.isArray(event.rsvps)?event.rsvps.map(String):[];
+  const uid=String(req.user.id);
+  event.rsvps=going?[...new Set([...event.rsvps,uid])]:event.rsvps.filter(x=>x!==uid);
+  event.updatedAt=now();
+  const result=sanitizeEvent(event,req.user.id);
+  emitToServer(event.serverId,"event:rsvp",{event:result});
+  res.json({event:result});
+});
+
+app.get("/api/servers/:id/projects", auth, (req,res)=>{
+  if(!canAccessServer(req.params.id,req.user.id)) return res.status(403).json({error:"Not a member"});
+  const projects=[...memory.projects.values()]
+    .filter(p=>String(p.serverId)===String(req.params.id))
+    .sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)))
+    .map(p=>sanitizeProject(p,req.user.id));
+  res.json({projects});
+});
+app.post("/api/servers/:id/projects", auth, (req,res)=>{
+  const access=member(req.params.id,req.user.id);
+  if(!access || !canManage(access.role)) return res.status(403).json({error:"Owner/admin/moderator permission required"});
+  const name=String(req.body?.name||"").trim().slice(0,120);
+  if(!name) return res.status(400).json({error:"Project name is required"});
+  const project={id:id("project"),serverId:access.server.id,name,description:String(req.body?.description||"").trim().slice(0,800),creatorId:req.user.id,createdAt:now(),updatedAt:now(),tasks:[]};
+  memory.projects.set(project.id,project);
+  audit(req.user.id,"PROJECT_CREATE",project.id,{serverId:project.serverId,name:project.name});
+  const result=sanitizeProject(project,req.user.id);
+  emitToServer(project.serverId,"project:created",{project:result});
+  res.status(201).json({project:result});
+});
+app.patch("/api/projects/:id", auth, (req,res)=>{
+  const project=findProject(req.params.id);
+  if(!project) return res.status(404).json({error:"Project not found"});
+  const access=member(project.serverId,req.user.id);
+  if(!access) return res.status(403).json({error:"Not a member"});
+  if(String(project.creatorId)!==String(req.user.id)&&!canManage(access.role)) return res.status(403).json({error:"Permission denied"});
+  if(req.body?.name!==undefined) project.name=String(req.body.name||"").trim().slice(0,120);
+  if(req.body?.description!==undefined) project.description=String(req.body.description||"").trim().slice(0,800);
+  project.updatedAt=now();
+  const result=sanitizeProject(project,req.user.id);
+  emitToServer(project.serverId,"project:updated",{project:result});
+  res.json({project:result});
+});
+app.delete("/api/projects/:id", auth, (req,res)=>{
+  const project=findProject(req.params.id);
+  if(!project) return res.status(404).json({error:"Project not found"});
+  const access=member(project.serverId,req.user.id);
+  if(!access) return res.status(403).json({error:"Not a member"});
+  if(String(project.creatorId)!==String(req.user.id)&&!canManage(access.role)) return res.status(403).json({error:"Permission denied"});
+  memory.projects.delete(project.id);
+  emitToServer(project.serverId,"project:deleted",{projectId:project.id});
+  res.json({ok:true});
+});
+app.post("/api/projects/:id/tasks", auth, (req,res)=>{
+  const project=findProject(req.params.id);
+  if(!project) return res.status(404).json({error:"Project not found"});
+  if(!canAccessServer(project.serverId,req.user.id)) return res.status(403).json({error:"Not a member"});
+  const title=String(req.body?.title||"").trim().slice(0,180);
+  if(!title) return res.status(400).json({error:"Task title is required"});
+  const task={id:id("task"),title,description:String(req.body?.description||"").trim().slice(0,1000),status:["backlog","in-progress","done"].includes(req.body?.status)?req.body.status:"backlog",label:String(req.body?.label||"Workspace").slice(0,40),assigneeId:req.body?.assigneeId?String(req.body.assigneeId):null,createdBy:req.user.id,createdAt:now(),updatedAt:now()};
+  project.tasks.push(task);
+  project.updatedAt=now();
+  const result=sanitizeProject(project,req.user.id);
+  emitToServer(project.serverId,"project:task-created",{project:result,task});
+  res.status(201).json({project:result,task});
+});
+app.patch("/api/projects/:projectId/tasks/:taskId", auth, (req,res)=>{
+  const project=findProject(req.params.projectId);
+  if(!project) return res.status(404).json({error:"Project not found"});
+  const access=member(project.serverId,req.user.id);
+  if(!access) return res.status(403).json({error:"Not a member"});
+  const task=project.tasks.find(t=>String(t.id)===String(req.params.taskId));
+  if(!task) return res.status(404).json({error:"Task not found"});
+  if(req.body?.title!==undefined) task.title=String(req.body.title||"").trim().slice(0,180);
+  if(req.body?.description!==undefined) task.description=String(req.body.description||"").trim().slice(0,1000);
+  if(req.body?.status!==undefined && ["backlog","in-progress","done"].includes(req.body.status)) task.status=req.body.status;
+  if(req.body?.label!==undefined) task.label=String(req.body.label||"Workspace").slice(0,40);
+  if(req.body?.assigneeId!==undefined) task.assigneeId=req.body.assigneeId?String(req.body.assigneeId):null;
+  task.updatedAt=now(); project.updatedAt=now();
+  const result=sanitizeProject(project,req.user.id);
+  emitToServer(project.serverId,"project:task-updated",{project:result,task});
+  res.json({project:result,task});
+});
+app.delete("/api/projects/:projectId/tasks/:taskId", auth, (req,res)=>{
+  const project=findProject(req.params.projectId);
+  if(!project) return res.status(404).json({error:"Project not found"});
+  const access=member(project.serverId,req.user.id);
+  if(!access) return res.status(403).json({error:"Not a member"});
+  project.tasks=project.tasks.filter(t=>String(t.id)!==String(req.params.taskId));
+  project.updatedAt=now();
+  emitToServer(project.serverId,"project:task-deleted",{projectId:project.id,taskId:req.params.taskId});
+  res.json({ok:true});
+});
+
+app.get("/api/ai/conversations", auth, (req,res)=>{
+  const conversations=[...memory.aiConversations.values()]
+    .filter(c=>String(c.userId)===String(req.user.id))
+    .sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)))
+    .slice(0,30)
+    .map(c=>({id:c.id,title:c.title,serverId:c.serverId||null,createdAt:c.createdAt,updatedAt:c.updatedAt,messages:c.messages||[]}));
+  res.json({conversations});
+});
+app.post("/api/ai/chat", auth, async (req,res)=>{
+  const message=String(req.body?.message||"").trim().slice(0,4000);
+  if(!message) return res.status(400).json({error:"Message is required"});
+  let conversation=req.body?.conversationId?memory.aiConversations.get(String(req.body.conversationId)):null;
+  const serverId=req.body?.serverId?String(req.body.serverId):null;
+  if(serverId && !canAccessServer(serverId,req.user.id)) return res.status(403).json({error:"Not a member"});
+  if(conversation && String(conversation.userId)!==String(req.user.id)) return res.status(403).json({error:"Conversation access denied"});
+  if(!conversation){
+    conversation={id:id("ai"),userId:req.user.id,serverId,title:message.slice(0,80),createdAt:now(),updatedAt:now(),messages:[]};
+    memory.aiConversations.set(conversation.id,conversation);
+  }
+  conversation.messages.push({role:"user",content:message,createdAt:now()});
+  conversation.messages=conversation.messages.slice(-40);
+  let reply=null;
+  let usedProvider=false;
+  try{
+    const modelMessages=[
+      {role:"system",content:"You are ORBIT, an optional assistant inside a community communication platform. Respect server/member permissions. Never claim access to private data that is not present in this conversation."},
+      ...conversation.messages.slice(-20).map(m=>({role:m.role,content:m.content}))
+    ];
+    reply=await requestOrbitModel(modelMessages);
+    usedProvider=Boolean(reply);
+  }catch(error){
+    console.error("[orbit] AI provider failed:",error.message);
+  }
+  if(!reply) reply=localOrbitReply(message);
+  conversation.messages.push({role:"assistant",content:reply,createdAt:now()});
+  conversation.updatedAt=now();
+  audit(req.user.id,"AI_CHAT",conversation.id,{serverId:conversation.serverId||null,provider:usedProvider});
+  res.json({conversation:{id:conversation.id,title:conversation.title,serverId:conversation.serverId||null,messages:conversation.messages},reply,provider:usedProvider?"external":"local"});
+});
+
+app.get("/api/servers/:id/live", auth, (req,res)=>{
+  if(!canAccessServer(req.params.id,req.user.id)) return res.status(403).json({error:"Not a member"});
+  const sessions=[...memory.liveSessions.values()]
+    .filter(s=>String(s.serverId)===String(req.params.id)&&s.status==="live")
+    .sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)))
+    .map(s=>sanitizeLive(s));
+  res.json({sessions});
+});
+app.post("/api/servers/:id/live", auth, (req,res)=>{
+  const access=member(req.params.id,req.user.id);
+  if(!access) return res.status(403).json({error:"Not a member"});
+  const channel=memory.channels.get(String(req.body?.channelId||""));
+  if(!channel || String(channel.serverId)!==String(access.server.id) || channel.type!=="voice") return res.status(400).json({error:"Choose a Voice Space for the live session"});
+  const existing=[...memory.liveSessions.values()].find(s=>String(s.channelId)===String(channel.id)&&s.status==="live");
+  if(existing) return res.status(409).json({error:"A live session is already active in this Space",session:sanitizeLive(existing)});
+  const session={id:id("live"),serverId:access.server.id,channelId:channel.id,hostUserId:req.user.id,title:String(req.body?.title||channel.name+" Live").trim().slice(0,140),category:String(req.body?.category||"Community").trim().slice(0,60),status:"live",createdAt:now(),endedAt:null};
+  memory.liveSessions.set(session.id,session);
+  emitToServer(session.serverId,"live:started",{session:sanitizeLive(session)});
+  res.status(201).json({session:sanitizeLive(session)});
+});
+app.post("/api/live/:id/end", auth, (req,res)=>{
+  const session=memory.liveSessions.get(String(req.params.id));
+  if(!session) return res.status(404).json({error:"Live session not found"});
+  const access=member(session.serverId,req.user.id);
+  if(!access) return res.status(403).json({error:"Not a member"});
+  if(String(session.hostUserId)!==String(req.user.id)&&!canManage(access.role)) return res.status(403).json({error:"Permission denied"});
+  session.status="ended";session.endedAt=now();
+  emitToServer(session.serverId,"live:ended",{sessionId:session.id});
+  res.json({ok:true});
 });
 
 app.post("/api/uploads", auth, (req,res)=>{
