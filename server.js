@@ -255,9 +255,36 @@ function serverSettings(server) {
   if (!Number.isFinite(Number(server.settings.slowmode))) server.settings.slowmode = 0;
   server.settings.slowmode = Math.max(0, Math.min(120, Number(server.settings.slowmode)));
   if (!["open","verified","high"].includes(server.settings.verification)) server.settings.verification = "open";
+  if (!server.settings.theme || typeof server.settings.theme !== "object") server.settings.theme = {};
+  const theme=server.settings.theme;
+  if (!/^#[0-9a-f]{6}$/i.test(String(theme.accent||""))) theme.accent="#7c5cff";
+  if (!/^#[0-9a-f]{6}$/i.test(String(theme.secondary||""))) theme.secondary="#14b8a6";
+  if (theme.icon_url && !/^\/api\/avatar\/[A-Za-z0-9_-]+$/.test(String(theme.icon_url))) theme.icon_url=null;
+  if (theme.banner_url && !/^\/api\/avatar\/[A-Za-z0-9_-]+$/.test(String(theme.banner_url))) theme.banner_url=null;
+  theme.description=String(theme.description||"").slice(0,500);
+  theme.welcomeMessage=String(theme.welcomeMessage||"").slice(0,700);
   if (!Array.isArray(server.bannedUserIds)) server.bannedUserIds = [];
   return server.settings;
 }
+function ensureUserStats(user) {
+  if (!user.stats || typeof user.stats !== "object") user.stats={};
+  user.stats.messages=Number(user.stats.messages||0);
+  user.stats.voiceJoins=Number(user.stats.voiceJoins||0);
+  user.stats.serversCreated=Number(user.stats.serversCreated||0);
+  user.stats.friends=Number(user.stats.friends||0);
+  return user.stats;
+}
+function userBadges(user) {
+  const stats=ensureUserStats(user);
+  const badges=[];
+  if (stats.serversCreated>0) badges.push({id:"creator",label:"Creator",icon:"✦"});
+  if (stats.messages>=10) badges.push({id:"chatter",label:"Chatter",icon:"◈"});
+  if (stats.voiceJoins>=1) badges.push({id:"voice",label:"Voice Explorer",icon:"◉"});
+  if (stats.friends>=1) badges.push({id:"social",label:"Social",icon:"◎"});
+  if (user.avatarUrl || user.avatarDecorationUrl || userBio(user)) badges.push({id:"profile",label:"Profile Crafted",icon:"◇"});
+  return badges.slice(0,6);
+}
+function userBio(user){ return String(user.bio||"").trim(); }
 function isServerBanned(server, userId) {
   serverSettings(server);
   return server.bannedUserIds.includes(String(userId));
@@ -343,6 +370,7 @@ function adminAttemptKey(req) {
   return String(req.ip || req.headers["x-forwarded-for"] || "unknown") + ":" + String(req.user?.id || "unknown");
 }
 function publicUser(user) {
+  ensureUserStats(user);
   return {
     id: user.id,
     username: user.username,
@@ -352,6 +380,9 @@ function publicUser(user) {
     avatar_decoration: user.avatarDecoration || "none",
     avatar_decoration_url: user.avatarDecorationUrl || null,
     status: user.status || "online",
+    activity: user.activity || "Online",
+    activity_type: user.activityType || "custom",
+    badges: userBadges(user),
     guest: true
   };
 }
@@ -364,10 +395,14 @@ function createGuest(username, existingId) {
     username: uniqueUsername(requested),
     displayName: cleanName(username, requested),
     status: "online",
+    activity: "Online",
+    activityType: "custom",
+    bio: "",
     createdAt: now(),
     avatarUrl: null,
     avatarDecoration: "none",
-    avatarDecorationUrl: null
+    avatarDecorationUrl: null,
+    stats: {messages:0,voiceJoins:0,serversCreated:0,friends:0}
   };
   if (!existing) {
     user.username = uniqueUsername(requested, user.id);
@@ -544,6 +579,8 @@ app.post("/api/friends/request/:id/accept", auth, (req, res) => {
   request.status = "accepted";
   memory.friendships.add(pairKey(request.from, request.to));
   const from = memory.users.get(request.from);
+  ensureUserStats(req.user).friends+=1;
+  if(from) ensureUserStats(from).friends+=1;
   notify(request.from, { type: "friend_request", title: "Friend request accepted", body: req.user.username + " accepted your request", actorId: req.user.id });
   emitToUser(request.from, "friend:accepted", { friend: publicUser(req.user), requestId: request.id });
   emitToUser(request.to, "friend:accepted", { friend: from ? publicUser(from) : null, requestId: request.id });
@@ -928,6 +965,8 @@ app.post("/api/uploads", auth, (req,res)=>{
   const purpose=String(req.body?.purpose||"file");
   if (purpose==="avatar" && (size>2_000_000 || !type.startsWith("image/"))) return res.status(400).json({error:"Avatar must be an image up to 2 MB"});
   if (purpose==="avatar-decoration" && (size>1_000_000 || !type.startsWith("image/"))) return res.status(400).json({error:"Avatar decoration must be an image up to 1 MB"});
+  if (purpose==="server-icon" && (size>2_000_000 || !type.startsWith("image/"))) return res.status(400).json({error:"Server icon must be an image up to 2 MB"});
+  if (purpose==="server-banner" && (size>2_000_000 || !type.startsWith("image/"))) return res.status(400).json({error:"Server banner must be an image up to 2 MB"});
   const item={id:id("file"),name:String(req.body?.name||"file").slice(0,180),type,size,data,created_at:now(),user_id:req.user.id};
   memory.uploads.set(item.id,item);
   res.status(201).json({file:{id:item.id,name:item.name,type:item.type,size:item.size}});
@@ -983,6 +1022,15 @@ app.patch("/api/me", auth, (req, res) => {
   if (req.body?.displayName !== undefined) {
     req.user.displayName = cleanName(req.body.displayName, req.user.username);
   }
+  if (req.body?.bio !== undefined) {
+    req.user.bio = String(req.body.bio||"").trim().slice(0,500);
+  }
+  if (req.body?.activity !== undefined || req.body?.activityType !== undefined) {
+    const activity=String(req.body?.activity||"").trim().slice(0,80);
+    const type=String(req.body?.activityType||"custom").trim().toLowerCase().slice(0,24);
+    req.user.activity = activity || "Online";
+    req.user.activityType = type || "custom";
+  }
   if (req.body?.avatarUrl !== undefined) {
     const avatarUrl = String(req.body.avatarUrl || "").trim();
     if (avatarUrl && !/^\/api\/avatar\/[A-Za-z0-9_-]+$/.test(avatarUrl)) {
@@ -1035,8 +1083,11 @@ app.post("/api/servers", auth, (req, res) => {
     ownerId: req.user.id,
     createdAt: now(),
     members: new Map([[req.user.id, "owner"]]),
-    channels: [channelId, voiceId]
+    channels: [channelId, voiceId],
+    settings: {locked:false,slowmode:0,verification:"open",theme:{accent:"#7c5cff",secondary:"#14b8a6",icon_url:null,banner_url:null,description:"",welcomeMessage:"Welcome to our Orbit community."}},
+    bannedUserIds: []
   };
+  ensureUserStats(req.user).serversCreated+=1;
   memory.servers.set(serverId, s);
   memory.channels.set(channelId, {
     id: channelId,
@@ -1066,6 +1117,42 @@ app.post("/api/servers", auth, (req, res) => {
     channel: memory.channels.get(channelId),
     voiceChannel: memory.channels.get(voiceId)
   });
+});
+
+app.get("/api/servers/:id/community", auth, (req,res)=>{
+  const access=member(req.params.id,req.user.id);
+  if(!access) return res.status(403).json({error:"Not a member"});
+  const settings=serverSettings(access.server);
+  res.json({server:{id:access.server.id,name:access.server.name,owner_id:access.server.ownerId},role:access.role,theme:settings.theme});
+});
+app.patch("/api/servers/:id/community", auth, (req,res)=>{
+  const access=member(req.params.id,req.user.id);
+  if(!access || !["owner","admin"].includes(access.role)) return res.status(403).json({error:"Permission denied"});
+  const settings=serverSettings(access.server);
+  const body=req.body||{};
+  if(body.accent!==undefined){
+    const accent=String(body.accent||"").trim();
+    if(!/^#[0-9a-f]{6}$/i.test(accent)) return res.status(400).json({error:"Invalid accent color"});
+    settings.theme.accent=accent;
+  }
+  if(body.secondary!==undefined){
+    const secondary=String(body.secondary||"").trim();
+    if(!/^#[0-9a-f]{6}$/i.test(secondary)) return res.status(400).json({error:"Invalid secondary color"});
+    settings.theme.secondary=secondary;
+  }
+  if(body.iconUrl!==undefined){
+    const v=String(body.iconUrl||"").trim();
+    if(v && !/^\/api\/avatar\/[A-Za-z0-9_-]+$/.test(v)) return res.status(400).json({error:"Invalid server icon"});
+    settings.theme.icon_url=v||null;
+  }
+  if(body.bannerUrl!==undefined){
+    const v=String(body.bannerUrl||"").trim();
+    if(v && !/^\/api\/avatar\/[A-Za-z0-9_-]+$/.test(v)) return res.status(400).json({error:"Invalid server banner"});
+    settings.theme.banner_url=v||null;
+  }
+  if(body.description!==undefined) settings.theme.description=String(body.description||"").trim().slice(0,500);
+  if(body.welcomeMessage!==undefined) settings.theme.welcomeMessage=String(body.welcomeMessage||"").trim().slice(0,700);
+  res.json({ok:true,theme:settings.theme});
 });
 
 app.get("/api/servers/:id/channels", auth, (req, res) => {
@@ -1296,6 +1383,7 @@ io.on("connection", socket => {
     }
     serverMessageRate.set(rateKey, Date.now());
 
+    ensureUserStats(socket.user).messages+=1;
     const message = {
       id: id("msg"),
       channel_id: channel.id,
@@ -1335,6 +1423,7 @@ io.on("connection", socket => {
       .filter(idValue => idValue !== socket.id);
 
     socket.join(room);
+    ensureUserStats(socket.user).voiceJoins+=1;
     socket.user.activity = mode === "voice" ? "In voice" : "In video";
     socket.user.activityChannelId = channel.id;
     socket.user.activityChannelName = channel.name;
