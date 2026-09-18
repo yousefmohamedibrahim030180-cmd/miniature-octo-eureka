@@ -339,10 +339,33 @@ function connectRealtime() {
 
 async function loadServers() {
   const data = await api("/api/servers");
-  servers = data.servers;
+  servers = data.servers || [];
+  if (currentServer && !servers.some(s => String(s.id) === String(currentServer.id))) {
+    currentServer = null;
+    channels = [];
+    currentChannel = null;
+  }
   renderServers();
-  if (!currentServer || !servers.some(s => String(s.id) === String(currentServer.id))) currentServer = servers[0] || null;
-  if (currentServer) await selectServer(currentServer);
+  if (currentServer) {
+    await selectServer(currentServer);
+  } else {
+    closeServerSidebar();
+    $("#workspace-name").textContent = "Choose a community";
+    $("#workspace-role").textContent = "click a server on the left";
+    $("#workspace-avatar").textContent = "O";
+    $("#channel-list").innerHTML = "";
+    $("#voice-channel-list").innerHTML = "";
+  }
+}
+function openServerSidebar(open = true) {
+  const app = $("#app");
+  app?.classList.toggle("server-sidebar-open", Boolean(open && currentServer));
+  if (open && currentServer) document.body.classList.remove("mobile-sidebar-open");
+}
+function closeServerSidebar() {
+  $("#app")?.classList.remove("server-sidebar-open");
+  $("#sidebar")?.classList.remove("open");
+  document.body.classList.remove("mobile-sidebar-open");
 }
 function renderServers() {
   $("#server-list").innerHTML = servers.map(s =>
@@ -355,9 +378,12 @@ function renderServers() {
   });
 }
 async function selectServer(serverItem) {
+  if (!serverItem) return;
   currentServer = serverItem;
   if (callState.active) leaveCall();
+  openServerSidebar(true);
   renderServers();
+  if (orbitUI.view !== "chat") setView("chat");
   $("#workspace-name").textContent = currentServer.name;
   $("#workspace-brand")?.classList.add("workspace-brand-ready");
   const data = await api("/api/servers/" + currentServer.id + "/channels");
@@ -2231,8 +2257,15 @@ function renderSettingsPage(section="appearance"){
       else orbitToast("Profile update failed",err.message,"error");
     }}
   }else if(section==="voice"){
-    card.innerHTML='<h3>Voice & Video</h3><p>Configure live media capture.</p>'+setting("Noise suppression","Reduce keyboard and room noise.",true,"voice-ns")+setting("Echo cancellation","Reduce feedback.",true,"voice-ec")+setting("Auto gain","Normalize microphone volume.",true,"voice-gain")+'<div class="setting-row"><div><strong>Preferred quality</strong><span>Used for video capture.</span></div><select id="preferred-quality"><option>480p</option><option selected>720p</option><option>1080p</option><option>1080p60</option><option>1440p</option></select></div>';
-    $("#preferred-quality").onchange=e=>callState.settings.quality=e.target.value;
+    const screenShareEnabled=localStorage.getItem("orbit_screen_share")!=="off";
+    const preferred=callState.settings.quality||"720p";
+    card.innerHTML='<h3>Voice & Video</h3><p>Configure calls, camera quality and screen sharing.</p>'+
+      setting("Noise suppression","Reduce keyboard and room noise.",true,"voice-ns")+
+      setting("Echo cancellation","Reduce feedback.",true,"voice-ec")+
+      setting("Auto gain","Normalize microphone volume.",true,"voice-gain")+
+      setting("Screen sharing","Allow screen sharing in calls and rooms.",screenShareEnabled,"voice-screen-share")+
+      '<div class="setting-row"><div><strong>Preferred quality</strong><span>Used for video capture and screen sharing.</span></div><select id="preferred-quality"><option '+(preferred==="480p"?"selected":"")+' value="480p">480p</option><option '+(preferred==="720p"?"selected":"")+' value="720p">720p</option><option '+(preferred==="1080p"?"selected":"")+' value="1080p">1080p</option><option '+(preferred==="1080p60"?"selected":"")+' value="1080p60">1080p60</option><option '+(preferred==="1440p"?"selected":"")+' value="1440p">1440p</option></select></div>';
+    $("#preferred-quality").onchange=e=>{callState.settings.quality=e.target.value;localStorage.setItem("orbit_video_quality",e.target.value);};
   }else if(section==="privacy"){
     card.innerHTML=setting("Friend requests","Allow requests from guests.",true,"privacy-friends")+setting("Direct messages","Allow private messages from shared communities.",true,"privacy-dms")+setting("Read receipts","Show when messages are opened.",false,"privacy-receipts");
   }else if(section==="notifications"){
@@ -2246,9 +2279,25 @@ function renderSettingsPage(section="appearance"){
   }else{
     card.innerHTML=setting("Command palette","Enable Ctrl+K.",true,"advanced-palette")+setting("Developer diagnostics","Expose realtime diagnostics.",false,"advanced-dev");
   }
-  document.querySelectorAll("[data-setting-toggle]").forEach(b=>b.onclick=()=>{b.classList.toggle("on");if(b.dataset.settingToggle==="appearance-motion"){document.body.classList.toggle("reduced-motion",b.classList.contains("on"));localStorage.setItem("orbit_motion",b.classList.contains("on")?"reduced":"full")}if(b.dataset.settingToggle==="appearance-density"){document.body.classList.toggle("compact",b.classList.contains("on"));localStorage.setItem("orbit_density",b.classList.contains("on")?"compact":"comfortable")}});
+  document.querySelectorAll("[data-setting-toggle]").forEach(b=>b.onclick=()=>{
+    b.classList.toggle("on");
+    const key=b.dataset.settingToggle;
+    if(key==="appearance-motion"){document.body.classList.toggle("reduced-motion",b.classList.contains("on"));localStorage.setItem("orbit_motion",b.classList.contains("on")?"reduced":"full")}
+    if(key==="appearance-density"){document.body.classList.toggle("compact",b.classList.contains("on"));localStorage.setItem("orbit_density",b.classList.contains("on")?"compact":"comfortable")}
+    if(key==="voice-screen-share"){localStorage.setItem("orbit_screen_share",b.classList.contains("on")?"on":"off");syncScreenShareControls();}
+  });
 }
 function setting(title,desc,on,key){return '<div class="setting-row"><div><strong>'+title+'</strong><span>'+desc+'</span></div><button class="switch '+(on?"on":"")+'" data-setting-toggle="'+key+'"></button></div>'}
+function syncScreenShareControls(){
+  const enabled=localStorage.getItem("orbit_screen_share")!=="off";
+  ["#quick-screen-share-btn","#share-btn","#dock-screen"].forEach(sel=>{
+    const el=$(sel);
+    if(!el)return;
+    el.classList.toggle("hidden",!enabled);
+    el.disabled=!enabled;
+    el.setAttribute("aria-hidden",enabled?"false":"true");
+  });
+}
 
 function openPoll(){
   if(!currentChannel || currentChannel.type==="voice"){orbitToast("Open a text channel","Polls are posted inside text channels.","error");return}
@@ -2360,8 +2409,7 @@ function wireEnhancedControls() {
 function bindPremiumNavigation(){
   document.querySelectorAll(".rail-nav[data-view]").forEach(b=>b.onclick=()=>{
     setView(b.dataset.view);
-    document.body.classList.remove("mobile-sidebar-open");
-    $("#sidebar")?.classList.remove("open");
+    closeServerSidebar();
   });
   $("#mobile-sidebar-btn")?.addEventListener("click",()=>{
     const sidebar=$("#sidebar");
@@ -2369,8 +2417,8 @@ function bindPremiumNavigation(){
     sidebar.classList.toggle("open");
     document.body.classList.toggle("mobile-sidebar-open",sidebar.classList.contains("open"));
   });
-  $("#settings-nav")?.addEventListener("click",()=>setView("settings"));
-  $("#profile-card-btn")?.addEventListener("click",()=>{setView("settings");renderSettingsPage("profile")});
+  $("#settings-nav")?.addEventListener("click",()=>{setView("settings");closeServerSidebar()});
+  $("#profile-card-btn")?.addEventListener("click",()=>{setView("settings");closeServerSidebar();renderSettingsPage("profile")});
   $("#sidebar-search")?.addEventListener("click",()=>openSearchModal($("#quick-search")?.value||""));
 $("#quick-search")?.addEventListener("focus",()=>$("#sidebar-search")?.classList.add("focused"));
 $("#quick-search")?.addEventListener("blur",()=>$("#sidebar-search")?.classList.remove("focused"));
@@ -2542,7 +2590,10 @@ wireEnhancedControls();
 updateVoiceDock();
 
 applyAccentTheme(localStorage.getItem("orbit_theme")||"purple");
+if(localStorage.getItem("orbit_video_quality")) callState.settings.quality=localStorage.getItem("orbit_video_quality");
 applySavedOrbitBackground();
+syncScreenShareControls();
+closeServerSidebar();
 
 (async()=>{
   try{
