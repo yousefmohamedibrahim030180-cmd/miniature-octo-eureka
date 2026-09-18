@@ -4220,3 +4220,82 @@ body::before,body::after,.app::before{display:none!important}
   .settings-card{padding:20px!important}
   .accent-palette,.background-palette{grid-template-columns:1fr 1fr!important}
 }
+
+
+/* =========================================================
+   ORBIT EASY UI / V7
+   Server drawer opens only after a server is selected.
+   Appearance wallpaper is visible and controlled from Settings.
+   ========================================================= */
+.app{
+  position:relative!important;
+  grid-template-columns:68px 250px minmax(0,1fr)!important;
+  background:
+    linear-gradient(rgba(4,7,11,var(--orbit-overlay-opacity)),rgba(4,7,11,var(--orbit-overlay-opacity))),
+    var(--orbit-wallpaper)!important;
+  background-size:cover!important;
+  background-position:center!important;
+  background-repeat:no-repeat!important;
+}
+.app:not(.server-sidebar-open){
+  grid-template-columns:68px minmax(0,1fr)!important;
+}
+.app:not(.server-sidebar-open)>.sidebar{
+  display:none!important;
+}
+.app.server-sidebar-open>.sidebar{
+  display:flex!important;
+}
+.content{
+  background:transparent!important;
+}
+.chat{
+  background:rgba(32,35,41,.90)!important;
+  backdrop-filter:blur(2px);
+}
+.chat-body{
+  background:transparent!important;
+}
+.global-page{
+  background:rgba(11,13,16,.76)!important;
+}
+.server-sidebar-open .chat-head{
+  background:rgba(37,40,46,.94)!important;
+}
+.server-sidebar-open .chat-body{
+  background:rgba(32,35,41,.72)!important;
+}
+
+/* Make the background feature obvious in Appearance settings. */
+.settings-card .background-palette{
+  margin-top:10px!important;
+}
+.settings-card .background-tools{
+  margin-top:8px!important;
+}
+.settings-card .bg-opacity-row{
+  align-items:center!important;
+}
+.settings-card .bg-opacity-row input[type=range]{
+  accent-color:var(--easy-accent)!important;
+}
+
+/* Screen sharing is a real setting; keep the action visually clear when enabled. */
+#quick-screen-share-btn.screen-live,
+#share-btn.screen-live,
+#dock-screen.screen-live{
+  background:#2f2b48!important;
+  border-color:#5b4e91!important;
+  color:#efeaff!important;
+}
+
+@media(max-width:900px){
+  .app:not(.server-sidebar-open){grid-template-columns:64px 1fr!important}
+  .app.server-sidebar-open{grid-template-columns:64px 1fr!important}
+  .app:not(.server-sidebar-open)>.sidebar{display:none!important}
+  .app.server-sidebar-open>.sidebar{display:flex!important}
+}
+@media(max-width:680px){
+  .app:not(.server-sidebar-open){grid-template-columns:56px 1fr!important}
+  .app.server-sidebar-open{grid-template-columns:56px 1fr!important}
+}
