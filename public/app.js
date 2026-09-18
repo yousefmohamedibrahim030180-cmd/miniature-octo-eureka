@@ -796,7 +796,7 @@ async function toggleScreenShare() {
     if (err.name !== "AbortError") showError("Screen sharing failed: " + (err.message || "permission denied"));
   }
 }
-async async function stopScreenShare() {
+async function stopScreenShare() {
   if (!callState.screenTrack) return;
   callState.screenTrack.stop();
   callState.screenTrack = null;
