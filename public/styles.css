@@ -107,3 +107,17 @@ button,input,select,textarea{font:inherit}button{border:0;cursor:pointer;color:i
   .hero-card .hero-action{left:16px;bottom:14px}
   .metric strong{font-size:18px}
 }
+
+/* ===== Product polish / realtime UX ===== */
+.channel{position:relative}
+.channel-name-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.channel-unread{margin-left:auto;min-width:19px;height:17px;padding:0 5px;border-radius:9px;display:inline-grid;place-items:center;background:var(--accent);color:#fff;font-size:7px;line-height:1}
+.channel.active .channel-unread{background:#fff;color:#4b3a98}
+.voice-channel.active{background:#1b2830;color:#fff}
+.voice-channel:hover .voice-icon,.voice-channel.active .voice-icon{color:var(--good)}
+.voice-dock-actions button.active{background:#2a2144;border-color:#664eb4;color:#fff}
+.call-top-actions .live-stat{white-space:nowrap}
+.call-network-good{color:#8df0b8!important;background:#11271b!important;border-color:#2b6440!important}
+.call-network-fair{color:#f0d68d!important;background:#2b2715!important;border-color:#66552b!important}
+.call-network-poor{color:#ffafb7!important;background:#321920!important;border-color:#6d3540!important}
+.chat-head .mobile-sidebar-btn{box-shadow:0 4px 16px #0004}
