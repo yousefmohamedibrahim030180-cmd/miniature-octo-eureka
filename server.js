@@ -38,10 +38,15 @@ const CALL_EVENT_PREFIX = "call:";
 const callRoomFor = channelId => CALL_EVENT_PREFIX + String(channelId);
 
 const DATABASE_URL = String(process.env.DATABASE_URL || "").trim();
+const PERSIST_URL = String(process.env.ORBIT_PERSIST_URL || "").trim().replace(/\/$/, "");
+const PERSIST_SECRET = String(process.env.ORBIT_PERSIST_SECRET || "").trim();
+
 let dbPool = null;
 let dbReady = false;
 let persistTimer = null;
 let persistInFlight = false;
+let persistPending = false;
+let persistMode = "memory";
 
 function now() { return new Date().toISOString(); }
 
@@ -77,40 +82,122 @@ function hydrateMemory(data) {
   memory.audit = Array.isArray(data.audit) ? data.audit : [];
 }
 
+async function sidecarRequest(method, body) {
+  if (!PERSIST_URL || !PERSIST_SECRET) return { configured: false, found: false };
+  const response = await fetch(PERSIST_URL + "/state", {
+    method,
+    headers: {
+      "x-orbit-secret": PERSIST_SECRET,
+      ...(body ? { "content-type": "application/json" } : {})
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (response.status === 404 && method === "GET") return { configured: true, found: false };
+  if (!response.ok) throw new Error("Persistence sidecar returned HTTP " + response.status);
+  return { configured: true, found: true, payload: await response.json() };
+}
+
 async function initPersistence() {
-  if (!DATABASE_URL) { console.log("[orbit] PostgreSQL not configured; using memory mode."); return; }
-  try {
-    dbPool = new Pool({ connectionString: DATABASE_URL, max: 5, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000, ssl: process.env.DATABASE_SSL === "disable" ? false : { rejectUnauthorized: false } });
-    await dbPool.query("CREATE TABLE IF NOT EXISTS orbit_state (id INTEGER PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
-    const result = await dbPool.query("SELECT data FROM orbit_state WHERE id = 1");
-    if (result.rows[0]?.data) {
-      hydrateMemory(result.rows[0].data);
-      for (const user of memory.users.values()) { user.status = "offline"; user.activity = "Offline"; user.activityChannelId = null; user.activityChannelName = null; user.activityServerId = null; }
-      console.log("[orbit] PostgreSQL state restored.");
-    } else {
+  if (DATABASE_URL) {
+    try {
+      dbPool = new Pool({
+        connectionString: DATABASE_URL,
+        max: 5,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
+        ssl: process.env.DATABASE_SSL === "disable" ? false : { rejectUnauthorized: false }
+      });
+      await dbPool.query("CREATE TABLE IF NOT EXISTS orbit_state (id INTEGER PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+      const result = await dbPool.query("SELECT data FROM orbit_state WHERE id = 1");
+      if (result.rows[0]?.data) {
+        hydrateMemory(result.rows[0].data);
+        for (const user of memory.users.values()) {
+          user.status = "offline";
+          user.activity = "Offline";
+          user.activityChannelId = null;
+          user.activityChannelName = null;
+          user.activityServerId = null;
+        }
+        console.log("[orbit] PostgreSQL state restored.");
+      } else {
+        dbReady = true;
+        persistMode = "postgres-memory-cache";
+        await persistState();
+        console.log("[orbit] PostgreSQL persistence initialized.");
+      }
       dbReady = true;
-      await persistState();
-      console.log("[orbit] PostgreSQL persistence initialized.");
+      persistMode = "postgres-memory-cache";
+      return;
+    } catch (error) {
+      console.error("[orbit] PostgreSQL unavailable; trying private sidecar:", error.message);
+      dbReady = false;
+      if (dbPool) { try { await dbPool.end(); } catch {} }
+      dbPool = null;
     }
-    dbReady = true;
-  } catch (error) {
-    console.error("[orbit] PostgreSQL unavailable; continuing in memory mode:", error.message);
-    dbReady = false; if (dbPool) { try { await dbPool.end(); } catch {} } dbPool = null;
   }
+
+  if (PERSIST_URL && PERSIST_SECRET) {
+    try {
+      const result = await sidecarRequest("GET");
+      if (result.found && result.payload?.data) {
+        hydrateMemory(result.payload.data);
+        for (const user of memory.users.values()) {
+          user.status = "offline";
+          user.activity = "Offline";
+          user.activityChannelId = null;
+          user.activityChannelName = null;
+          user.activityServerId = null;
+        }
+        console.log("[orbit] Private persistence sidecar state restored.");
+      } else {
+        console.log("[orbit] Private persistence sidecar is empty; initializing.");
+      }
+      dbReady = true;
+      persistMode = "sidecar-memory-cache";
+      await persistState();
+      console.log("[orbit] Private persistence sidecar ready.");
+      return;
+    } catch (error) {
+      console.error("[orbit] Persistence sidecar unavailable; continuing in memory mode:", error.message);
+    }
+  }
+
+  dbReady = false;
+  persistMode = "memory";
+  console.log("[orbit] No persistent store configured; using memory mode.");
 }
 
 async function persistState() {
-  if (!dbPool || !dbReady || persistInFlight) return;
+  if (!dbReady) return;
+  if (persistInFlight) {
+    persistPending = true;
+    return;
+  }
+
   persistInFlight = true;
   try {
     const data = serializeMemory();
-    await dbPool.query("INSERT INTO orbit_state (id, data, updated_at) VALUES (1, $1::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()", [JSON.stringify(data)]);
-  } catch (error) { console.error("[orbit] PostgreSQL write failed:", error.message); }
-  finally { persistInFlight = false; }
+    if (dbPool) {
+      await dbPool.query(
+        "INSERT INTO orbit_state (id, data, updated_at) VALUES (1, $1::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()",
+        [JSON.stringify(data)]
+      );
+    } else if (PERSIST_URL && PERSIST_SECRET) {
+      await sidecarRequest("PUT", { data });
+    }
+  } catch (error) {
+    console.error("[orbit] Persistence write failed:", error.message);
+  } finally {
+    persistInFlight = false;
+    if (persistPending) {
+      persistPending = false;
+      setImmediate(() => persistState().catch(error => console.error("[orbit] persistence retry failed:", error.message)));
+    }
+  }
 }
 
 function schedulePersist() {
-  if (!dbPool || !dbReady) return;
+  if (!dbReady) return;
   clearTimeout(persistTimer);
   persistTimer = setTimeout(() => persistState().catch(error => console.error("[orbit] persistence error:", error.message)), 250);
 }
@@ -257,7 +344,7 @@ app.get("/health", (req, res) => {
   res.status(200).json({
     ok: true,
     service: "orbit-chat",
-    mode: dbReady ? "postgres-memory-cache" : "guest-memory",
+    mode: persistMode,
     db: dbReady,
     users: memory.users.size,
     servers: memory.servers.size,
