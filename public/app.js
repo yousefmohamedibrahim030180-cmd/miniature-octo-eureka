@@ -1657,7 +1657,7 @@ function renderSettingsPage(section="appearance"){
       '<button type="button" class="avatar-style-card" data-avatar-style="neon"><span class="style-preview style-neon"></span><strong>Neon Pulse</strong><small>Cyber glow</small></button>'+
       '<button type="button" class="avatar-style-card" data-avatar-style="energy"><span class="style-preview style-energy"></span><strong>Energy Ring</strong><small>Power wave</small></button>'+
       '<button type="button" class="avatar-style-card" data-avatar-style="off"><span class="style-preview style-off"></span><strong>Static</strong><small>No animation</small></button>'+
-      '</div>'+\
+      '</div>'+
       '<div class="avatar-frame-section">'+
       '<div class="avatar-frame-head"><div><strong>Avatar frames</strong><span>Choose a live frame for your profile avatar.</span></div></div>'+
       '<div class="avatar-frame-grid">'+
@@ -1670,7 +1670,8 @@ function renderSettingsPage(section="appearance"){
       '<button type="button" class="avatar-frame-card" data-avatar-frame="ice"><span class="frame-preview frame-ice">A</span><strong>Ice</strong></button>'+
       '<button type="button" class="avatar-frame-card" data-avatar-frame="cyber"><span class="frame-preview frame-cyber">A</span><strong>Cyber</strong></button>'+
       '<button type="button" class="avatar-frame-card" data-avatar-frame="royal"><span class="frame-preview frame-royal">A</span><strong>Royal</strong></button>'+
-      '<button type="button" class="avatar-frame-card" data-avatar-frame="dragon"><span class="frame-preview frame-dragon">A</span><strong>Dragon</strong></button>'+      '</div></div></div>'+
+      '<button type="button" class="avatar-frame-card" data-avatar-frame="dragon"><span class="frame-preview frame-dragon">A</span><strong>Dragon</strong></button>'+\
+      '</div></div></div>'+
       '<input id="profile-name" value="'+escapeHtml(orbitUI.profile.displayName||me?.display_name||me?.username||"Guest")+'" placeholder="Display name">'+
       '<textarea id="profile-bio" placeholder="Bio">'+escapeHtml(orbitUI.profile.bio||"")+'</textarea>'+
       '<select id="profile-status"><option>Online</option><option>Idle</option><option>Do Not Disturb</option><option>Invisible</option></select>'+
