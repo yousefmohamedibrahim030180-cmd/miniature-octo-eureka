@@ -4,6 +4,7 @@ const path = require("path");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { Server } = require("socket.io");
+const { Pool } = require("pg");
 
 const app = express();
 const server = http.createServer(app);
@@ -36,7 +37,83 @@ const memory = {
 const CALL_EVENT_PREFIX = "call:";
 const callRoomFor = channelId => CALL_EVENT_PREFIX + String(channelId);
 
+const DATABASE_URL = String(process.env.DATABASE_URL || "").trim();
+let dbPool = null;
+let dbReady = false;
+let persistTimer = null;
+let persistInFlight = false;
+
 function now() { return new Date().toISOString(); }
+
+function serializeMemory() {
+  return {
+    users: [...memory.users.entries()],
+    servers: [...memory.servers.entries()].map(([key, value]) => [key, { ...value, members: [...(value.members instanceof Map ? value.members.entries() : [])] }]),
+    channels: [...memory.channels.entries()],
+    messages: [...memory.messages.entries()],
+    invites: [...memory.invites.entries()],
+    friendRequests: [...memory.friendRequests.entries()],
+    friendships: [...memory.friendships],
+    dms: [...memory.dms.entries()],
+    dmMessages: [...memory.dmMessages.entries()],
+    dmReads: [...memory.dmReads.entries()],
+    notifications: [...memory.notifications.entries()],
+    threads: [...memory.threads.entries()],
+    polls: [...memory.polls.entries()],
+    uploads: [...memory.uploads.entries()],
+    audit: memory.audit
+  };
+}
+
+function hydrateMemory(data) {
+  if (!data || typeof data !== "object") return;
+  const restoreMap = name => { memory[name] = new Map(Array.isArray(data[name]) ? data[name] : []); };
+  restoreMap("users");
+  memory.servers = new Map((data.servers || []).map(([key, value]) => [key, { ...value, members: new Map(value?.members || []) }]));
+  restoreMap("channels"); restoreMap("messages"); restoreMap("invites"); restoreMap("friendRequests");
+  memory.friendships = new Set(data.friendships || []);
+  restoreMap("dms"); restoreMap("dmMessages"); restoreMap("dmReads"); restoreMap("notifications");
+  restoreMap("threads"); restoreMap("polls"); restoreMap("uploads");
+  memory.audit = Array.isArray(data.audit) ? data.audit : [];
+}
+
+async function initPersistence() {
+  if (!DATABASE_URL) { console.log("[orbit] PostgreSQL not configured; using memory mode."); return; }
+  try {
+    dbPool = new Pool({ connectionString: DATABASE_URL, max: 5, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000, ssl: process.env.DATABASE_SSL === "disable" ? false : { rejectUnauthorized: false } });
+    await dbPool.query("CREATE TABLE IF NOT EXISTS orbit_state (id INTEGER PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+    const result = await dbPool.query("SELECT data FROM orbit_state WHERE id = 1");
+    if (result.rows[0]?.data) {
+      hydrateMemory(result.rows[0].data);
+      for (const user of memory.users.values()) { user.status = "offline"; user.activity = "Offline"; user.activityChannelId = null; user.activityChannelName = null; user.activityServerId = null; }
+      console.log("[orbit] PostgreSQL state restored.");
+    } else {
+      dbReady = true;
+      await persistState();
+      console.log("[orbit] PostgreSQL persistence initialized.");
+    }
+    dbReady = true;
+  } catch (error) {
+    console.error("[orbit] PostgreSQL unavailable; continuing in memory mode:", error.message);
+    dbReady = false; if (dbPool) { try { await dbPool.end(); } catch {} } dbPool = null;
+  }
+}
+
+async function persistState() {
+  if (!dbPool || !dbReady || persistInFlight) return;
+  persistInFlight = true;
+  try {
+    const data = serializeMemory();
+    await dbPool.query("INSERT INTO orbit_state (id, data, updated_at) VALUES (1, $1::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()", [JSON.stringify(data)]);
+  } catch (error) { console.error("[orbit] PostgreSQL write failed:", error.message); }
+  finally { persistInFlight = false; }
+}
+
+function schedulePersist() {
+  if (!dbPool || !dbReady) return;
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => persistState().catch(error => console.error("[orbit] persistence error:", error.message)), 250);
+}
 function id(prefix) { return prefix + "_" + crypto.randomUUID(); }
 function cleanName(value, fallback = "Guest") {
   const name = String(value || "").trim().replace(/\s+/g, " ").slice(0, 24);
@@ -171,12 +248,17 @@ app.use(express.static(path.join(__dirname, "public"), {
   }
 }));
 
+app.use((req, res, next) => {
+  res.on("finish", () => schedulePersist());
+  next();
+});
+
 app.get("/health", (req, res) => {
   res.status(200).json({
     ok: true,
     service: "orbit-chat",
-    mode: "guest-memory",
-    db: false,
+    mode: dbReady ? "postgres-memory-cache" : "guest-memory",
+    db: dbReady,
     users: memory.users.size,
     servers: memory.servers.size,
     calls: [...io.sockets.adapter.rooms.keys()].filter(k => k.startsWith(CALL_EVENT_PREFIX)).length,
@@ -805,6 +887,7 @@ function emitPulse(type, data = {}) {
 }
 
 io.on("connection", socket => {
+  socket.onAny(() => setImmediate(schedulePersist));
   socket.user.activity = socket.user.activity || "Online";
   socket.user.status = "online";
   socket.emit("pulse:snapshot", livePulseSnapshot());
@@ -1067,6 +1150,8 @@ io.on("connection", socket => {
   });
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log("[orbit] guest mode listening on " + PORT);
-});
+async function boot() {
+  await initPersistence();
+  server.listen(PORT, "0.0.0.0", () => console.log("[orbit] guest mode listening on " + PORT + (dbReady ? " with PostgreSQL" : " in memory mode")));
+}
+boot().catch(error => { console.error("[orbit] boot failed", error); process.exit(1); });
