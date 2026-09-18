@@ -192,6 +192,10 @@ app.get("/api/me", auth, (req, res) => {
   res.json({ user: publicUser(req.user) });
 });
 
+app.get("/api/pulse", auth, (req, res) => {
+  res.json(livePulseSnapshot());
+});
+
 app.get("/api/platform/summary", auth, (req, res) => {
   let totalMessages = 0;
   for (const list of memory.messages.values()) totalMessages += list.length;
@@ -746,12 +750,51 @@ function callParticipant(socket) {
     username: socket.user.username
   };
 }
+function livePulseSnapshot() {
+  const activeCalls = [];
+  for (const roomName of io.sockets.adapter.rooms.keys()) {
+    if (!roomName.startsWith(CALL_EVENT_PREFIX)) continue;
+    const channelId = roomName.slice(CALL_EVENT_PREFIX.length);
+    const channel = memory.channels.get(channelId);
+    if (!channel) continue;
+    const ids = [...(io.sockets.adapter.rooms.get(roomName) || [])];
+    const participants = ids.map(socketId => io.sockets.sockets.get(socketId)).filter(Boolean).map(callParticipant);
+    activeCalls.push({
+      roomId: roomName,
+      channelId: channel.id,
+      serverId: channel.serverId,
+      channelName: channel.name,
+      participants
+    });
+  }
+  const liveUsers = [...memory.users.values()].map(u => ({
+    ...publicUser(u),
+    activity: u.activity || "Online",
+    activityChannelId: u.activityChannelId || null,
+    activityChannelName: u.activityChannelName || null,
+    activityServerId: u.activityServerId || null
+  }));
+  return { users: liveUsers, calls: activeCalls, generatedAt: now() };
+}
+function emitPulse(type, data = {}) {
+  io.emit("pulse:update", {
+    id: id("pulse"),
+    type,
+    createdAt: now(),
+    ...data
+  });
+}
 
 io.on("connection", socket => {
+  socket.user.activity = socket.user.activity || "Online";
+  socket.user.status = "online";
+  socket.emit("pulse:snapshot", livePulseSnapshot());
   socket.broadcast.emit("presence:update", {
     userId: socket.user.id,
-    status: "online"
+    status: "online",
+    activity: socket.user.activity || "Online"
   });
+  emitPulse("presence", { user: publicUser(socket.user), activity: socket.user.activity || "Online" });
 
   socket.on("channel:join", channelId => {
     const channel = memory.channels.get(String(channelId));
@@ -792,6 +835,13 @@ io.on("connection", socket => {
     if (list.length > 500) list.splice(0, list.length - 500);
     memory.messages.set(channel.id, list);
     io.to("channel:" + channel.id).emit("message:new", message);
+    emitPulse("message", {
+      serverId: channel.serverId,
+      channelId: channel.id,
+      channelName: channel.name,
+      user: publicUser(socket.user),
+      preview: text.slice(0, 120)
+    });
   });
 
   socket.on("call:join", payload => {
@@ -809,6 +859,25 @@ io.on("connection", socket => {
       .filter(idValue => idValue !== socket.id);
 
     socket.join(room);
+    socket.user.activity = mode === "voice" ? "In voice" : "In video";
+    socket.user.activityChannelId = channel.id;
+    socket.user.activityChannelName = channel.name;
+    socket.user.activityServerId = channel.serverId;
+    socket.broadcast.emit("presence:update", {
+      userId: socket.user.id,
+      status: "online",
+      activity: socket.user.activity,
+      activityChannelId: channel.id,
+      activityChannelName: channel.name,
+      activityServerId: channel.serverId
+    });
+    emitPulse("call-start", {
+      serverId: channel.serverId,
+      channelId: channel.id,
+      channelName: channel.name,
+      mode,
+      user: publicUser(socket.user)
+    });
 
     socket.to("channel:" + channel.id).emit("call:incoming", {
       ...callParticipant(socket),
@@ -834,10 +903,26 @@ io.on("connection", socket => {
   socket.on("call:leave", channelId => {
     const room = callRoomFor(channelId);
     if (!socket.rooms.has(room)) return;
+    const channel = memory.channels.get(String(channelId));
     socket.leave(room);
     socket.to(room).emit("call:participant-left", {
       socketId: socket.id,
       userId: socket.user.id
+    });
+    socket.user.activity = "Online";
+    socket.user.activityChannelId = null;
+    socket.user.activityChannelName = null;
+    socket.user.activityServerId = null;
+    socket.broadcast.emit("presence:update", {
+      userId: socket.user.id,
+      status: "online",
+      activity: "Online"
+    });
+    emitPulse("call-end", {
+      serverId: channel?.serverId || null,
+      channelId: channel?.id || channelId,
+      channelName: channel?.name || null,
+      user: publicUser(socket.user)
     });
   });
 
@@ -870,11 +955,28 @@ io.on("connection", socket => {
   });
 
   socket.on("call:media-state", ({ channelId, muted, cameraOff, screenShare }) => {
+    const channel = memory.channels.get(String(channelId));
+    if (screenShare) socket.user.activity = "Sharing screen";
+    else if (channel && socket.user.activity !== "Online") socket.user.activity = socket.user.activity || "In call";
     socket.to(callRoomFor(channelId)).emit("call:media-state", {
       socketId: socket.id,
       muted: Boolean(muted),
       cameraOff: Boolean(cameraOff),
       screenShare: Boolean(screenShare)
+    });
+    socket.broadcast.emit("presence:update", {
+      userId: socket.user.id,
+      status: "online",
+      activity: socket.user.activity || "Online",
+      activityChannelId: channel?.id || channelId,
+      activityChannelName: channel?.name || null,
+      activityServerId: channel?.serverId || null
+    });
+    if (screenShare) emitPulse("screen-share", {
+      serverId: channel?.serverId || null,
+      channelId: channel?.id || channelId,
+      channelName: channel?.name || null,
+      user: publicUser(socket.user)
     });
   });
 
@@ -898,10 +1000,16 @@ io.on("connection", socket => {
 
   socket.on("disconnect", () => {
     socket.user.status = "offline";
+    socket.user.activity = "Offline";
+    socket.user.activityChannelId = null;
+    socket.user.activityChannelName = null;
+    socket.user.activityServerId = null;
     socket.broadcast.emit("presence:update", {
       userId: socket.user.id,
-      status: "offline"
+      status: "offline",
+      activity: "Offline"
     });
+    emitPulse("presence", { user: publicUser(socket.user), activity: "Offline" });
 
     for (const room of socket.rooms) {
       if (room.startsWith(CALL_EVENT_PREFIX)) {
