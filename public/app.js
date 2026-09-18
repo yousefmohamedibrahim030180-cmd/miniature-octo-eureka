@@ -275,57 +275,14 @@ $("#message").oninput = () => {
   typingTimer = setTimeout(() => socket.emit("typing", { channelId: currentChannel.id, isTyping: false }), 900);
 };
 
-$("#new-server").onclick = () => openModal(
-  "Create a server",
-  '<input id="server-name" placeholder="e.g. Gaming Hub"><button class="primary" id="create-server">Create server</button>'
-);
-$("#new-channel").onclick = () => {
-  if (!currentServer) return;
-  openModal(
-    "Create channel",
-    '<input id="channel-name-input" placeholder="general"><select id="channel-type"><option value="text">Text</option><option value="announcement">Announcement</option></select><button class="primary" id="create-channel">Create channel</button>'
-  );
-};
 const renameGuestBtn = $("#rename-guest");
 if (renameGuestBtn) renameGuestBtn.onclick = () => openModal(
   "Change guest name",
   '<input id="guest-name-input" value="' + escapeHtml(me?.username || "") + '" maxlength="24"><button class="primary" id="save-guest-name">Save name</button>'
 );
-$("#modal-close").onclick = closeModal;
-$("#modal").onclick = e => { if (e.target.id === "modal") closeModal(); };
 
 document.addEventListener("click", async e => {
   try {
-    if (e.target.id === "create-server") {
-      const data = await api("/api/servers", { method: "POST", body: JSON.stringify({ name: $("#server-name").value }) });
-      closeModal();
-      await loadServers();
-      await selectServer(data.server);
-      return;
-    }
-    if (e.target.id === "create-channel") {
-      const data = await api("/api/servers/" + currentServer.id + "/channels", {
-        method: "POST",
-        body: JSON.stringify({ name: $("#channel-name-input").value, type: $("#channel-type").value })
-      });
-      closeModal();
-      channels.push(data.channel);
-      renderChannels();
-      await selectChannel(data.channel);
-      return;
-    }
-    if (e.target.id === "save-guest-name") {
-      const value = $("#guest-name-input").value.trim();
-      if (!value) return;
-      const data = await api("/api/me", { method: "PATCH", body: JSON.stringify({ username: value }) });
-      me = data.user;
-      guestName = me.username;
-      saveGuest();
-      $("#me-name").textContent = me.username;
-      $("#me-avatar").textContent = avatar(me.username);
-      closeModal();
-      return;
-    }
     if (e.target.id === "invite-btn" && currentServer) {
       const data = await api("/api/servers/" + currentServer.id + "/invites", { method: "POST", body: "{}" });
       openModal("Invite link",
@@ -1277,8 +1234,6 @@ selectChannel=async function(channel){
 };
 
 // Join/create voice support uses the server's "voice" channel type.
-$("#new-channel")?.addEventListener("click",()=>openChannelModal("text"));
-$("#new-voice-channel")?.addEventListener("click",()=>openChannelModal("voice"));
 function openChannelModal(defaultType){
   if(!currentServer)return;
   openModal("Create channel",'<input id="channel-name-input" placeholder="general"><select id="channel-type-input"><option value="text" '+(defaultType==="text"?"selected":"")+'>Text</option><option value="announcement">Announcement</option><option value="voice" '+(defaultType==="voice"?"selected":"")+'>Voice</option></select><button class="primary" id="create-channel-now">Create channel</button>');
@@ -1286,7 +1241,6 @@ function openChannelModal(defaultType){
 }
 
 // Ensure create server has a real post-create channel/voice refresh.
-$("#new-server")?.addEventListener("click",()=>openModal("Create server",'<input id="server-name-input" placeholder="Community name"><button class="primary" id="create-server-now">Create server</button>'));
 document.addEventListener("click",async e=>{
   if(e.target.id==="create-server-now"){try{const d=await api("/api/servers",{method:"POST",body:JSON.stringify({name:$("#server-name-input").value})});closeModal();await loadServers();const s=servers.find(x=>String(x.id)===String(d.server.id));if(s)await selectServer(s);orbitToast("Server created",d.server.name+" is ready.","success")}catch(err){orbitToast("Server creation failed",err.message,"error")}}
 });
