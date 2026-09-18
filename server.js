@@ -58,13 +58,14 @@ function ensureDefaultServer(user) {
   if (!memory.servers.size) {
     const serverId = id("server");
     const channelId = id("channel");
+    const voiceId = id("channel");
     const lobby = {
       id: serverId,
       name: "Orbit Lobby",
       ownerId: user.id,
       createdAt: now(),
       members: new Map([[user.id, "owner"]]),
-      channels: [channelId]
+      channels: [channelId, voiceId]
     };
     memory.servers.set(serverId, lobby);
     memory.channels.set(channelId, {
@@ -74,7 +75,15 @@ function ensureDefaultServer(user) {
       type: "text",
       position: 0
     });
+    memory.channels.set(voiceId, {
+      id: voiceId,
+      serverId,
+      name: "Lounge",
+      type: "voice",
+      position: 1
+    });
     memory.messages.set(channelId, []);
+    memory.messages.set(voiceId, []);
   } else {
     for (const s of memory.servers.values()) {
       if (!s.members.has(user.id) && s.name === "Orbit Lobby") {
@@ -194,13 +203,14 @@ app.post("/api/servers", auth, (req, res) => {
 
   const serverId = id("server");
   const channelId = id("channel");
+  const voiceId = id("channel");
   const s = {
     id: serverId,
     name,
     ownerId: req.user.id,
     createdAt: now(),
     members: new Map([[req.user.id, "owner"]]),
-    channels: [channelId]
+    channels: [channelId, voiceId]
   };
   memory.servers.set(serverId, s);
   memory.channels.set(channelId, {
@@ -210,7 +220,15 @@ app.post("/api/servers", auth, (req, res) => {
     type: "text",
     position: 0
   });
+  memory.channels.set(voiceId, {
+    id: voiceId,
+    serverId,
+    name: "Lounge",
+    type: "voice",
+    position: 1
+  });
   memory.messages.set(channelId, []);
+  memory.messages.set(voiceId, []);
 
   res.status(201).json({
     server: {
@@ -220,7 +238,8 @@ app.post("/api/servers", auth, (req, res) => {
       role: "owner",
       default_channel_id: channelId
     },
-    channel: memory.channels.get(channelId)
+    channel: memory.channels.get(channelId),
+    voiceChannel: memory.channels.get(voiceId)
   });
 });
 
@@ -407,7 +426,9 @@ io.on("connection", socket => {
     io.to("channel:" + channel.id).emit("message:new", message);
   });
 
-  socket.on("call:join", channelId => {
+  socket.on("call:join", payload => {
+    const channelId = typeof payload === "object" ? payload.channelId : payload;
+    const mode = typeof payload === "object" && payload.mode ? payload.mode : "video";
     const channel = memory.channels.get(String(channelId));
     if (!channel || !member(channel.serverId, socket.user.id)) return;
 
@@ -426,7 +447,11 @@ io.on("connection", socket => {
       return peer ? callParticipant(peer) : null;
     }).filter(Boolean));
 
-    socket.to(room).emit("call:participant-joined", callParticipant(socket));
+    socket.to(room).emit("call:participant-joined", {
+      ...callParticipant(socket),
+      channelId: channel.id,
+      mode
+    });
   });
 
   socket.on("call:leave", channelId => {

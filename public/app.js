@@ -10,6 +10,7 @@ let channels = [];
 let currentChannel = null;
 let socket = null;
 let typingTimer = null;
+let pendingIncomingCall = null;
 
 const callState = {
   active: false,
@@ -132,6 +133,14 @@ function connectRealtime() {
 
   socket.on("call:participant-joined", p => {
     addRemoteTile(p.socketId, p);
+    if (!callState.active && p.channelId) {
+      pendingIncomingCall = p;
+      $("#incoming-avatar").textContent = avatar(p.username);
+      $("#incoming-title").textContent = p.mode === "voice" ? "Incoming voice call" : "Incoming video call";
+      const incomingChannel = channels.find(c => String(c.id) === String(p.channelId));
+      $("#incoming-subtitle").textContent = (p.username || "Guest") + " wants to join #" + (incomingChannel?.name || "channel");
+      $("#incoming-call").classList.remove("hidden");
+    }
     updateCallMeta();
   });
 
@@ -408,7 +417,13 @@ async function startCall(mode = "video") {
   try {
     await setupLocalMedia(mode);
     ensureSelfTile();
-    socket.emit("call:join", callState.roomId);
+    socket.emit("call:join", { channelId: callState.roomId, mode: callState.mode });
+    socket.emit("call:media-state", {
+      channelId: callState.roomId,
+      muted: callState.micTrack ? !callState.micTrack.enabled : true,
+      cameraOff: callState.cameraTrack ? !callState.cameraTrack.enabled : true,
+      screenShare: false
+    });
     setCallIndicator("LIVE");
     startCallClock();
     startStatsMonitor();
@@ -641,7 +656,7 @@ function applyLayout() {
   stage.classList.add("layout-" + callState.settings.layout);
 }
 function applyFrameClass(el) {
-  el.classList.remove("frame-soft", "frame-square", "frame-cinema");
+  el.classList.remove("frame-soft", "frame-square", "frame-cinema", "frame-glow");
   el.classList.add("frame-" + callState.settings.frame);
 }
 function applyAllFrames() {
@@ -948,6 +963,19 @@ $("#quality-btn").onclick = e => openCallPopoverFrom(e.currentTarget, "quality")
 $("#frames-btn").onclick = e => openCallPopoverFrom(e.currentTarget, "frame");
 $("#settings-btn").onclick = e => openCallPopoverFrom(e.currentTarget, "settings");
 $("#participants-btn").onclick = e => openCallPopoverFrom(e.currentTarget, "participants");
+$("#incoming-decline").onclick = () => {
+  pendingIncomingCall = null;
+  $("#incoming-call").classList.add("hidden");
+};
+$("#incoming-accept").onclick = async () => {
+  const incoming = pendingIncomingCall;
+  pendingIncomingCall = null;
+  $("#incoming-call").classList.add("hidden");
+  if (!incoming) return;
+  const targetChannel = channels.find(c => String(c.id) === String(incoming.channelId));
+  if (targetChannel) currentChannel = targetChannel;
+  await startCall(incoming.mode === "voice" ? "voice" : "video");
+};
 $("#more-call-btn").onclick = e => openCallPopoverFrom(e.currentTarget, "more");
 $("#quick-share-btn").onclick = () => {
   if (!callState.active) return startCall("video");

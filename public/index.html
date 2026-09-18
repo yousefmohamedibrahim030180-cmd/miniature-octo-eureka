@@ -47,7 +47,7 @@
       <div class="head-actions">
         <button id="voice-call-btn" class="head-action"><span>☎</span> Voice</button>
         <button id="video-call-btn" class="head-action primary-soft"><span>▣</span> Video</button>
-        <button id="quick-share-btn" class="head-action"><span>↗</span> Share
+        <button id="quick-share-btn" class="head-action"><span>↗</span> Share</button>
         <button id="invite-btn" class="head-action">Invite</button>
         <button id="members-btn" class="head-action">Members</button>
         <button id="admin-btn" class="head-action">Control</button>
@@ -120,6 +120,12 @@
 
   <div id="call-popover" class="call-popover hidden"></div>
 </section>
+
+<div id="incoming-call" class="incoming-call hidden">
+  <div class="incoming-avatar" id="incoming-avatar">G</div>
+  <div class="incoming-copy"><strong id="incoming-title">Incoming call</strong><span id="incoming-subtitle">Someone is calling</span></div>
+  <div class="incoming-actions"><button id="incoming-accept">Accept</button><button id="incoming-decline">Decline</button></div>
+</div>
 
 <div id="modal" class="modal hidden">
   <div class="modal-card">
