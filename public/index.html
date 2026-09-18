@@ -7,7 +7,7 @@
 <title>Orbit — Community, Chat & Calls</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.css?v=570aedfed">
+<link rel="stylesheet" href="/styles.css?v=ui-20260918-299444">
 </head>
 <body>
 <div id="app" class="app">
@@ -18,7 +18,7 @@
       <button class="rail-nav" data-view="discover" title="Discover">✦</button>
       <button class="rail-nav" data-view="dms" title="Direct Messages">◌</button>
       <button class="rail-nav" data-view="friends" title="Friends">◎</button>
-      <button class="rail-nav" data-view="notifications" title="Notifications"><span class="nav-glyph">◇</span><b class="nav-badge" id="notification-badge">3</b></button>
+      <button class="rail-nav" data-view="notifications" title="Notifications"><span class="nav-glyph">◇</span><b class="nav-badge" id="notification-badge">0</b></button>
       <button class="rail-nav" data-view="saved" title="Saved">⌑</button>
       <button class="rail-nav" data-view="explore" title="Explore">⌖</button>
     </nav>
@@ -68,7 +68,7 @@
 
     <div id="chat-view" class="chat">
       <header class="chat-head">
-        <button id="mobile-sidebar-btn" class="mobile-sidebar-btn" title="Channels">☰</button>
+        <button id="mobile-sidebar-btn" class="mobile-sidebar-btn" title="Channels" aria-label="Open channels">☰</button>
         <div class="channel-title">
           <span class="hash" id="channel-symbol">#</span>
           <div><strong id="channel-name">general</strong><span id="channel-meta">Realtime conversation</span></div>
@@ -146,6 +146,6 @@
 <div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><div><strong id="modal-title"></strong><span id="modal-subtitle"></span></div><button id="modal-close">×</button></div><div id="modal-body"></div></div></div>
 
 <script src="/socket.io/socket.io.js?v=4.8"></script>
-<script src="/app.js?v=570aedfed"></script>
+<script src="/app.js?v=ui-20260918-299444"></script>
 </body>
 </html>
