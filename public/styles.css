@@ -1786,3 +1786,13 @@ body[data-avatar-motion="off"] .orbit-avatar-preview{animation:none!important}
 @keyframes orbitFrameDragon{0%,100%{transform:scale(1) rotate(0deg)}50%{transform:scale(1.04) rotate(.8deg)}}
 
 @media(max-width:700px){.avatar-frame-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+#me-avatar.orbit-frame-custom .orbit-custom-frame{
+  position:absolute;inset:-8px;width:calc(100% + 16px);height:calc(100% + 16px);
+  object-fit:contain;z-index:4;border:0!important;border-radius:0!important;
+  pointer-events:none;display:block;
+}
+.avatar-frame-upload-card .frame-upload{
+  border:1px dashed #8b7add;background:linear-gradient(135deg,#17132b,#111722);
+  color:#c9beff;font-size:20px;box-shadow:0 0 15px #8b5cf622;
+}
