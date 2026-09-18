@@ -330,6 +330,7 @@ async function selectServer(serverItem) {
   if (callState.active) leaveCall();
   renderServers();
   $("#workspace-name").textContent = currentServer.name;
+  $("#workspace-brand")?.classList.add("workspace-brand-ready");
   const data = await api("/api/servers/" + currentServer.id + "/channels");
   channels = data.channels;
   $("#workspace-role").textContent = data.role + " · guest";
@@ -1038,6 +1039,9 @@ function openCallPopoverFrom(btn, kind) {
 }
 function updateCallDuration() {}
 
+const workspaceBrand=$("#workspace-brand");
+if(workspaceBrand) workspaceBrand.onclick=()=>{if(currentServer)setView("server-home")};
+
 $("#voice-call-btn").onclick = () => startCall("voice");
 $("#video-call-btn").onclick = () => startCall("video");
 
@@ -1135,6 +1139,7 @@ function orbitToast(title, body="", kind="") {
 function renderPage(view) {
   const cfg={
     home:["ORBIT / COMMAND CENTER","Home","A single control surface for communities, conversations, and live rooms."],
+    "server-home":["SERVER / HOME",currentServer?.name||"Server Home","Your community command center, members, roles, and channels."],
     discover:["DISCOVER","Discover communities","Explore spaces, categories, and new conversations."],
     dms:["DIRECT MESSAGES","Messages","Private conversations, groups, and recent contacts."],
     friends:["SOCIAL GRAPH","Friends","Online people, requests, suggestions, and connections."],
@@ -1148,6 +1153,7 @@ function renderPage(view) {
   $("#page-subtitle").textContent=cfg[2];
   $("#page-actions").innerHTML="";
   if(view==="home")renderHomePage();
+  if(view==="server-home")renderServerHomePage().catch(err=>orbitToast("Server Home",err.message,"error"));
   if(view==="discover")renderDiscoverPage();
   if(view==="dms")renderDMPage();
   if(view==="friends")renderFriendsPage();
@@ -1160,7 +1166,7 @@ function setView(view){
   orbitUI.view=view;
   document.querySelectorAll(".rail-nav[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
   const global=$("#global-page"),chat=$("#chat-view");
-  const globalViews=["home","discover","dms","friends","notifications","saved","explore","settings"];
+  const globalViews=["home","server-home","discover","dms","friends","notifications","saved","explore","settings"];
   if(globalViews.includes(view)){
     global.classList.remove("hidden");
     chat.classList.add("hidden");
@@ -1311,6 +1317,88 @@ async function openPulseProfile(userId){
     try{await api("/api/friends/request",{method:"POST",body:JSON.stringify({username:user.username})});closeModal();orbitToast("Friend request sent","Request sent to @"+user.username+".","success")}catch(e){orbitToast("Friend request failed",e.message,"error")}
   };
 }
+async function renderServerHomePage(){
+  if(!currentServer){
+    goChat();
+    return;
+  }
+  const serverId=String(currentServer.id);
+  const data=await api("/api/servers/"+encodeURIComponent(serverId)+"/members");
+  const memberRows=(data.members||[]);
+  const textChannels=channels.filter(c=>c.type!=="voice");
+  const voiceChannels=channels.filter(c=>c.type==="voice");
+  const onlineMembers=memberRows.filter(m=>String(m.status||"").toLowerCase()==="online");
+  const role=String(currentServer.role||memberRows.find(m=>String(m.id)===String(me?.id))?.role||"member");
+  const canManage=["owner","admin"].includes(role);
+  const welcomeKey="orbit_onboarding_"+serverId+"_"+String(me?.id||"guest");
+  const onboardingDone=localStorage.getItem(welcomeKey)==="done";
+  const profileReady=Boolean(me?.avatar_url)||Boolean(orbitUI.profile?.bio);
+  const topMembers=memberRows.slice(0,8);
+  $("#page-eyebrow").textContent="SERVER / HOME";
+  $("#page-title").textContent=currentServer.name;
+  $("#page-subtitle").textContent="Your community command center.";
+  $("#page-actions").innerHTML='<button id="server-home-chat" class="primary">Open chat</button><button id="server-home-invite">Invite</button>';
+  $("#page-body").innerHTML=
+    '<div class="server-home-hero">'+
+      '<div class="server-home-hero-copy"><span class="eyebrow">ORBIT WORLD</span><h2>'+escapeHtml(currentServer.name)+'</h2><p>Welcome back. Jump into the conversation, meet members, or personalize your community.</p>'+
+      '<div class="server-home-hero-actions"><button class="hero-action" id="server-home-open-chat">Open #'+escapeHtml(currentChannel?.name||textChannels[0]?.name||"general")+'</button><button class="hero-action soft" id="server-home-members">Browse members</button></div></div>'+
+      '<div class="server-orbit-badge"><span>'+escapeHtml(currentServer.name.slice(0,2).toUpperCase())+'</span><i></i></div>'+
+    '</div>'+
+    (!onboardingDone?
+      '<div class="server-onboarding"><div><span class="eyebrow">QUICK START</span><h3>Make Orbit yours</h3><p>Three small steps to get this server feeling like home.</p></div><div class="onboarding-steps">'+
+      '<button class="onboarding-step" id="onboard-profile"><span>01</span><strong>Complete profile</strong><small>'+(profileReady?"Done · profile has a personal touch":"Add your bio or avatar")+'</small></button>'+
+      '<button class="onboarding-step" id="onboard-chat"><span>02</span><strong>Open a channel</strong><small>Start with #'+escapeHtml(textChannels[0]?.name||"general")+'</small></button>'+
+      '<button class="onboarding-step" id="onboard-invite"><span>03</span><strong>Invite friends</strong><small>Bring someone into the community</small></button>'+
+      '</div><button class="onboarding-dismiss" id="onboard-done">Got it</button></div>':'')+
+    '<div class="server-metrics">'+
+      '<div class="metric"><span>Members</span><strong>'+memberRows.length+'</strong><span>Total community</span></div>'+
+      '<div class="metric"><span>Online</span><strong>'+onlineMembers.length+'</strong><span>Currently active</span></div>'+
+      '<div class="metric"><span>Channels</span><strong>'+channels.length+'</strong><span>Text & voice rooms</span></div>'+
+      '<div class="metric"><span>Your role</span><strong>'+escapeHtml(role.toUpperCase())+'</strong><span>Access level in this server</span></div>'+
+    '</div>'+
+    '<div class="server-home-columns">'+
+      '<section class="server-home-card"><div class="section-heading"><h3>Channels</h3><span>'+textChannels.length+' text · '+voiceChannels.length+' voice</span></div>'+
+      '<div class="server-channel-home-list">'+channels.slice(0,10).map(c=>'<button class="server-channel-home" data-home-channel="'+escapeHtml(c.id)+'"><span class="home-channel-icon">'+(c.type==="voice"?"◉":"#")+'</span><div><strong>'+escapeHtml(c.name)+'</strong><small>'+escapeHtml(c.type==="voice"?"Voice room":"Text channel")+'</small></div><b>Open</b></button>').join("")+'</div></section>'+
+      '<section class="server-home-card"><div class="section-heading"><h3>Members</h3><span>'+memberRows.length+' total</span></div>'+
+      '<div class="server-member-grid">'+topMembers.map(m=>'<button class="server-member-card" data-home-user="'+escapeHtml(m.id)+'"><div class="avatar '+(m.avatar_url?"has-image":"")+'">'+(m.avatar_url?'<img src="'+escapeHtml(m.avatar_url)+'" alt="">':escapeHtml(avatar(m.username)))+'</div><div><strong>'+escapeHtml(m.display_name||m.username)+'</strong><small>@'+escapeHtml(m.username)+' · '+escapeHtml(m.role)+'</small></div><i class="'+(String(m.status||"").toLowerCase()==="online"?"online":"offline")+'"></i></button>').join("")+'</div></section>'+
+    '</div>'+
+    '<div class="server-home-card server-role-card"><div class="section-heading"><h3>Roles</h3><span>Current role: '+escapeHtml(role)+'</span></div>'+
+      '<div class="role-chip-row"><span class="role-chip owner">OWNER <small>Full control</small></span><span class="role-chip admin">ADMIN <small>Manage community</small></span><span class="role-chip moderator">MODERATOR <small>Moderation tools</small></span><span class="role-chip member">MEMBER <small>Community access</small></span></div>'+
+      (canManage?
+        '<div class="role-manager"><div><strong>Quick role manager</strong><small>Assign a role without leaving Server Home.</small></div><div class="role-manager-controls"><select id="home-role-user">'+memberRows.filter(m=>m.role!=="owner").map(m=>'<option value="'+escapeHtml(m.id)+'">'+escapeHtml(m.username)+' · '+escapeHtml(m.role)+'</option>').join("")+'</select><select id="home-role-value"><option value="member">Member</option><option value="moderator">Moderator</option><option value="admin">Admin</option></select><button class="primary" id="home-role-save">Save role</button></div></div>':
+        '<div class="role-manager role-manager-note"><strong>Need higher access?</strong><small>Owners and admins can assign custom server roles from here.</small></div>')+
+    '</div>';
+  $("#server-home-chat").onclick=goChat;
+  $("#server-home-open-chat").onclick=goChat;
+  $("#server-home-invite").onclick=()=>$("#invite-btn")?.click();
+  $("#server-home-members").onclick=()=>{$("#members-panel")?.classList.remove("hidden");loadMembers().catch(()=>{})};
+  document.querySelectorAll("[data-home-channel]").forEach(b=>b.onclick=async()=>{
+    const ch=channels.find(c=>String(c.id)===String(b.dataset.homeChannel));
+    if(ch){goChat();await selectChannel(ch);}
+  });
+  document.querySelectorAll("[data-home-user]").forEach(b=>b.onclick=()=>{
+    const u=memberRows.find(x=>String(x.id)===String(b.dataset.homeUser));
+    if(!u)return;
+    openModal("Profile",
+      '<div class="profile-card-pro"><div class="profile-card-cover"></div><div class="profile-card-avatar '+(u.avatar_url?"has-image":"")+'">'+(u.avatar_url?'<img src="'+escapeHtml(u.avatar_url)+'" alt="">':escapeHtml(avatar(u.username)))+'</div><div class="profile-card-main"><strong>'+escapeHtml(u.display_name||u.username)+'</strong><span>@'+escapeHtml(u.username)+'</span><em>'+escapeHtml(u.status||"online")+' · '+escapeHtml(u.role)+'</em></div><div class="profile-card-bio">'+escapeHtml(u.activity||"Member of "+currentServer.name)+'</div><div class="profile-card-actions"><button class="primary" id="home-profile-message">Message</button><button id="home-profile-friend">Add friend</button></div></div>');
+    $("#home-profile-message").onclick=async()=>{try{await api("/api/dms",{method:"POST",body:JSON.stringify({username:u.username})});closeModal();setView("dms");renderDMPage()}catch(err){orbitToast("DM failed",err.message,"error")}};
+    $("#home-profile-friend").onclick=async()=>{try{await api("/api/friends/request",{method:"POST",body:JSON.stringify({username:u.username})});closeModal();orbitToast("Friend request sent","Request sent to @"+u.username+".","success")}catch(err){orbitToast("Friend request failed",err.message,"error")}};
+  });
+  if($("#onboard-profile"))$("#onboard-profile").onclick=()=>{setView("settings");renderSettingsPage("profile")};
+  if($("#onboard-chat"))$("#onboard-chat").onclick=goChat;
+  if($("#onboard-invite"))$("#onboard-invite").onclick=()=>$("#server-home-invite")?.click();
+  if($("#onboard-done"))$("#onboard-done").onclick=()=>{localStorage.setItem(welcomeKey,"done");renderServerHomePage()};
+  if($("#home-role-save"))$("#home-role-save").onclick=async()=>{
+    try{
+      const userId=$("#home-role-user").value;
+      const newRole=$("#home-role-value").value;
+      await api("/api/servers/"+encodeURIComponent(serverId)+"/members/"+encodeURIComponent(userId)+"/role",{method:"PATCH",body:JSON.stringify({role:newRole})});
+      orbitToast("Role updated","Member role changed to "+newRole+".","success");
+      renderServerHomePage();
+    }catch(err){orbitToast("Role update failed",err.message,"error")}
+  };
+}
+
 function renderHomePage(){
   $("#page-actions").innerHTML='<button id="home-create">+ Create server</button><button id="home-search">Search</button>';
   $("#page-body").innerHTML=
