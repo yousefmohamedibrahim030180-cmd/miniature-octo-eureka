@@ -250,7 +250,19 @@ function connectRealtime() {
     console.error("[orbit] realtime connect error", err);
     if (callState.active) setCallIndicator("RECONNECTING");
   });
-  socket.on("error:toast", payload => orbitToast("Server", payload?.message || "Action blocked."));
+  socket.on("error:toast", payload => orbitToast("Server", payload?.message || "Action blocked."));\n  socket.on("server:removed", payload => {
+    if (String(payload?.action || "").toLowerCase() === "ban") {
+      if (callState.active) leaveCall();
+      currentServer = null;
+      currentChannel = null;
+      channels = [];
+      renderServers();
+      renderChannels();
+      orbitToast("Server access removed", "You have been banned from this server.", "error");
+      loadServers().catch(() => {});
+    }
+  });
+
   socket.on("disconnect", () => {
     if (callState.active) setCallIndicator("RECONNECTING");
   });
