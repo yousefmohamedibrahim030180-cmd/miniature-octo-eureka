@@ -25,6 +25,7 @@ const memory = {
   friendships: new Set(),
   dms: new Map(),
   dmMessages: new Map(),
+  dmReads: new Map(),
   notifications: new Map(),
   threads: new Map(),
   polls: new Map(),
@@ -341,7 +342,8 @@ app.get("/api/dms", auth, (req, res) => {
       const otherId = dm.members.find(idValue => idValue !== String(req.user.id));
       const other = otherId ? memory.users.get(otherId) : null;
       const list = memory.dmMessages.get(dm.id) || [];
-      return { ...dm, otherUser: other ? publicUser(other) : null, lastMessage: list[list.length - 1] || null };
+      const unreadCount = list.filter(m => String(m.user_id) !== String(req.user.id) && !m.seen_at).length;
+      return { ...dm, otherUser: other ? publicUser(other) : null, lastMessage: list[list.length - 1] || null, unreadCount };
     })
     .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
   res.json({ dms: rows });
@@ -374,7 +376,7 @@ app.post("/api/dms/:id/messages", auth, (req, res) => {
   if (!dm || !dm.members.includes(String(req.user.id))) return res.status(403).json({ error: "Not a participant" });
   const content = String(req.body?.content || "").trim().slice(0, 4000);
   if (!content) return res.status(400).json({ error: "Message is empty" });
-  const message = { id: id("dmmsg"), dm_id: dm.id, content, user_id: req.user.id, username: req.user.username, created_at: now() };
+  const message = { id: id("dmmsg"), dm_id: dm.id, content, user_id: req.user.id, username: req.user.username, created_at: now(), seen_at: null };
   const list = memory.dmMessages.get(dm.id) || [];
   list.push(message);
   memory.dmMessages.set(dm.id, list.slice(-500));
@@ -383,6 +385,23 @@ app.post("/api/dms/:id/messages", auth, (req, res) => {
   }
   io.to(socketRoom("dm", dm.id)).emit("dm:message", message);
   res.status(201).json({ message });
+});
+
+app.post("/api/dms/:id/read", auth, (req, res) => {
+  const dm = memory.dms.get(req.params.id);
+  if (!dm || !dm.members.includes(String(req.user.id))) return res.status(403).json({ error: "Not a participant" });
+  const readAt = now();
+  const list = memory.dmMessages.get(dm.id) || [];
+  let changed = false;
+  for (const message of list) {
+    if (String(message.user_id) !== String(req.user.id) && !message.seen_at) {
+      message.seen_at = readAt;
+      changed = true;
+    }
+  }
+  memory.dmReads.set(dm.id + ":" + req.user.id, readAt);
+  if (changed) io.to(socketRoom("dm", dm.id)).emit("dm:read", { dmId: dm.id, readerId: req.user.id, readAt });
+  res.json({ ok: true, readAt });
 });
 
 app.get("/api/notifications", auth, (req, res) => {
@@ -996,6 +1015,32 @@ io.on("connection", socket => {
     const dm = memory.dms.get(String(dmId));
     if (!dm || !dm.members.includes(String(socket.user.id))) return;
     socket.join(socketRoom("dm", dmId));
+  });
+
+  socket.on("dm:typing", ({ dmId, isTyping }) => {
+    const dm = memory.dms.get(String(dmId));
+    if (!dm || !dm.members.includes(String(socket.user.id))) return;
+    socket.to(socketRoom("dm", dmId)).emit("dm:typing", {
+      dmId: dm.id,
+      userId: socket.user.id,
+      username: socket.user.username,
+      isTyping: Boolean(isTyping)
+    });
+  });
+
+  socket.on("dm:read", dmId => {
+    const dm = memory.dms.get(String(dmId));
+    if (!dm || !dm.members.includes(String(socket.user.id))) return;
+    const readAt = now();
+    const list = memory.dmMessages.get(dm.id) || [];
+    let changed = false;
+    for (const message of list) {
+      if (String(message.user_id) !== String(socket.user.id) && !message.seen_at) {
+        message.seen_at = readAt;
+        changed = true;
+      }
+    }
+    if (changed) io.to(socketRoom("dm", dm.id)).emit("dm:read", { dmId: dm.id, readerId: socket.user.id, readAt });
   });
 
   socket.on("disconnect", () => {
