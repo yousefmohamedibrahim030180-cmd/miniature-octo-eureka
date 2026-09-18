@@ -864,3 +864,56 @@ body{
   font-size:10px!important;font-weight:700;
 }
 .friend-send-btn:disabled{opacity:.42;cursor:not-allowed;filter:saturate(.5)}
+
+
+/* Orbit search redesign + unique username UI */
+.sidebar-search{
+  min-height:44px;
+  margin:10px 11px 8px;
+  padding:0 10px;
+  border-radius:12px;
+  background:linear-gradient(145deg,#121923,#0d131a);
+  border:1px solid #283442;
+  transition:.16s;
+}
+.sidebar-search:hover,
+.sidebar-search.focused{
+  border-color:color-mix(in srgb,var(--accent) 56%,#283442);
+  background:#141c26;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 8%,transparent);
+}
+.sidebar-search input{font-size:10px}
+.sidebar-search kbd{background:#1a222d;border-color:#2d3846;color:#8a95a6;border-radius:6px}
+.search-shell{display:grid;gap:12px}
+.search-input-box{
+  height:50px;display:flex;align-items:center;gap:10px;padding:0 12px;
+  border:1px solid #2d3947;border-radius:13px;background:#0b1118;
+  box-shadow:inset 0 1px rgba(255,255,255,.02);
+}
+.search-input-box:focus-within{border-color:color-mix(in srgb,var(--accent) 64%,#2d3947);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 10%,transparent)}
+.search-input-box>span{font-size:17px;color:#8692a5}
+.search-input-box input{flex:1!important;width:auto!important;margin:0!important;min-height:0!important;padding:0!important;border:0!important;background:transparent!important;outline:0!important;color:#eef2f7!important;font-size:11px!important}
+.search-input-box kbd{padding:4px 7px;border:1px solid #293440;border-radius:6px;color:#758196;background:#111821;font-size:7px}
+#global-search-results{display:grid;gap:10px;max-height:430px;overflow:auto}
+.search-section{border:1px solid #263240;border-radius:13px;background:#0d131a;overflow:hidden}
+.search-section-head{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;border-bottom:1px solid #222d38;background:#101720}
+.search-section-head strong{font-size:9px;color:#e4e9f1;text-transform:uppercase;letter-spacing:.08em}
+.search-section-head span{font-size:8px;color:#6f7b8e}
+.search-result{width:100%;display:flex;align-items:center;gap:10px;padding:10px 11px;border:0;border-bottom:1px solid #1d2732;background:transparent;color:inherit;text-align:left}
+.search-result:last-child{border-bottom:0}
+.search-result:hover{background:#151e29}
+.search-result>div:nth-child(2){min-width:0;flex:1}
+.search-result strong{display:block;font-size:10px;color:#edf2f7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-result span{display:block;margin-top:2px;font-size:8px;color:#778397;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-result>b{font-size:7px;font-weight:600;color:#8f9caf;padding:5px 7px;border:1px solid #293542;border-radius:7px;background:#131b24}
+.search-type-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;background:#151e29;border:1px solid #293542;color:#a2afc1;flex:0 0 auto}
+.search-empty{min-height:110px;display:grid;place-items:center;text-align:center;padding:20px;color:#778397}
+.search-empty-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:color-mix(in srgb,var(--accent) 14%,#111821);border:1px solid color-mix(in srgb,var(--accent) 32%,#293542);color:var(--accent2);font-size:19px}
+.search-empty strong{font-size:10px;color:#e9edf4;margin-top:8px}
+.search-empty span{font-size:8px;margin-top:2px}
+.username-field{display:flex;align-items:center;gap:0;margin-bottom:5px;border:1px solid #2b3745;border-radius:11px;background:#0c1219;overflow:hidden}
+.username-field>span{padding-left:12px;color:var(--accent2);font-size:12px;font-weight:800}
+.username-field input{flex:1!important;width:auto!important;margin:0!important;min-height:42px!important;border:0!important;background:transparent!important}
+.username-field button{height:32px;margin-right:6px;padding:0 9px;border-radius:8px;border:1px solid #2a3542;background:#151e29;color:#d7deea;font-size:8px}
+.field-note{font-size:8px;color:#768296;margin:4px 2px 11px}
+.field-note.is-good{color:#67d79a}.field-note.is-bad{color:#ff8897}
