@@ -776,3 +776,31 @@ body{
 .primary-soft{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 34%,#171c28),color-mix(in srgb,var(--accent) 22%,#111721));border-color:color-mix(in srgb,var(--accent) 60%,#303848)}
 .call-empty-icon{background:radial-gradient(circle at 35% 30%,var(--accent2),var(--accent) 70%)}
 @media(max-width:560px){.accent-palette{grid-template-columns:1fr 1fr}}
+
+
+/* Dedicated screen sharing controls */
+.screen-head-action{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 28%,#121923),#101720);
+  border-color:color-mix(in srgb,var(--accent) 58%,#2a3440);
+  box-shadow:0 8px 22px color-mix(in srgb,var(--accent) 14%,transparent);
+}
+.screen-head-action:hover{border-color:color-mix(in srgb,var(--accent2) 72%,#303a46)}
+.share-screen-btn{
+  min-width:46px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+}
+.share-screen-btn .share-label{font-size:9px}
+.share-screen-btn.screen-live{
+  background:linear-gradient(135deg,#244f3e,#18372c);
+  border-color:#3c8b66;
+  color:#a8f0c7;
+  box-shadow:0 0 0 1px #3c8b6640 inset,0 8px 24px #1f8a5b22;
+}
+@media(max-width:850px){
+  .screen-head-action{display:none}
+  .share-screen-btn .share-label{display:none}
+  .share-screen-btn{width:42px;padding:0}
+}
