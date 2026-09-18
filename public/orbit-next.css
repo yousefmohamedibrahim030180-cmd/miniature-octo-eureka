@@ -972,3 +972,61 @@ body{
   #app .head-action{display:none!important}
   #app .mobile-sidebar-btn{display:grid!important;place-items:center!important}
 }
+
+
+/* =========================================================
+   ORBIT NEXUS / V9.2 — viewport lock
+   Guarantees the application surface occupies the entire browser viewport.
+   ========================================================= */
+html,body,#app.app{
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+}
+#app.app{
+  position:fixed!important;
+  inset:0!important;
+  margin:0!important;
+  height:100dvh!important;
+  min-height:100vh!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+}
+#app.app > .server-rail,
+#app.app > .content,
+#app.app > .sidebar{
+  min-width:0!important;
+  box-sizing:border-box!important;
+}
+#app.app > .content{
+  width:auto!important;
+  min-height:0!important;
+  overflow:hidden!important;
+}
+#app.app > .content > .chat,
+#app.app > .content > .global-page{
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+}
+@media (min-width:641px){
+  #app.app{
+    grid-template-columns:76px 282px minmax(0,1fr)!important;
+    padding:10px!important;
+    gap:10px!important;
+  }
+  #app.app:not(.server-sidebar-open){
+    grid-template-columns:76px minmax(0,1fr)!important;
+  }
+}
+@media (min-width:641px) and (max-width:1100px){
+  #app.app.server-sidebar-open{grid-template-columns:68px 250px minmax(0,1fr)!important}
+  #app.app:not(.server-sidebar-open){grid-template-columns:68px minmax(0,1fr)!important}
+}
+@media (max-width:640px){
+  #app.app{
+    grid-template-columns:56px minmax(0,1fr)!important;
+    padding:6px!important;
+    gap:6px!important;
+  }
+}
