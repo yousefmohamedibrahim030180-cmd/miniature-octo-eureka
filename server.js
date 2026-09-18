@@ -624,7 +624,7 @@ async function requestOrbitModel(messages) {
   if(!url || !key) return null;
   const response=await fetch(url,{
     method:"POST",
-    headers:{"content-type":"application/json","authorization:"Bearer "+key},
+    headers:{"content-type":"application/json","authorization":"Bearer "+key},
     body:JSON.stringify({model,messages})
   });
   if(!response.ok) throw new Error("AI provider returned HTTP "+response.status);
