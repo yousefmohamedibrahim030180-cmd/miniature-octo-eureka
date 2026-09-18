@@ -4299,3 +4299,109 @@ body::before,body::after,.app::before{display:none!important}
   .app:not(.server-sidebar-open){grid-template-columns:56px 1fr!important}
   .app.server-sidebar-open{grid-template-columns:56px 1fr!important}
 }
+
+
+/* =========================================================
+   ORBIT PRO / V8 — media, sound and upload experience
+   ========================================================= */
+.content{position:relative!important}
+.drop-overlay{
+  position:absolute;inset:0;z-index:120;
+  display:grid;place-items:center;
+  background:rgba(7,9,13,.72);
+  backdrop-filter:blur(8px);
+  border:2px dashed color-mix(in srgb,var(--easy-accent) 70%,white 10%);
+  pointer-events:none;
+}
+.drop-card{
+  min-width:min(460px,80vw);padding:28px 34px;text-align:center;
+  border:1px solid #5d53a8;border-radius:18px;
+  background:linear-gradient(180deg,#1b1930,#15171d);
+  box-shadow:0 24px 80px rgba(0,0,0,.55),0 0 55px rgba(124,108,255,.18);
+}
+.drop-icon{
+  width:56px;height:56px;margin:0 auto 12px;display:grid;place-items:center;
+  border-radius:16px;background:#2b2750;color:#dcd8ff;font-size:28px;
+  box-shadow:inset 0 0 0 1px #4d4389;
+}
+.drop-card strong{display:block;font-size:18px;color:#fff}
+.drop-card span{display:block;margin-top:7px;font-size:10px;line-height:1.6;color:#929aa7}
+.upload-overlay{
+  position:absolute;left:50%;bottom:22px;transform:translateX(-50%);
+  z-index:125;min-width:min(420px,calc(100% - 28px));
+}
+.upload-card{
+  display:grid;grid-template-columns:42px 1fr;gap:10px;align-items:center;
+  padding:12px 14px;border:1px solid #3d4350;border-radius:12px;
+  background:rgba(20,23,29,.96);backdrop-filter:blur(12px);
+  box-shadow:0 18px 50px rgba(0,0,0,.45);
+}
+.upload-icon{
+  width:38px;height:38px;border-radius:10px;display:grid;place-items:center;
+  background:#242038;color:#cfc9ff;font-size:19px;
+}
+.upload-copy{min-width:0}
+.upload-copy strong{display:block;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#f0f2f6}
+.upload-copy span{display:block;margin-top:3px;font-size:8px;color:#89919f}
+.upload-progress{grid-column:1/-1;height:4px;border-radius:999px;background:#2b2e36;overflow:hidden}
+.upload-progress i{display:block;width:0;height:100%;border-radius:999px;background:linear-gradient(90deg,#6f61ff,#a191ff);box-shadow:0 0 16px rgba(124,108,255,.45);transition:width .18s ease}
+
+.message-attachment{
+  margin-top:8px;max-width:min(520px,72vw);overflow:hidden;
+  border:1px solid #3a3e47;border-radius:11px;background:#171a20;
+}
+.message-attachment>a{
+  display:flex;gap:10px;align-items:center;padding:10px 12px;color:#e9edf4;text-decoration:none;
+}
+.message-attachment>a:hover{background:#1d2128}
+.message-attachment>img,.message-attachment>video{
+  display:block;width:100%;max-height:310px;object-fit:contain;background:#0d0f12;
+}
+.message-attachment>audio{display:block;width:calc(100% - 20px);margin:10px}
+.message-attachment>div:not(.file-badge){
+  display:grid;gap:2px;padding:0 12px 10px;
+}
+.message-attachment strong{font-size:9px;word-break:break-word;color:#eef1f4}
+.message-attachment span{font-size:8px;color:#838c99}
+.file-attachment{display:grid;grid-template-columns:40px 1fr auto;align-items:center;padding:9px}
+.file-attachment>div:not(.file-badge){padding:0 8px}
+.file-attachment>a{padding:7px 9px!important;font-size:8px;border-radius:7px;background:#282b33}
+.file-badge{
+  width:36px;height:36px;display:grid;place-items:center;border-radius:9px;
+  background:#29253f;color:#c8bfff;font-size:8px;font-weight:800;letter-spacing:.06em;
+}
+.message-attachment.media-attachment>div{padding-bottom:10px}
+
+.settings-status-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:44px;height:24px;padding:0 8px;border:1px solid #3e4550;
+  border-radius:999px;background:#11151a;color:#8f98a7;font-size:7px;letter-spacing:.12em
+}
+.sound-test-row{align-items:center}
+#sound-volume{width:180px;accent-color:var(--easy-accent)}
+#sound-volume-value{min-width:32px;text-align:right;color:#a2a9b4!important}
+.settings-card select#sound-pack{min-width:150px}
+.settings-card #preferred-fps,.settings-card #preferred-quality{min-width:145px}
+
+#quick-screen-share-btn:not(.hidden),#share-btn:not(.hidden),#dock-screen:not(.hidden){
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
+}
+#quick-screen-share-btn:not(.hidden):hover,#share-btn:not(.hidden):hover,#dock-screen:not(.hidden):hover{
+  box-shadow:0 0 0 1px #4d4389,0 0 24px rgba(124,108,255,.13);
+}
+#share-btn.screen-live{
+  position:relative;overflow:hidden;
+}
+#share-btn.screen-live::after{
+  content:"";position:absolute;inset:-30%;border:1px solid rgba(125,112,255,.35);
+  border-radius:999px;animation:orbitSharePulse 1.6s ease-out infinite;
+}
+@keyframes orbitSharePulse{
+  0%{transform:scale(.55);opacity:.75}
+  100%{transform:scale(1.15);opacity:0}
+}
+
+@media(max-width:680px){
+  .drop-card{min-width:0;width:min(420px,88vw);padding:22px}
+  .message-attachment{max-width:88vw}
+}
