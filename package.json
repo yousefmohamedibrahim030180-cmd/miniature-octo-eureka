@@ -1,0 +1,16 @@
+{
+  "name": "orbit-chat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production realtime chat platform with Discord-style workspaces, roles, channels and Socket.IO.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "dev": "node server.js" },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3",
+    "socket.io": "^4.8.1"
+  },
+  "engines": { "node": ">=22.0.0 <23.0.0" }
+}
