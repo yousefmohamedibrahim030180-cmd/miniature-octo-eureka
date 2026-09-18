@@ -1,136 +1,119 @@
-/* ORBIT DESK product layer */
+/* ORBIT SOCIAL — community first home */
 (function(){
   "use strict";
-  if(window.__orbitDeskInstalled)return;
-  window.__orbitDeskInstalled=true;
+  if(window.__orbitSocialInstalled)return;
+  window.__orbitSocialInstalled=true;
 
-  function q(s){return document.querySelector(s)}
-  function esc(x){return String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
-  function go(view){try{setView(view)}catch(e){console.warn(e)}}
-  function chat(){try{goChat()}catch(e){console.warn(e)}}
-  function fmtTime(ts){if(!ts)return "";const d=new Date(ts);return Number.isNaN(d.getTime())?"":d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
-  function currentProjectTasks(projects){
-    const selected=orbitUI.projectId&&projects.find(p=>String(p.id)===String(orbitUI.projectId));
-    return (selected||projects[0])?.tasks||[];
+  const q=s=>document.querySelector(s);
+  const esc=x=>String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+  const liveUsers=()=> (pulseState?.users||[]).filter(u=>String(u.status||"online").toLowerCase()!=="offline");
+  const liveCalls=()=> (pulseState?.calls||[]);
+  const activity=()=> (pulseState?.activity||[]);
+  const go=v=>{try{setView(v)}catch(e){console.warn(e)}};
+  const chat=()=>{try{goChat()}catch(e){console.warn(e)}};
+
+  function personMarkup(u){
+    return '<button class="osocial-person" data-social-user="'+esc(u.id)+'">'+
+      '<span class="osocial-avatar">'+esc(avatar(u.username||"G"))+'</span>'+
+      '<span class="osocial-person-copy"><strong>'+esc(u.display_name||u.username||"Guest")+'</strong><span>'+esc(u.activity||u.status||"Online")+'</span></span>'+
+      '<i class="osocial-online-dot"></i></button>';
   }
 
-  async function renderDesk(){
-    if(!q("#page-body"))return;
-    const server=currentServer||null;
-    q("#page-actions").innerHTML=
-      '<button id="desk-search">Search Orbit</button><button id="desk-chat" class="primary">Open Space</button>';
+  function activityMarkup(a){
+    const u=a.user||{};let text="active in Orbit";
+    if(a.type==="message")text="messaged #"+(a.channelName||"channel");
+    if(a.type==="call-start")text="joined "+(a.mode==="voice"?"voice":"video")+" in #"+(a.channelName||"room");
+    if(a.type==="call-end")text="left #"+(a.channelName||"room");
+    if(a.type==="screen-share")text="started screen sharing";
+    if(a.type==="presence")text=(a.activity||u.status||"online");
+    return '<button class="osocial-row" data-social-user="'+esc(u.id||"")+'"><span class="osocial-row-icon">✦</span><span class="osocial-row-main"><strong>'+esc(u.display_name||u.username||"Guest")+'</strong><span>'+esc(text)+(a.preview?' · '+esc(a.preview):"")+'</span></span><span class="osocial-row-end">'+formatPulseTime(a.createdAt)+'</span></button>';
+  }
 
-    q("#page-body").innerHTML=
-      '<div class="orbit-desk">'+
-        '<header class="orbit-desk-head">'+
-          '<div class="orbit-desk-title"><span class="orbit-desk-kicker">ORBIT WORKSPACE</span><h2>Your Desk</h2><p>One place to talk, meet, plan, and move work forward.</p></div>'+
-          '<div class="orbit-desk-head-actions"><button class="orbit-desk-btn" id="desk-focus">Focus</button><button class="orbit-desk-btn" id="desk-ai">ORBIT AI</button><button class="orbit-desk-btn primary" id="desk-new-chat">New conversation</button></div>'+
-        '</header>'+
-        '<div class="orbit-desk-grid">'+
-          '<main class="orbit-desk-main">'+
-            '<section class="orbit-desk-card orbit-continue">'+
-              '<div class="orbit-continue-copy"><span class="eyebrow">CONTINUE WHERE YOU LEFT OFF</span><h3>'+(server?esc(server.name):'Orbit Lobby')+'</h3><p>'+(server?'Pick up the current conversation, jump into a live room, or work on shared tasks without leaving your community.':'Create or join a community and Orbit will turn it into a shared workspace.')+'</p>'+
-              '<div class="orbit-continue-meta"><span class="orbit-desk-chip"><b>'+(server?esc(currentChannel?.name||"general"):'No space')+'</b> current Space</span><span class="orbit-desk-chip"><b>'+(pulseState.users||[]).filter(u=>String(u.status||"online")!=="offline").length+'</b> online</span><span class="orbit-desk-chip"><b>'+(pulseState.calls||[]).length+'</b> live rooms</span></div></div>'+
-              '<div class="orbit-continue-action"><button id="desk-open-space" class="orbit-desk-btn primary">Open current Space →</button></div>'+
-            '</section>'+
-            '<div class="orbit-desk-statline" id="desk-stats"></div>'+
-            '<section class="orbit-desk-card"><div class="orbit-desk-card-head"><div><strong>Live now</strong><span>People and rooms that need attention</span></div><button class="orbit-desk-btn" id="desk-calls">View all</button></div><div id="desk-live-list" class="orbit-desk-list"></div></section>'+
-            '<section class="orbit-desk-card"><div class="orbit-desk-card-head"><div><strong>Shared work</strong><span>Tasks from the active community</span></div><button class="orbit-desk-btn" id="desk-projects">Projects</button></div><div id="desk-tasks"></div></section>'+
-          '</main>'+
-          '<aside class="orbit-desk-side">'+
-            '<section class="orbit-desk-card"><div class="orbit-desk-card-head"><div><strong>Activity</strong><span>Realtime workspace feed</span></div></div><div id="desk-activity" class="orbit-desk-list"></div></section>'+
-            '<section class="orbit-desk-card"><div class="orbit-desk-card-head"><div><strong>Upcoming</strong><span>Community events</span></div><button class="orbit-desk-btn" id="desk-events">Events</button></div><div id="desk-events-list" class="orbit-desk-list"></div></section>'+
-          '</aside>'+
-        '</div>'+
-        '<div class="orbit-desk-footgrid">'+
-          '<section class="orbit-desk-card"><div class="orbit-desk-card-head"><div><strong>Recent files</strong><span>Shared workspace files</span></div><button class="orbit-desk-btn" id="desk-files">Files</button></div><div id="desk-files-list" class="orbit-desk-list"></div></section>'+
-          '<section class="orbit-desk-card"><div class="orbit-desk-card-head"><div><strong>Why Orbit</strong><span>The product model</span></div></div><div class="orbit-desk-list"><div class="orbit-desk-item"><div class="orbit-desk-icon">◈</div><div class="orbit-desk-item-main"><strong>Conversation + execution</strong><span>Chat, calls, projects, files and events stay in the same workspace.</span></div></div><div class="orbit-desk-item"><div class="orbit-desk-icon">⌘</div><div class="orbit-desk-item-main"><strong>Fewer context switches</strong><span>Open the work surface you need without rebuilding your workflow in another tool.</span></div></div></div></section>'+
-        '</div>'+
-      '</div>';
+  async function renderSocial(){
+    const body=q("#page-body"); if(!body)return;
+    q("#page-actions").innerHTML='<button id="social-search">Search Orbit</button><button id="social-chat" class="primary">Open Space</button>';
+    const users=liveUsers().slice(0,8),calls=liveCalls().slice(0,5),acts=activity().slice(0,7);
+    const current=currentServer||null;
+    const textChannels=(channels||[]).filter(c=>c.type!=="voice").slice(0,8);
+    const communityCards=(servers||[]).slice(0,6);
 
-    $("#desk-search").onclick=()=>openSearchModal("");
-    $("#desk-chat").onclick=chat;
-    $("#desk-open-space").onclick=chat;
-    $("#desk-new-chat").onclick=()=>{chat();$("#message")?.focus()};
-    $("#desk-focus").onclick=()=>{document.body.classList.toggle("orbit-focus-on");orbitToast("Focus mode",document.body.classList.contains("orbit-focus-on")?"Focus enabled":"Focus disabled","success")};
-    $("#desk-ai").onclick=()=>go("ai");
-    $("#desk-calls").onclick=()=>go("calls");
-    $("#desk-projects").onclick=()=>go("projects");
-    $("#desk-events").onclick=()=>go("events");
-    $("#desk-files").onclick=()=>go("files");
+    body.innerHTML='<div class="orbit-social">'+
+      '<header class="osocial-header"><div class="osocial-brand"><div class="osocial-mark">◈</div><div class="osocial-brand-copy"><strong>ORBIT SOCIAL</strong><span>People · Communities · Conversations · Live</span></div></div><div class="osocial-actions"><button class="osocial-btn" id="social-discover">Discover</button><button class="osocial-btn" id="social-friends">Friends</button><button class="osocial-btn primary" id="social-new">New conversation</button></div></header>'+
+      '<section class="osocial-hero"><div class="osocial-hero-copy"><span class="eyebrow">YOUR SOCIAL SPACE</span><h1>Stay close to your people.</h1><p>Orbit puts conversations, friendships, communities, profiles and live presence in one calm social home. No project boards, no busywork — just people and the places they gather.</p><div class="osocial-presence"><span class="osocial-pill"><b>'+users.length+'</b> online now</span><span class="osocial-pill"><b>'+calls.length+'</b> live rooms</span><span class="osocial-pill"><b>'+servers.length+'</b> communities</span><span class="osocial-pill"><b>@'+esc(me?.username||"guest")+'</b> your identity</span></div></div><div class="osocial-hero-actions"><button class="osocial-btn primary" id="social-open-chat">Open current Space →</button><button class="osocial-btn" id="social-start-call">Start a live room</button><button class="osocial-btn" id="social-profile">My profile</button></div></section>'+
+      '<div class="osocial-grid">'+
+        '<main class="osocial-main">'+
+          '<section class="osocial-card"><div class="osocial-card-head"><div><strong>Live together</strong><span>People who are here right now</span></div><button class="osocial-link" id="social-view-calls">View live rooms</button></div><div class="osocial-live"><div class="osocial-people"><div class="osocial-people-grid">'+(users.length?users.map(personMarkup).join(""):'<div class="osocial-empty"><strong>No one else is online</strong>Invite your friends and community members to Orbit.</div>')+'</div></div><div class="osocial-rooms">'+(calls.length?calls.map(c=>'<button class="osocial-room" data-social-call="'+esc(c.channelId)+'"><span class="osocial-room-icon">◉</span><span class="osocial-room-copy"><strong>#'+esc(c.channelName||"room")+'</strong><span>'+esc(c.mode==="voice"?"Voice":"Video")+' · '+((c.participants||[]).length||0)+' people</span></span><span class="osocial-room-join">Join</span></button>').join(""):'<div class="osocial-empty"><strong>No live rooms</strong>Start voice or video when you want to hang out.</div>')+'</div></div></section>'+
+          '<section class="osocial-card"><div class="osocial-card-head"><div><strong>Your communities</strong><span>Jump straight to the people you follow</span></div><button class="osocial-link" id="social-view-communities">All communities</button></div><div class="osocial-discovery">'+(communityCards.length?communityCards.map(s=>'<div class="osocial-community-card"><span class="osocial-avatar">'+esc((s.name||"O").slice(0,1).toUpperCase())+'</span><strong>'+esc(s.name||"Community")+'</strong><span>'+Number(s.memberCount||0)+' members</span><button class="osocial-btn" data-social-community="'+esc(s.id)+'">Open community</button></div>').join(""):'<div class="osocial-empty"><strong>Your community list is empty</strong>Create a community to start your first social space.</div>')+'</div></section>'+
+          '<section class="osocial-card"><div class="osocial-card-head"><div><strong>Recent conversations</strong><span>What your social graph is doing</span></div><button class="osocial-link" id="social-view-activity">Open activity</button></div><div class="osocial-activity-list">'+(acts.length?acts.map(activityMarkup).join(""):'<div class="osocial-empty"><strong>No recent activity</strong>New messages, calls and presence changes will appear here.</div>')+'</div></section>'+
+        '</main>'+
+        '<aside class="osocial-side">'+
+          '<section class="osocial-card"><div class="osocial-card-head"><div><strong>People you know</strong><span>Friends and connections</span></div><button class="osocial-link" id="social-friends-2">Friends</button></div><div id="social-friend-list" class="osocial-friend-list"><div class="osocial-empty"><strong>Loading friends…</strong></div></div></section>'+
+          '<section class="osocial-card"><div class="osocial-card-head"><div><strong>Upcoming</strong><span>'+(current?esc(current.name):"Choose a community")+'</span></div><button class="osocial-link" id="social-events">Events</button></div><div id="social-event-list" class="osocial-event-list"><div class="osocial-empty"><strong>Loading events…</strong></div></div></section>'+
+          '<section class="osocial-card"><div class="osocial-card-head"><div><strong>Spaces</strong><span>Jump directly into conversation</span></div><button class="osocial-link" id="social-space-settings">Manage</button></div><div class="osocial-channel-list">'+(textChannels.length?textChannels.map(c=>'<button class="osocial-channel" data-social-channel="'+esc(c.id)+'"><b># '+esc(c.name)+'</b><span>Open</span></button>').join(""):'<div class="osocial-empty"><strong>No text spaces</strong>Select a community first.</div>')+'</div></section>'+
+        '</aside>'+
+      '</div>'+
+      '<div class="osocial-bottom">'+
+        '<section class="osocial-card"><div class="osocial-card-head"><div><strong>Make your profile yours</strong><span>Identity is part of the community</span></div><button class="osocial-link" id="social-profile-2">Customize</button></div><div class="osocial-community-list"><div class="osocial-row" id="social-profile-row"><span class="osocial-avatar">'+esc(avatar(me?.username||"G"))+'</span><span class="osocial-row-main"><strong>'+esc(me?.display_name||me?.username||"Guest")+'</strong><span>@'+esc(me?.username||"guest")+' · '+esc(orbitUI?.profile?.bio||"Add a bio, avatar and presence to be recognizable.")+'</span></span><span class="osocial-row-end">Profile →</span></div></div></section>'+
+        '<section class="osocial-card"><div class="osocial-card-head"><div><strong>Community discovery</strong><span>Find a new place to belong</span></div><button class="osocial-link" id="social-discover-2">Explore</button></div><div class="osocial-community-list"><div class="osocial-row" id="social-discover-row"><span class="osocial-row-icon">✦</span><span class="osocial-row-main"><strong>Discover communities</strong><span>Explore gaming, creative, tech, study and social spaces.</span></span><span class="osocial-row-end">Explore →</span></div></div></section>'+
+      '</div>'+
+    '</div>';
 
-    const pulse=pulseState||{users:[],calls:[],activity:[]};
-    const users=(pulse.users||[]).filter(u=>String(u.status||"online")!=="offline");
-    const calls=(pulse.calls||[]).slice(0,5);
-    const activity=(pulse.activity||[]).slice(0,6);
+    q("#social-search").onclick=()=>openSearchModal("");
+    q("#social-chat").onclick=chat;
+    q("#social-open-chat").onclick=chat;
+    q("#social-new").onclick=()=>{chat();q("#message")?.focus()};
+    q("#social-start-call").onclick=()=>{chat(); if(currentChannel?.type==="voice")startCall("video"); else orbitToast("Live room","Open a Voice Space first, then start video.","error")};
+    q("#social-profile").onclick=()=>{go("settings");setTimeout(()=>renderSettingsPage("profile"),0)};
+    q("#social-profile-2").onclick=q("#social-profile-row").onclick=q("#social-profile").onclick;
+    q("#social-discover").onclick=q("#social-discover-2").onclick=q("#social-discover-row").onclick=()=>go("discover");
+    q("#social-friends").onclick=q("#social-friends-2").onclick=()=>go("friends");
+    q("#social-events").onclick=()=>go("events");
+    q("#social-space-settings").onclick=()=>{if(currentServer)$("#workspace-menu")?.click();else go("communities")};
+    q("#social-view-calls").onclick=()=>go("calls");
+    q("#social-view-communities").onclick=()=>go("communities");
+    q("#social-view-activity").onclick=()=>go("notifications");
 
-    q("#desk-stats").innerHTML=
-      '<div class="orbit-desk-stat"><span>Communities</span><strong>'+servers.length+'</strong><small>Connected workspaces</small></div>'+
-      '<div class="orbit-desk-stat"><span>People online</span><strong>'+users.length+'</strong><small>Realtime presence</small></div>'+
-      '<div class="orbit-desk-stat"><span>Live rooms</span><strong>'+calls.length+'</strong><small>Active voice/video</small></div>'+
-      '<div class="orbit-desk-stat"><span>Current Space</span><strong>'+esc(currentChannel?.name||"general")+'</strong><small>'+esc(server?.name||"Orbit Lobby")+'</small></div>';
-
-    q("#desk-live-list").innerHTML=calls.length?calls.map(c=>
-      '<button class="orbit-desk-item" data-desk-call="'+esc(c.channelId)+'"><div class="orbit-desk-icon">◉</div><div class="orbit-desk-item-main"><strong>#'+esc(c.channelName||"room")+'</strong><span>'+esc(c.mode==="voice"?"Voice":"Video")+' · '+((c.participants||[]).length||0)+' participants</span></div><span class="orbit-desk-item-end">Join →</span></button>'
-    ).join(""):'<div class="orbit-desk-empty"><strong>No live rooms</strong>Start a room when you are ready.</div>';
-    document.querySelectorAll("[data-desk-call]").forEach(b=>b.onclick=async()=>{
-      const c=calls.find(x=>String(x.channelId)===String(b.dataset.deskCall)); if(!c)return;
-      const s=servers.find(x=>String(x.id)===String(c.serverId)); if(s)await selectServer(s);
-      const ch=(channels||[]).find(x=>String(x.id)===String(c.channelId)); if(ch)await selectChannel(ch);
+    document.querySelectorAll("[data-social-user]").forEach(b=>b.onclick=()=>openPulseProfile(b.dataset.socialUser));
+    document.querySelectorAll("[data-social-community]").forEach(b=>b.onclick=async()=>{
+      const s=servers.find(x=>String(x.id)===String(b.dataset.socialCommunity));if(!s)return;
+      await selectServer(s);goChat();
+    });
+    document.querySelectorAll("[data-social-channel]").forEach(b=>b.onclick=async()=>{
+      const c=(channels||[]).find(x=>String(x.id)===String(b.dataset.socialChannel));if(c){await selectChannel(c);chat()}
+    });
+    document.querySelectorAll("[data-social-call]").forEach(b=>b.onclick=async()=>{
+      const c=calls.find(x=>String(x.channelId)===String(b.dataset.socialCall));if(!c)return;
+      const s=servers.find(x=>String(x.id)===String(c.serverId));if(s)await selectServer(s);
+      const ch=(channels||[]).find(x=>String(x.id)===String(c.channelId));if(ch)await selectChannel(ch);
       chat();
+      startCall(c.mode==="voice"?"voice":"video");
     });
 
-    q("#desk-activity").innerHTML=activity.length?activity.map(a=>{
-      const u=a.user||{}; let t="Activity";
-      if(a.type==="message")t="message in #"+(a.channelName||"channel");
-      if(a.type==="call-start")t="joined "+(a.mode==="voice"?"voice":"video");
-      if(a.type==="call-end")t="left "+(a.channelName||"room");
-      if(a.type==="screen-share")t="started screen share";
-      if(a.type==="presence")t="presence: "+(a.activity||u.status||"online");
-      return '<button class="orbit-desk-item" data-desk-user="'+esc(u.id||"")+'"><div class="orbit-desk-icon">✦</div><div class="orbit-desk-item-main"><strong>'+esc(u.display_name||u.username||"Guest")+'</strong><span>'+esc(t)+(a.preview?' · '+esc(a.preview):"")+'</span></div><span class="orbit-desk-item-end">'+fmtTime(a.createdAt)+'</span></button>';
-    }).join(""):'<div class="orbit-desk-empty"><strong>No activity yet</strong>New actions will appear here.</div>';
-    document.querySelectorAll("[data-desk-user]").forEach(b=>b.onclick=()=>openPulseProfile(b.dataset.deskUser));
-
-    let projects=[],events=[],files=[];
     try{
-      const tasksUrl=server?"/api/servers/"+encodeURIComponent(server.id)+"/projects":null;
-      const eventsUrl=server?"/api/servers/"+encodeURIComponent(server.id)+"/events?upcoming=1":null;
-      const [p,e,f]=await Promise.all([
-        tasksUrl?api(tasksUrl):Promise.resolve({projects:[]}),
-        eventsUrl?api(eventsUrl):Promise.resolve({events:[]}),
-        api("/api/files?limit=6")
+      const [fd,ed]=await Promise.all([
+        api("/api/friends"),
+        current?api("/api/servers/"+encodeURIComponent(current.id)+"/events?upcoming=1"):Promise.resolve({events:[]})
       ]);
-      projects=p.projects||[]; events=e.events||[]; files=f.files||[];
-    }catch(err){
-      console.warn("Desk data",err);
+      const friends=(fd.friends||[]).slice(0,6);
+      q("#social-friend-list").innerHTML=friends.length?friends.map(u=>'<button class="osocial-row" data-friend-dm="'+esc(u.username)+'"><span class="osocial-avatar">'+esc(avatar(u.username))+'</span><span class="osocial-row-main"><strong>'+esc(u.display_name||u.username)+'</strong><span>'+esc(u.status||"offline")+' · @'+esc(u.username)+'</span></span><span class="osocial-row-end">Message</span></button>').join(""):'<div class="osocial-empty"><strong>No friends yet</strong>Add friends from the Friends page and they will appear here.</div>';
+      document.querySelectorAll("[data-friend-dm]").forEach(b=>b.onclick=async()=>{try{await api("/api/dms",{method:"POST",body:JSON.stringify({username:b.dataset.friendDm})});go("dms");renderDMPage()}catch(e){orbitToast("DM failed",e.message,"error")}});
+      const events=(ed.events||[]).slice(0,4);
+      q("#social-event-list").innerHTML=events.length?events.map(e=>{const d=new Date(e.when);return '<button class="osocial-row" data-social-event="1"><span class="osocial-row-icon">◷</span><span class="osocial-row-main"><strong>'+esc(e.title)+'</strong><span>'+esc(e.type||"Community")+' · '+Number(e.rsvpCount||0)+' going</span></span><span class="osocial-row-end">'+(Number.isNaN(d.getTime())?"":d.toLocaleDateString([],{month:"short",day:"numeric"}))+'</span></button>}).join(""):'<div class="osocial-empty"><strong>No upcoming events</strong>'+(current?'Start something for the community.':'Choose a community to see events.')+'</div>';
+      q("#social-event-list").querySelectorAll("[data-social-event]").forEach(b=>b.onclick=()=>go("events"));
+    }catch(e){
+      q("#social-friend-list").innerHTML='<div class="osocial-empty"><strong>Friends unavailable</strong>Open Friends to connect.</div>';
+      q("#social-event-list").innerHTML='<div class="osocial-empty"><strong>Events unavailable</strong>Open Events to see community activity.</div>';
     }
-
-    const tasks=currentProjectTasks(projects).slice(0,5);
-    q("#desk-tasks").innerHTML=tasks.length?tasks.map(t=>
-      '<button class="orbit-task-row" data-desk-task="1"><span class="orbit-task-dot"></span><span class="orbit-task-copy"><strong>'+esc(t.title||"Task")+'</strong><span>'+esc(t.label||"Workspace")+'</span></span><span class="orbit-task-status">'+esc(t.status||"backlog")+'</span></button>'
-    ).join(""):'<div class="orbit-desk-empty"><strong>No shared tasks</strong>'+ (server?'Create a project to turn conversation into trackable work.':'Select a community to see shared projects.')+'</div>';
-    q("#desk-tasks").querySelectorAll("[data-desk-task]").forEach(b=>b.onclick=()=>go("projects"));
-
-    q("#desk-events-list").innerHTML=events.length?events.slice(0,4).map(e=>{
-      const d=new Date(e.when);
-      return '<button class="orbit-desk-item" data-desk-event="1"><div class="orbit-desk-icon">◷</div><div class="orbit-desk-item-main"><strong>'+esc(e.title)+'</strong><span>'+esc(e.type||"Community")+' · '+(Number(e.rsvpCount||0))+' going</span></div><span class="orbit-desk-item-end">'+(Number.isNaN(d.getTime())?"":d.toLocaleDateString([],{month:"short",day:"numeric"}))+'</span></button>';
-    }).join(""):'<div class="orbit-desk-empty"><strong>No upcoming events</strong>'+ (server?'Schedule the next community moment.':'Choose a community first.')+'</div>';
-    q("#desk-events-list").querySelectorAll("[data-desk-event]").forEach(b=>b.onclick=()=>go("events"));
-
-    q("#desk-files-list").innerHTML=files.length?files.slice(0,5).map(f=>
-      '<button class="orbit-desk-item" data-desk-file="1"><div class="orbit-desk-icon">'+(String(f.type||"").includes("pdf")?"PDF":"FILE")+'</div><div class="orbit-desk-item-main"><strong>'+esc(f.name||"file")+'</strong><span>'+Math.max(0,Math.round(Number(f.size||0)/1024))+' KB · '+esc(f.type||"file")+'</span></div><span class="orbit-desk-item-end">Open →</span></button>'
-    ).join(""):'<div class="orbit-desk-empty"><strong>No recent files</strong>Upload a file from the Files workspace.</div>';
-    q("#desk-files-list").querySelectorAll("[data-desk-file]").forEach(b=>b.onclick=()=>go("files"));
   }
 
   const base=window.renderHomePage;
-  if(typeof base==="function" && !base.__orbitDesk){
+  if(typeof base==="function"&&!base.__orbitSocial){
     function wrapped(){
       base.apply(this,arguments);
-      renderDesk().catch(e=>console.warn("Orbit Desk render",e));
+      renderSocial().catch(e=>console.warn("Orbit Social",e));
     }
-    wrapped.__orbitDesk=true;
+    wrapped.__orbitSocial=true;
     window.renderHomePage=wrapped;
   }
-  setTimeout(()=>{if(orbitUI?.view==="home")renderDesk().catch(()=>{})},0);
+  setTimeout(()=>{try{if(orbitUI?.view==="home")renderSocial()}catch(e){}},0);
 })();
