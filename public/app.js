@@ -164,11 +164,13 @@ function connectRealtime() {
   socket.on("message:new", m => {
     const active = currentChannel && String(m.channel_id) === String(currentChannel.id);
     if (active) {
+      if(String(m.user_id||"")!==String(me?.id||"")) playUiTone("message");
       appendMessage(m);
     } else if (m.channel_id) {
       unreadChannels[m.channel_id] = Number(unreadChannels[m.channel_id] || 0) + 1;
       localStorage.setItem("orbit_unread_channels", JSON.stringify(unreadChannels));
       renderChannels();
+      playUiTone("message");
     }
   });
   socket.on("typing", x => {
@@ -236,6 +238,7 @@ function connectRealtime() {
     $("#incoming-subtitle").textContent = (call.mode === "voice" ? "Voice call" : "Video call") + " · " + (incomingChannel ? "#" + incomingChannel.name : "Orbit room");
     $("#incoming-avatar").textContent = avatar(call.username || "G");
     box.classList.remove("hidden");
+    playUiTone("call");
   });
 
   socket.on("call:participants", participants => {
@@ -441,13 +444,27 @@ async function selectChannel(channel) {
   if (socket) socket.emit("channel:join", channel.id);
   $("#messages").scrollTop = $("#messages").scrollHeight;
 }
+function renderMessageAttachment(att){
+  if(!att?.id) return "";
+  const href="/api/uploads/"+encodeURIComponent(att.id);
+  const name=escapeHtml(att.name||"file");
+  const type=String(att.type||"application/octet-stream");
+  const size=Math.max(0,Number(att.size||0));
+  const kb=size?Math.max(1,Math.round(size/1024))+" KB":"";
+  if(type.startsWith("image/")) return '<div class="message-attachment media-attachment"><a href="'+href+'" target="_blank" rel="noopener"><img src="'+href+'" alt="'+name+'" loading="lazy"></a><div><strong>'+name+'</strong><span>'+type+' · '+kb+'</span></div></div>';
+  if(type.startsWith("video/")) return '<div class="message-attachment"><video controls preload="metadata" src="'+href+'"></video><a href="'+href+'" target="_blank" rel="noopener"><strong>'+name+'</strong><span>'+type+' · '+kb+'</span></a></div>';
+  if(type.startsWith("audio/")) return '<div class="message-attachment"><audio controls preload="metadata" src="'+href+'"></audio><a href="'+href+'" target="_blank" rel="noopener"><strong>'+name+'</strong><span>'+type+' · '+kb+'</span></a></div>';
+  const icon=type==="application/pdf"?"PDF":type.includes("zip")?"ZIP":"FILE";
+  return '<div class="message-attachment file-attachment"><div class="file-badge">'+icon+'</div><div><strong>'+name+'</strong><span>'+type+' · '+kb+'</span></div><a href="'+href+'" target="_blank" rel="noopener">Open</a></div>';
+}
 function appendMessage(m) {
   const el = document.createElement("article");
   el.className = "message";
+  const attachment=renderMessageAttachment(m.attachment);
   el.innerHTML =
     '<div class="avatar">' + escapeHtml(avatar(m.username)) + '</div>' +
     '<div><div class="msg-head"><strong>' + escapeHtml(m.username) + '</strong><time>' +
-    fmt(m.created_at) + '</time></div><div class="msg-body">' + escapeHtml(m.content) + "</div></div>";
+    fmt(m.created_at) + '</time></div><div class="msg-body">' + escapeHtml(m.content) + (attachment?attachment:"") + "</div></div>";
   $("#messages").appendChild(el);
   $("#messages").scrollTop = $("#messages").scrollHeight;
 }
@@ -459,6 +476,7 @@ $("#composer").onsubmit = e => {
   socket.emit("message:send", { channelId: currentChannel.id, content: value });
   $("#message").value = "";
   socket.emit("typing", { channelId: currentChannel.id, isTyping: false });
+  playUiTone("send");
 };
 $("#message").oninput = () => {
   if (!socket || !currentChannel) return;
@@ -879,7 +897,7 @@ async function toggleScreenShare() {
         height: { ideal: preset.height },
         frameRate: { ideal: Number(callState.settings.fps), max: Number(callState.settings.fps) }
       },
-      audio: true
+      audio: localStorage.getItem("orbit_screen_audio")!=="off"
     });
 
     const track = display.getVideoTracks()[0];
@@ -1191,6 +1209,47 @@ function orbitToast(title, body="", kind="") {
   setTimeout(()=>node.remove(),3200);
 }
 
+/* Orbit Sound Engine: subtle UI feedback without shipping audio assets. */
+const orbitSound={
+  ctx:null,
+  master:Number(localStorage.getItem("orbit_sound_volume")||"0.42"),
+  enabled:localStorage.getItem("orbit_sound_enabled")!=="off",
+  pack:localStorage.getItem("orbit_sound_pack")||"crystal",
+  duck:0
+};
+function ensureSoundContext(){
+  if(!orbitSound.enabled) return null;
+  if(!orbitSound.ctx){
+    try{orbitSound.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch{return null}
+  }
+  if(orbitSound.ctx.state==="suspended") orbitSound.ctx.resume().catch(()=>{});
+  return orbitSound.ctx;
+}
+function playUiTone(kind="click"){
+  const ctx=ensureSoundContext(); if(!ctx)return;
+  const now=ctx.currentTime, g=ctx.createGain();
+  g.gain.setValueAtTime(0.0001,now);
+  g.gain.exponentialRampToValueAtTime(Math.max(.002,orbitSound.master*.06),now+.012);
+  g.gain.exponentialRampToValueAtTime(.0001,now+0.18);
+  g.connect(ctx.destination);
+  const o=ctx.createOscillator();
+  const wave=orbitSound.pack==="soft"?"sine":orbitSound.pack==="arcade"?"square":"triangle";
+  o.type=wave;
+  const tones={
+    click:[520,.08],hover:[380,.045],send:[740,.11],message:[560,.14],success:[660,.18],error:[210,.16],join:[430,.18],leave:[260,.20],call:[880,.24],upload:[600,.16],share:[760,.20]
+  };
+  const [freq,dur]=tones[kind]||tones.click;
+  o.frequency.setValueAtTime(freq,now);
+  if(["success","join","call","share"].includes(kind)) o.frequency.exponentialRampToValueAtTime(freq*1.28,now+dur*.55);
+  if(["error","leave"].includes(kind)) o.frequency.exponentialRampToValueAtTime(freq*.72,now+dur*.7);
+  o.connect(g); o.start(now); o.stop(now+dur);
+}
+function setOrbitSoundSetting(key,value){
+  if(key==="enabled"){orbitSound.enabled=Boolean(value);localStorage.setItem("orbit_sound_enabled",orbitSound.enabled?"on":"off");}
+  if(key==="volume"){orbitSound.master=Math.max(0,Math.min(1,Number(value)||0));localStorage.setItem("orbit_sound_volume",String(orbitSound.master));}
+  if(key==="pack"){orbitSound.pack=String(value||"crystal");localStorage.setItem("orbit_sound_pack",orbitSound.pack);}
+}
+document.addEventListener("pointerdown",()=>ensureSoundContext(),{once:true,passive:true});
 function renderPage(view) {
   const cfg={
     home:["ORBIT / COMMAND CENTER","Home","A single control surface for communities, conversations, and live rooms."],
@@ -2056,7 +2115,7 @@ function applySavedOrbitBackground(){
   document.documentElement.style.setProperty("--orbit-overlay-opacity",(Number(opacity)||72)/100);
 }
 function renderSettingsPage(section="appearance"){
-  const sections=[["appearance","Appearance"],["profile","Profile"],["privacy","Privacy"],["voice","Voice & Video"],["notifications","Notifications"],["accessibility","Accessibility"],["performance","Performance"],["security","Security"],["advanced","Advanced"]];
+  const sections=[["appearance","Appearance"],["profile","Profile"],["privacy","Privacy"],["voice","Voice & Video"],["sound","Sounds"],["notifications","Notifications"],["accessibility","Accessibility"],["performance","Performance"],["files","Files & Sharing"],["security","Security"],["advanced","Advanced"]];
   $("#page-actions").innerHTML="";
   $("#page-body").innerHTML='<div class="settings-layout"><nav class="settings-nav">'+sections.map(s=>'<button class="'+(s[0]===section?"active":"")+'" data-settings-section="'+s[0]+'">'+s[1]+'</button>').join("")+'</nav><div id="settings-card" class="settings-card"></div></div>';
   document.querySelectorAll("[data-settings-section]").forEach(b=>b.onclick=()=>renderSettingsPage(b.dataset.settingsSection));
@@ -2259,13 +2318,36 @@ function renderSettingsPage(section="appearance"){
   }else if(section==="voice"){
     const screenShareEnabled=localStorage.getItem("orbit_screen_share")!=="off";
     const preferred=callState.settings.quality||"720p";
-    card.innerHTML='<h3>Voice & Video</h3><p>Configure calls, camera quality and screen sharing.</p>'+
+    const screenAudio=localStorage.getItem("orbit_screen_audio")!=="off";
+    card.innerHTML='<h3>Voice & Video</h3><p>Professional controls for calls, cameras and screen sharing.</p>'+
       setting("Noise suppression","Reduce keyboard and room noise.",true,"voice-ns")+
       setting("Echo cancellation","Reduce feedback.",true,"voice-ec")+
       setting("Auto gain","Normalize microphone volume.",true,"voice-gain")+
       setting("Screen sharing","Allow screen sharing in calls and rooms.",screenShareEnabled,"voice-screen-share")+
-      '<div class="setting-row"><div><strong>Preferred quality</strong><span>Used for video capture and screen sharing.</span></div><select id="preferred-quality"><option '+(preferred==="480p"?"selected":"")+' value="480p">480p</option><option '+(preferred==="720p"?"selected":"")+' value="720p">720p</option><option '+(preferred==="1080p"?"selected":"")+' value="1080p">1080p</option><option '+(preferred==="1080p60"?"selected":"")+' value="1080p60">1080p60</option><option '+(preferred==="1440p"?"selected":"")+' value="1440p">1440p</option></select></div>';
+      setting("System audio","Also share browser/tab audio when supported.",screenAudio,"voice-screen-audio")+
+      '<div class="setting-row"><div><strong>Video & screen quality</strong><span>Choose a capture profile for cameras and shared screens.</span></div><select id="preferred-quality"><option '+(preferred==="480p"?"selected":"")+' value="480p">480p</option><option '+(preferred==="720p"?"selected":"")+' value="720p">720p</option><option '+(preferred==="1080p"?"selected":"")+' value="1080p">1080p</option><option '+(preferred==="1080p60"?"selected":"")+' value="1080p60">1080p60</option><option '+(preferred==="1440p"?"selected":"")+' value="1440p">1440p</option></select></div>'+
+      '<div class="setting-row"><div><strong>Frame rate</strong><span>Higher FPS makes screen motion smoother.</span></div><select id="preferred-fps"><option value="24">24 FPS</option><option value="30">30 FPS</option><option value="60">60 FPS</option></select></div>';
     $("#preferred-quality").onchange=e=>{callState.settings.quality=e.target.value;localStorage.setItem("orbit_video_quality",e.target.value);};
+    const fpsSelect=$("#preferred-fps"); if(fpsSelect) fpsSelect.value=String(callState.settings.fps||30);
+    fpsSelect?.addEventListener("change",e=>{callState.settings.fps=Number(e.target.value);});
+  }else if(section==="sound"){
+    const enabled=orbitSound.enabled;
+    const vol=Math.round(orbitSound.master*100);
+    card.innerHTML='<h3>Sounds</h3><p>Give Orbit its own audio identity. These sounds run locally in your browser.</p>'+
+      setting("Interface sounds","Clicks, sends, uploads and call feedback.",enabled,"sound-enabled")+
+      '<div class="setting-row"><div><strong>Master volume</strong><span>Control Orbit UI sound level.</span></div><input id="sound-volume" type="range" min="0" max="100" value="'+vol+'"><b id="sound-volume-value">'+vol+'%</b></div>'+
+      '<div class="setting-row"><div><strong>Sound pack</strong><span>Choose the tone character you prefer.</span></div><select id="sound-pack"><option value="crystal">Crystal</option><option value="soft">Soft</option><option value="arcade">Arcade</option></select></div>'+
+      '<div class="setting-row sound-test-row"><div><strong>Preview</strong><span>Test the current sound profile.</span></div><button class="primary" id="sound-test">Play test</button></div>';
+    $("#sound-volume").oninput=e=>{setOrbitSoundSetting("volume",Number(e.target.value)/100);$("#sound-volume-value").textContent=e.target.value+"%";playUiTone("click");};
+    $("#sound-pack").value=orbitSound.pack;
+    $("#sound-pack").onchange=e=>{setOrbitSoundSetting("pack",e.target.value);playUiTone("success");};
+    $("#sound-test").onclick=()=>{playUiTone("call");setTimeout(()=>playUiTone("success"),120);};
+  }else if(section==="files"){
+    card.innerHTML='<h3>Files & Sharing</h3><p>Control how Orbit handles attachments and shared media.</p>'+
+      '<div class="setting-row"><div><strong>Drag & drop uploads</strong><span>Drop files directly into a text channel.</span></div><span class="setting-status-badge">READY</span></div>'+
+      '<div class="setting-row"><div><strong>Maximum file size</strong><span>Per file in the current guest workspace.</span></div><strong>4.5 MB</strong></div>'+
+      '<div class="setting-row"><div><strong>Supported media</strong><span>Images, video, audio, PDF and common office/archive files.</span></div><span class="setting-status-badge">MULTI</span></div>'+
+      '<div class="setting-row"><div><strong>Screen share</strong><span>Use the Share screen action inside a call.</span></div><span class="setting-status-badge">LIVE</span></div>';
   }else if(section==="privacy"){
     card.innerHTML=setting("Friend requests","Allow requests from guests.",true,"privacy-friends")+setting("Direct messages","Allow private messages from shared communities.",true,"privacy-dms")+setting("Read receipts","Show when messages are opened.",false,"privacy-receipts");
   }else if(section==="notifications"){
@@ -2285,6 +2367,8 @@ function renderSettingsPage(section="appearance"){
     if(key==="appearance-motion"){document.body.classList.toggle("reduced-motion",b.classList.contains("on"));localStorage.setItem("orbit_motion",b.classList.contains("on")?"reduced":"full")}
     if(key==="appearance-density"){document.body.classList.toggle("compact",b.classList.contains("on"));localStorage.setItem("orbit_density",b.classList.contains("on")?"compact":"comfortable")}
     if(key==="voice-screen-share"){localStorage.setItem("orbit_screen_share",b.classList.contains("on")?"on":"off");syncScreenShareControls();}
+    if(key==="voice-screen-audio"){localStorage.setItem("orbit_screen_audio",b.classList.contains("on")?"on":"off");}
+    if(key==="sound-enabled"){setOrbitSoundSetting("enabled",b.classList.contains("on"));if(orbitSound.enabled)playUiTone("success");}
   });
 }
 function setting(title,desc,on,key){return '<div class="setting-row"><div><strong>'+title+'</strong><span>'+desc+'</span></div><button class="switch '+(on?"on":"")+'" data-setting-toggle="'+key+'"></button></div>'}
@@ -2555,10 +2639,57 @@ function openMessageMore(el){
   $("#msg-edit-action").onclick=async()=>{closeModal();const value=prompt("Edit message",el.querySelector(".msg-body")?.textContent||"");if(value===null)return;try{await api("/api/messages/"+encodeURIComponent(el.dataset.messageId),{method:"PATCH",body:JSON.stringify({content:value})})}catch(e){orbitToast("Edit failed",e.message,"error")}};
   $("#msg-delete-action").onclick=async()=>{closeModal();if(!confirm("Delete this message?"))return;try{await api("/api/messages/"+encodeURIComponent(el.dataset.messageId),{method:"DELETE"})}catch(e){orbitToast("Delete failed",e.message,"error")}};
 }
-$("#attach")?.addEventListener("click",()=>{
-  const input=document.createElement("input");input.type="file";input.accept="image/*,video/*,audio/*,.pdf,.zip,.txt,.doc,.docx";
-  input.onchange=()=>{const file=input.files?.[0];if(!file)return;if(file.size>1500000){orbitToast("File too large","Guest mode limit is 1.5 MB.","error");return}const fr=new FileReader();fr.onload=async()=>{try{const up=await api("/api/uploads",{method:"POST",body:JSON.stringify({name:file.name,type:file.type,size:file.size,data:String(fr.result)})});if(socket&&currentChannel){socket.emit("message:send",{channelId:currentChannel.id,content:"📎 "+file.name,attachment:up.file});orbitToast("File sent",file.name,"success")}}catch(e){orbitToast("Upload failed",e.message,"error")}};fr.readAsDataURL(file)};
-  input.click();
+async function uploadFileToCurrentChannel(file){
+  if(!file||!socket||!currentChannel||currentChannel.type==="voice") return;
+  const max=4_500_000;
+  if(file.size>max){orbitToast("File too large","Orbit allows files up to 4.5 MB in this build.","error");playUiTone("error");return;}
+  const overlay=$("#upload-overlay"),name=$("#upload-file-name"),bar=$("#upload-progress-bar"),percent=$("#upload-progress-value");
+  overlay?.classList.remove("hidden");
+  if(name)name.textContent=file.name;
+  if(bar)bar.style.width="4%";
+  if(percent)percent.textContent="Reading…";
+  try{
+    const fr=new FileReader();
+    const data=await new Promise((resolve,reject)=>{
+      fr.onprogress=e=>{if(e.lengthComputable){const p=Math.round((e.loaded/e.total)*70);if(bar)bar.style.width=p+"%";if(percent)percent.textContent=p+"%";}};
+      fr.onload=()=>resolve(String(fr.result)); fr.onerror=()=>reject(new Error("Could not read this file."));
+      fr.readAsDataURL(file);
+    });
+    if(percent)percent.textContent="Uploading…";
+    if(bar)bar.style.width="76%";
+    const up=await api("/api/uploads",{method:"POST",body:JSON.stringify({name:file.name,type:file.type||"application/octet-stream",size:file.size,data,purpose:"workspace-file"})});
+    if(bar)bar.style.width="100%";
+    if(percent)percent.textContent="Sent";
+    socket.emit("message:send",{channelId:currentChannel.id,content:"📎 "+file.name,attachment:up.file});
+    playUiTone("upload");
+    orbitToast("File sent",file.name,"success");
+  }catch(e){
+    playUiTone("error");
+    orbitToast("Upload failed",e.message,"error");
+  }finally{
+    setTimeout(()=>overlay?.classList.add("hidden"),550);
+  }
+}
+const fileInput=document.createElement("input");
+fileInput.type="file";
+fileInput.id="orbit-file-picker";
+fileInput.multiple=true;
+fileInput.accept="image/*,video/*,audio/*,.pdf,.zip,.txt,.doc,.docx,.ppt,.pptx,.xls,.xlsx";
+fileInput.hidden=true;
+document.body.appendChild(fileInput);
+fileInput.onchange=async()=>{for(const file of Array.from(fileInput.files||[])) await uploadFileToCurrentChannel(file);fileInput.value="";};
+$("#attach")?.addEventListener("click",()=>fileInput.click());
+
+function showDropOverlay(show){
+  $("#drop-overlay")?.classList.toggle("hidden",!show);
+}
+let dragDepth=0;
+["dragenter","dragover"].forEach(type=>$("#chat-view")?.addEventListener(type,e=>{if(!currentChannel||currentChannel.type==="voice")return;e.preventDefault();e.stopPropagation();dragDepth++;showDropOverlay(true)}));
+$("#chat-view")?.addEventListener("dragleave",e=>{e.preventDefault();dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)showDropOverlay(false)});
+$("#chat-view")?.addEventListener("drop",async e=>{
+  e.preventDefault();e.stopPropagation();dragDepth=0;showDropOverlay(false);
+  if(!currentChannel||currentChannel.type==="voice")return;
+  for(const file of Array.from(e.dataTransfer?.files||[])) await uploadFileToCurrentChannel(file);
 });
 
 // Wrap channel selection to load persisted polls and hide composer in voice rooms.
