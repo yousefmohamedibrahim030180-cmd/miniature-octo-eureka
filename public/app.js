@@ -70,7 +70,7 @@ function api(url, opts = {}) {
 }
 function fmt(ts) { return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
 function avatar(name) { return (name || "G").slice(0, 1).toUpperCase(); }
-const avatarDecorationNames={none:"None",halo:"Halo",crown:"Crown",orbit:"Orbit Ring",spark:"Sparkles",fire:"Fire",ice:"Ice",cyber:"Cyber Frame",royal:"Royal"};
+const avatarDecorationNames={none:"None",halo:"Halo",crown:"Crown",orbit:"Orbit Ring",spark:"Sparkles",fire:"Fire",ice:"Ice",cyber:"Cyber Frame",royal:"Royal",dragon:"Dragon Flame"};
 const knownAvatarUsers=new Map();
 function rememberAvatarUser(user){
   if(user?.id) knownAvatarUsers.set(String(user.id),user);
@@ -1695,6 +1695,7 @@ function renderSettingsPage(section="appearance"){
       '<button type="button" class="decoration-card" data-decoration="ice"><span class="decoration-preview decoration-ice"></span><strong>Ice</strong></button>'+
       '<button type="button" class="decoration-card" data-decoration="cyber"><span class="decoration-preview decoration-cyber"></span><strong>Cyber</strong></button>'+
       '<button type="button" class="decoration-card" data-decoration="royal"><span class="decoration-preview decoration-royal">◆</span><strong>Royal</strong></button>'+
+      '<button type="button" class="decoration-card decoration-card-dragon" data-decoration="dragon"><span class="decoration-preview decoration-dragon"></span><strong>Dragon</strong><small>Animated flame frame</small></button>'+
       '</div>'+
       '<div class="decoration-upload-row"><div class="orbit-avatar-preview decoration-live-preview" id="avatar-decoration-preview"><span>'+escapeHtml(avatar(me?.username||"G"))+'</span></div><div><strong>Custom decoration</strong><span>Upload a transparent PNG/WebP/GIF up to 1 MB.</span></div><button type="button" id="decoration-upload-btn">Upload decoration</button><button type="button" id="decoration-remove-btn">Remove</button></div>'+
       '</div></div>'+
