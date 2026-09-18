@@ -104,7 +104,17 @@ async function enterAsGuest() {
 
 function connectRealtime() {
   if (socket) socket.disconnect();
-  socket = io({ auth: { token }, transports: ["websocket", "polling"] });
+  socket = io({
+    auth: { token },
+    path: "/socket.io",
+    transports: ["polling", "websocket"],
+    timeout: 10000,
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 500,
+    reconnectionDelayMax: 5000,
+    withCredentials: true
+  });
 
   socket.on("message:new", m => {
     const active = currentChannel && String(m.channel_id) === String(currentChannel.id);
@@ -216,6 +226,14 @@ function connectRealtime() {
     } catch (err) { console.error("ICE candidate", err); }
   });
 
+  socket.on("connect", () => {
+    console.log("[orbit] realtime connected", socket.id);
+    if (callState.active) setCallIndicator("LIVE");
+  });
+  socket.on("connect_error", err => {
+    console.error("[orbit] realtime connect error", err);
+    if (callState.active) setCallIndicator("RECONNECTING");
+  });
   socket.on("disconnect", () => {
     if (callState.active) setCallIndicator("RECONNECTING");
   });
