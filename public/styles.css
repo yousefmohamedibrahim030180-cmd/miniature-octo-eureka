@@ -1613,3 +1613,92 @@ body[data-avatar-motion="off"] .orbit-avatar-preview{animation:none!important}
 .orbit-avatar-preview[data-avatar-decoration="cyber"]::before{inset:-4px;border:2px solid #00e5ff;border-radius:12px;box-shadow:0 0 12px #00e5ff55}
 .orbit-avatar-preview[data-avatar-decoration="royal"]::before{inset:-5px;border:2px solid #f5d77a;border-radius:inherit;box-shadow:0 0 0 3px #8b5cf633}
 .orbit-avatar-preview.has-decoration-image::before{inset:-13%;background:var(--avatar-decoration-image) center/contain no-repeat;filter:drop-shadow(0 3px 6px #0008)}
+
+/* ===== Dragon avatar frame ===== */
+.avatar[data-avatar-decoration="dragon"]{
+  overflow:visible!important;
+  z-index:1;
+  box-shadow:0 0 0 1px #ff6a0033 inset,0 0 18px #ff4d4d33;
+}
+.avatar[data-avatar-decoration="dragon"]::before{
+  content:"";
+  position:absolute;
+  inset:-15%;
+  z-index:4;
+  pointer-events:none;
+  background:url("/assets/avatar-dragon.svg") center/contain no-repeat;
+  filter:drop-shadow(0 0 5px #ff4d4d) drop-shadow(0 0 13px #ff6a0055);
+  animation:dragonFrameFloat 2.8s ease-in-out infinite;
+}
+.avatar[data-avatar-decoration="dragon"]::after{
+  content:"";
+  position:absolute;
+  inset:-7%;
+  z-index:3;
+  pointer-events:none;
+  border-radius:50%;
+  background:conic-gradient(from 0deg,transparent 0 8%,#ff3b30aa 13%,transparent 19% 42%,#ffd166aa 49%,transparent 55% 78%,#ff6a00aa 84%,transparent 91%);
+  -webkit-mask:radial-gradient(circle,transparent 59%,#000 63%,#000 69%,transparent 74%);
+  mask:radial-gradient(circle,transparent 59%,#000 63%,#000 69%,transparent 74%);
+  animation:dragonRingSpin 2.2s linear infinite;
+  filter:blur(.2px) drop-shadow(0 0 7px #ff6a0070);
+}
+.decoration-preview.decoration-dragon{
+  background:radial-gradient(circle at 50% 45%,#241019 0 38%,#131923 39% 100%);
+  overflow:visible;
+}
+.decoration-preview.decoration-dragon::before{
+  content:"";
+  position:absolute;
+  inset:-18%;
+  background:url("/assets/avatar-dragon.svg") center/contain no-repeat;
+  filter:drop-shadow(0 0 5px #ff4d4d) drop-shadow(0 0 10px #ff6a0066);
+  animation:dragonFrameFloat 2.8s ease-in-out infinite;
+}
+.decoration-preview.decoration-dragon::after{
+  content:"";
+  position:absolute;
+  inset:-7%;
+  border-radius:50%;
+  background:conic-gradient(from 0deg,transparent 0 8%,#ff3b30aa 13%,transparent 19% 42%,#ffd166aa 49%,transparent 55% 78%,#ff6a00aa 84%,transparent 91%);
+  -webkit-mask:radial-gradient(circle,transparent 58%,#000 62%,#000 70%,transparent 75%);
+  mask:radial-gradient(circle,transparent 58%,#000 62%,#000 70%,transparent 75%);
+  animation:dragonRingSpin 2.2s linear infinite;
+}
+.orbit-avatar-preview[data-avatar-decoration="dragon"]{
+  overflow:visible;
+  box-shadow:0 0 0 1px #ff6a0033 inset,0 0 22px #ff4d4d33;
+}
+.orbit-avatar-preview[data-avatar-decoration="dragon"]::before{
+  content:"";
+  position:absolute;
+  inset:-15%;
+  z-index:4;
+  background:url("/assets/avatar-dragon.svg") center/contain no-repeat;
+  filter:drop-shadow(0 0 5px #ff4d4d) drop-shadow(0 0 12px #ff6a0066);
+  animation:dragonFrameFloat 2.8s ease-in-out infinite;
+}
+.orbit-avatar-preview[data-avatar-decoration="dragon"]::after{
+  content:"";
+  position:absolute;
+  inset:-7%;
+  z-index:3;
+  border-radius:50%;
+  background:conic-gradient(from 0deg,transparent 0 8%,#ff3b30aa 13%,transparent 19% 42%,#ffd166aa 49%,transparent 55% 78%,#ff6a00aa 84%,transparent 91%);
+  -webkit-mask:radial-gradient(circle,transparent 59%,#000 63%,#000 69%,transparent 74%);
+  mask:radial-gradient(circle,transparent 59%,#000 63%,#000 69%,transparent 74%);
+  animation:dragonRingSpin 2.2s linear infinite;
+}
+@keyframes dragonFrameFloat{
+  0%,100%{transform:translateY(0) rotate(-1deg) scale(1)}
+  50%{transform:translateY(-2px) rotate(2deg) scale(1.025)}
+}
+@keyframes dragonRingSpin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){
+  .avatar[data-avatar-decoration="dragon"]::before,
+  .avatar[data-avatar-decoration="dragon"]::after,
+  .decoration-preview.decoration-dragon::before,
+  .decoration-preview.decoration-dragon::after,
+  .orbit-avatar-preview[data-avatar-decoration="dragon"]::before,
+  .orbit-avatar-preview[data-avatar-decoration="dragon"]::after{animation:none!important}
+}
