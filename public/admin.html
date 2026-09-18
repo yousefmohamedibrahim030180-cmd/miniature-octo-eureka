@@ -6,14 +6,31 @@
 <title>Orbit — Server Control Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/admin.css?v=orbit-admin-20260918-2">
+<link rel="stylesheet" href="/admin.css?v=orbit-admin-20260918-3">
 </head>
 <body>
-<div class="admin-app">
+<div id="key-gate" class="key-gate">
+  <div class="key-ambient ambient-a"></div><div class="key-ambient ambient-b"></div>
+  <div class="key-card">
+    <div class="key-brand"><span class="key-mark">◈</span><span>ORBIT</span><b>SECURE ADMIN</b></div>
+    <div class="key-lock">⌑</div>
+    <span class="key-eyebrow">PROTECTED CONTROL CENTER</span>
+    <h1>Unlock server command.</h1>
+    <p>Enter the private administrator key to access moderation, members, channels, calls and security controls.</p>
+    <form id="admin-login-form">
+      <div class="key-input-wrap"><span>KEY</span><input id="admin-key-input" type="password" autocomplete="one-time-code" placeholder="Enter admin key"><button type="button" id="toggle-key">Show</button></div>
+      <button class="key-submit" type="submit"><span>Unlock Control Center</span><b>↗</b></button>
+    </form>
+    <div id="key-error" class="key-error"></div>
+    <div class="key-meta"><span>8-hour secure session</span><span>Server-scoped access</span><span>Audit logged</span></div>
+  </div>
+</div>
+
+<div class="admin-app" id="admin-shell">
   <header class="admin-topbar">
     <div class="brand"><span class="brand-mark">◈</span><div><strong>ORBIT</strong><span>SERVER CONTROL CENTER</span></div></div>
     <div class="server-ident"><span class="live-dot"></span><div><strong id="server-name">Loading…</strong><span id="server-meta">Checking permissions</span></div></div>
-    <div class="top-actions"><span id="refresh-state" class="status-pill">SYNC</span><button id="refresh-btn">↻ Refresh</button><button id="back-btn">Back to server</button></div>
+    <div class="top-actions"><span id="refresh-state" class="status-pill">SYNC</span><button id="refresh-btn">↻ Refresh</button><button id="logout-btn" class="logout-btn">Lock</button><button id="back-btn">Back to server</button></div>
   </header>
   <div id="denied" class="state-card hidden"><div class="state-icon">⛔</div><h2>Access denied</h2><p>You need server management permissions to open this control center.</p><button id="denied-back">Return</button></div>
   <main id="dashboard" class="dashboard hidden">
