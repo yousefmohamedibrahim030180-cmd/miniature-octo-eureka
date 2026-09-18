@@ -93,14 +93,18 @@ function applyAvatarNode(node,user,nameOverride=""){
   const image=avatarImageUrl(u);
   node.innerHTML=image?'<img src="'+escapeHtml(image)+'" alt="">':'<span>'+escapeHtml(avatar(name))+'</span>';
   node.classList.toggle("has-image",Boolean(image));
-  node.dataset.avatarDecoration=avatarDecoration(u);
+  const decoration=avatarDecoration(u);
   const decorationImage=avatarDecorationUrl(u);
+  node.dataset.avatarDecoration=decoration;
   node.dataset.avatarDecorationUrl=decorationImage;
+  node.classList.toggle("has-decoration-image",Boolean(decorationImage));
+  if(decorationImage) node.style.setProperty("--avatar-decoration-image",'url("'+decorationImage.replace(/"/g,"%22")+'")');
+  else node.style.removeProperty("--avatar-decoration-image");
 }
 function avatarHtml(userOrName,className=""){
   const u=typeof userOrName==="object"&&userOrName?rememberAvatarUser(userOrName):(knownAvatarUsers.get(String(userOrName))||{username:userOrName||"G"});
   const image=avatarImageUrl(u),deco=avatarDecoration(u),decoUrl=avatarDecorationUrl(u);
-  return '<div class="avatar '+escapeHtml(className)+' '+(image?"has-image":"")+'" data-avatar-decoration="'+escapeHtml(deco)+'" data-avatar-decoration-url="'+escapeHtml(decoUrl)+'">'+(image?'<img src="'+escapeHtml(image)+'" alt="">':'<span>'+escapeHtml(avatar(u.username||"G"))+'</span>')+'</div>';
+  return '<div class="avatar '+escapeHtml(className)+' '+(image?"has-image ":"")+(decoUrl?"has-decoration-image":"")+'" data-avatar-decoration="'+escapeHtml(deco)+'" data-avatar-decoration-url="'+escapeHtml(decoUrl)+'"'+(decoUrl?' style="--avatar-decoration-image:url(\\"'+escapeHtml(decoUrl)+'\\")"':'')+'>'+(image?'<img src="'+escapeHtml(image)+'" alt="">':'<span>'+escapeHtml(avatar(u.username||"G"))+'</span>')+'</div>';
 }
 function renderOwnAvatar(){
   const node=$("#me-avatar");
@@ -1671,6 +1675,21 @@ function renderSettingsPage(section="appearance"){
       '<button type="button" class="avatar-style-card" data-avatar-style="neon"><span class="style-preview style-neon"></span><strong>Neon Pulse</strong><small>Cyber glow</small></button>'+
       '<button type="button" class="avatar-style-card" data-avatar-style="energy"><span class="style-preview style-energy"></span><strong>Energy Ring</strong><small>Power wave</small></button>'+
       '<button type="button" class="avatar-style-card" data-avatar-style="off"><span class="style-preview style-off"></span><strong>Static</strong><small>No animation</small></button>'+
+      '</div>'+
+      '<div class="avatar-decoration-panel">'+
+      '<div class="avatar-section-title"><strong>Avatar decoration</strong><span>Wear a frame, crown, aura or your own transparent artwork.</span></div>'+
+      '<div class="decoration-grid">'+
+      '<button type="button" class="decoration-card" data-decoration="none"><span class="decoration-preview decoration-none"></span><strong>None</strong></button>'+
+      '<button type="button" class="decoration-card" data-decoration="halo"><span class="decoration-preview decoration-halo"></span><strong>Halo</strong></button>'+
+      '<button type="button" class="decoration-card" data-decoration="crown"><span class="decoration-preview decoration-crown">♛</span><strong>Crown</strong></button>'+
+      '<button type="button" class="decoration-card" data-decoration="orbit"><span class="decoration-preview decoration-orbit"></span><strong>Orbit Ring</strong></button>'+
+      '<button type="button" class="decoration-card" data-decoration="spark"><span class="decoration-preview decoration-spark">✦</span><strong>Sparkles</strong></button>'+
+      '<button type="button" class="decoration-card" data-decoration="fire"><span class="decoration-preview decoration-fire"></span><strong>Fire</strong></button>'+
+      '<button type="button" class="decoration-card" data-decoration="ice"><span class="decoration-preview decoration-ice"></span><strong>Ice</strong></button>'+
+      '<button type="button" class="decoration-card" data-decoration="cyber"><span class="decoration-preview decoration-cyber"></span><strong>Cyber</strong></button>'+
+      '<button type="button" class="decoration-card" data-decoration="royal"><span class="decoration-preview decoration-royal">◆</span><strong>Royal</strong></button>'+
+      '</div>'+
+      '<div class="decoration-upload-row"><div class="orbit-avatar-preview decoration-live-preview" id="avatar-decoration-preview"><span>'+escapeHtml(avatar(me?.username||"G"))+'</span></div><div><strong>Custom decoration</strong><span>Upload a transparent PNG/WebP/GIF up to 1 MB.</span></div><button type="button" id="decoration-upload-btn">Upload decoration</button><button type="button" id="decoration-remove-btn">Remove</button></div>'+
       '</div></div>'+
       '<input id="profile-name" value="'+escapeHtml(orbitUI.profile.displayName||me?.display_name||me?.username||"Guest")+'" placeholder="Display name">'+
       '<textarea id="profile-bio" placeholder="Bio">'+escapeHtml(orbitUI.profile.bio||"")+'</textarea>'+
@@ -1722,7 +1741,56 @@ function renderSettingsPage(section="appearance"){
         applyAvatarMotion();
         document.querySelectorAll("[data-avatar-style]").forEach(x=>x.classList.toggle("active",x===b));
       };
+    });    const selectedDecoration=String(me?.avatar_decoration||orbitUI.profile.avatarDecoration||"none");
+    document.querySelectorAll("[data-decoration]").forEach(b=>{
+      b.classList.toggle("active",b.dataset.decoration===selectedDecoration && !me?.avatar_decoration_url);
+      b.onclick=async()=>{
+        try{
+          const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({avatarDecoration:b.dataset.decoration,avatarDecorationUrl:""})});
+          me=updated.user; saveGuest(); renderOwnAvatar();
+          orbitUI.profile.avatarDecoration=b.dataset.decoration; delete orbitUI.profile.avatarDecorationUrl;
+          localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));
+          document.querySelectorAll("[data-decoration]").forEach(x=>x.classList.toggle("active",x===b));
+          const p=$("#avatar-decoration-preview"); if(p) applyAvatarNode(p,me);
+          orbitToast("Decoration applied",avatarDecorationNames[b.dataset.decoration]||b.dataset.decoration,"success");
+        }catch(err){orbitToast("Decoration failed",err.message,"error")}
+      };
     });
+    const decorationPreview=$("#avatar-decoration-preview");
+    if(decorationPreview) applyAvatarNode(decorationPreview,me);
+    $("#decoration-upload-btn").onclick=()=>{
+      const input=document.createElement("input"); input.type="file"; input.accept="image/png,image/webp,image/gif";
+      input.onchange=async()=>{
+        const file=input.files?.[0]; if(!file)return;
+        if(file.size>1_000_000){orbitToast("Decoration","Decoration must be 1 MB or smaller.","error");return;}
+        const fr=new FileReader();
+        fr.onload=async()=>{
+          try{
+            const up=await api("/api/uploads",{method:"POST",body:JSON.stringify({name:file.name,type:file.type,size:file.size,data:String(fr.result),purpose:"avatar-decoration"})});
+            const url="/api/avatar/"+encodeURIComponent(up.file.id);
+            const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({avatarDecoration:"none",avatarDecorationUrl:url})});
+            me=updated.user; saveGuest(); renderOwnAvatar();
+            orbitUI.profile.avatarDecoration="none"; orbitUI.profile.avatarDecorationUrl=url;
+            localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));
+            document.querySelectorAll("[data-decoration]").forEach(x=>x.classList.remove("active"));
+            if(decorationPreview) applyAvatarNode(decorationPreview,me);
+            orbitToast("Custom decoration uploaded","Your artwork is now your avatar decoration.","success");
+          }catch(err){orbitToast("Decoration upload failed",err.message,"error")}
+        }; fr.readAsDataURL(file);
+      }; input.click();
+    };
+    $("#decoration-remove-btn").onclick=async()=>{
+      try{
+        const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({avatarDecoration:"none",avatarDecorationUrl:""})});
+        me=updated.user; saveGuest(); renderOwnAvatar();
+        delete orbitUI.profile.avatarDecorationUrl; orbitUI.profile.avatarDecoration="none";
+        localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));
+        document.querySelectorAll("[data-decoration]").forEach(x=>x.classList.toggle("active",x.dataset.decoration==="none"));
+        if(decorationPreview) applyAvatarNode(decorationPreview,me);
+        orbitToast("Decoration removed","Your avatar frame is back to normal.","success");
+      }catch(err){orbitToast("Decoration remove failed",err.message,"error")}
+    };
+
     $("#check-username").onclick=async()=>{try{const name=$("#profile-username").value.trim();if(!name)return;const r=await api("/api/search?q="+encodeURIComponent(name));const exact=(r.users||[]).find(u=>u.username.toLowerCase()===name.replace(/^@/,"").toLowerCase()&&String(u.id)!==String(me?.id));$("#username-status").textContent=exact?"Username is taken.":"Username looks available.";$("#username-status").classList.toggle("is-good",!exact);$("#username-status").classList.toggle("is-bad",!!exact)}catch{}};
     $("#save-profile").onclick=async()=>{try{
       const username=$("#profile-username").value.trim().replace(/^@+/,"").toLowerCase();
