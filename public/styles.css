@@ -724,3 +724,7 @@ body{
   .incoming-call{left:12px;right:12px;top:72px;min-width:0}
   .call-panel{inset:8px;border-radius:17px}
 }
+
+/* Keep call floating overlays absolutely positioned above the stage */
+.call-panel > #call-popover,
+.call-panel > #call-toast{position:absolute}
