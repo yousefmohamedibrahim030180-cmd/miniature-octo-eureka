@@ -737,10 +737,17 @@ function toggleCamera() {
   if (socket && callState.roomId) socket.emit("call:media-state", { channelId: callState.roomId, muted: callState.micTrack ? !callState.micTrack.enabled : true, cameraOff: !callState.cameraTrack.enabled, screenShare: Boolean(callState.screenTrack) });
 }
 async function toggleScreenShare() {
-  if (!callState.active) return;
+  if (!callState.active) {
+    if (!currentChannel) return showError("Open a voice or video room first.");
+    try { await startCall("video"); } catch {}
+    if (!callState.active) return;
+  }
   if (callState.screenTrack) {
-    stopScreenShare();
+    await stopScreenShare();
     return;
+  }
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    return showError("Screen sharing is not supported by this browser. Open Orbit over HTTPS in a modern browser.");
   }
   try {
     const preset = QUALITY_PRESETS[callState.settings.quality] || QUALITY_PRESETS["1080p"];
@@ -752,7 +759,11 @@ async function toggleScreenShare() {
       },
       audio: true
     });
-    callState.screenTrack = display.getVideoTracks()[0];
+
+    const track = display.getVideoTracks()[0];
+    if (!track) throw new Error("No screen track was returned.");
+    callState.screenTrack = track;
+
     const selfTile = document.querySelector('.call-tile[data-peer="self"]');
     if (selfTile) {
       const video = selfTile.querySelector("video");
@@ -765,17 +776,27 @@ async function toggleScreenShare() {
 
     for (const [, item] of callState.peers) {
       const sender = item.pc.getSenders().find(s => s.track?.kind === "video");
-      if (sender) await sender.replaceTrack(callState.screenTrack);
+      if (sender) await sender.replaceTrack(track);
     }
 
-    callState.screenTrack.onended = stopScreenShare;
-    $("#share-btn").classList.add("active");
-    if (socket && callState.roomId) socket.emit("call:media-state", { channelId: callState.roomId, muted: callState.micTrack ? !callState.micTrack.enabled : true, cameraOff: !callState.cameraTrack?.enabled, screenShare: true });
+    track.onended = () => stopScreenShare();
+    $("#share-btn")?.classList.add("active");
+    $("#share-btn")?.classList.add("screen-live");
+    $("#dock-screen")?.classList.add("active");
+    if (socket && callState.roomId) {
+      socket.emit("call:media-state", {
+        channelId: callState.roomId,
+        muted: callState.micTrack ? !callState.micTrack.enabled : true,
+        cameraOff: !callState.cameraTrack?.enabled,
+        screenShare: true
+      });
+    }
+    orbitToast("Screen sharing started", "Your screen is now being shared with the call.", "success");
   } catch (err) {
-    if (err.name !== "AbortError") showError("Screen sharing failed: " + err.message);
+    if (err.name !== "AbortError") showError("Screen sharing failed: " + (err.message || "permission denied"));
   }
 }
-async function stopScreenShare() {
+async async function stopScreenShare() {
   if (!callState.screenTrack) return;
   callState.screenTrack.stop();
   callState.screenTrack = null;
@@ -786,8 +807,10 @@ async function stopScreenShare() {
     }
   }
   ensureSelfTile();
-  $("#share-btn").classList.remove("active");
+  $("#share-btn")?.classList.remove("active", "screen-live");
+  $("#dock-screen")?.classList.remove("active");
   if (socket && callState.roomId) socket.emit("call:media-state", { channelId: callState.roomId, muted: callState.micTrack ? !callState.micTrack.enabled : true, cameraOff: callState.cameraTrack ? !callState.cameraTrack.enabled : true, screenShare: false });
+  orbitToast("Screen sharing stopped", "Your screen is no longer shared.", "");
 }
 async function applyQuality(name, fps) {
   if (name) callState.settings.quality = name;
@@ -1317,6 +1340,14 @@ async function runGlobalSearch(q){
 }
 
 function wireEnhancedControls() {
+  $("#quick-screen-share-btn")?.addEventListener("click", async () => {
+    if (!callState.active) {
+      if (!currentChannel) return orbitToast("Open a room", "Choose a voice room before sharing your screen.", "error");
+      goChat();
+      await startCall("video");
+    }
+    await toggleScreenShare();
+  });
   $("#quick-share-btn")?.addEventListener("click", async () => {
     if (!currentChannel) return;
     const link = location.origin + "/?server=" + encodeURIComponent(currentServer?.id || "") + "&channel=" + encodeURIComponent(currentChannel.id);
