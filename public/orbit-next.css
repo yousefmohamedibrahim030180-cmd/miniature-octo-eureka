@@ -871,3 +871,104 @@ body::before{
     scroll-behavior:auto!important;
   }
 }
+
+
+/* =========================================================
+   ORBIT NEXUS / V9.1 — layout recovery
+   Fixes constrained desktop widths and over-eager mobile breakpoints.
+   ========================================================= */
+html,body{
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+}
+body{
+  margin:0!important;
+  overflow:hidden!important;
+}
+#app.app{
+  width:100%!important;
+  min-width:0!important;
+  max-width:none!important;
+  margin:0!important;
+  box-sizing:border-box!important;
+}
+#app .content,
+#app .chat,
+#app .global-page{
+  min-width:0!important;
+  max-width:none!important;
+}
+
+/* Treat normal desktop/tablet widths as desktop UI.
+   Mobile drawer behavior only starts below 640px. */
+@media (min-width:641px){
+  #app.app{
+    grid-template-columns:76px 282px minmax(0,1fr)!important;
+    padding:10px!important;
+    gap:10px!important;
+  }
+  #app.app:not(.server-sidebar-open){
+    grid-template-columns:76px minmax(0,1fr)!important;
+  }
+  #app.app.server-sidebar-open{
+    grid-template-columns:76px 282px minmax(0,1fr)!important;
+  }
+  #app.app:not(.server-sidebar-open)>.sidebar{
+    display:none!important;
+  }
+  #app.app.server-sidebar-open>.sidebar{
+    display:flex!important;
+    position:relative!important;
+    left:auto!important;top:auto!important;bottom:auto!important;
+    width:auto!important;
+    transform:none!important;
+  }
+  #app .chat-head{
+    min-width:0!important;
+  }
+  #app .head-actions{
+    flex-wrap:nowrap!important;
+  }
+  #app .head-action{
+    font-size:10px!important;
+  }
+  #app .head-action span{
+    display:inline!important;
+  }
+  #app .mobile-sidebar-btn{
+    display:none!important;
+  }
+}
+
+@media (min-width:641px) and (max-width:1100px){
+  #app.app.server-sidebar-open{
+    grid-template-columns:68px 250px minmax(0,1fr)!important;
+  }
+  #app.app:not(.server-sidebar-open){
+    grid-template-columns:68px minmax(0,1fr)!important;
+  }
+  #app .sidebar{min-width:0!important}
+  #app .head-actions{gap:4px!important}
+  #app .head-action{min-width:34px!important;padding:7px 8px!important}
+}
+
+@media (max-width:640px){
+  #app.app{
+    width:100%!important;
+    grid-template-columns:56px minmax(0,1fr)!important;
+    padding:6px!important;
+    gap:6px!important;
+  }
+  #app.app.server-sidebar-open{
+    grid-template-columns:56px minmax(0,1fr)!important;
+  }
+  #app.app .sidebar{
+    position:absolute!important;
+    left:62px!important;top:6px!important;bottom:6px!important;
+    width:min(286px,calc(100vw - 70px))!important;
+    z-index:80!important;
+  }
+  #app .head-action{display:none!important}
+  #app .mobile-sidebar-btn{display:grid!important;place-items:center!important}
+}
