@@ -1146,6 +1146,13 @@ function renderPage(view) {
     notifications:["INBOX","Notifications","Mentions, replies, calls, requests, and system events."],
     saved:["LIBRARY","Saved","Messages and media you deliberately kept."],
     explore:["EXPLORE","Explore","Events, polls, files, media, and community activity."],
+    communities:["NETWORK","Communities","Connected communities, Spaces, roles and discovery."],
+    calls:["COMMUNICATION","Calls","Voice rooms, video meetings, screen sharing and media controls."],
+    live:["LIVE","Live","Live rooms, creator broadcasts and streaming architecture."],
+    events:["EVENTS","Events","Community events, classes, tournaments and watch parties."],
+    projects:["PROJECTS","Projects","Tasks, boards and team collaboration inside communities."],
+    files:["FILES","Files","Shared workspace files and attachments."],
+    ai:["ORBIT AI","AI","Your optional AI workspace assistant."],
     settings:["PREFERENCES","Settings","Appearance, privacy, voice, notifications, accessibility and security."]
   }[view] || ["ORBIT","Home",""];
   $("#page-eyebrow").textContent=cfg[0];
@@ -1154,9 +1161,16 @@ function renderPage(view) {
   $("#page-actions").innerHTML="";
   if(view==="home")renderHomePage();
   if(view==="server-home")renderServerHomePage().catch(err=>orbitToast("Server Home",err.message,"error"));
+  if(view==="communities")renderCommunitiesPage();
   if(view==="discover")renderDiscoverPage();
   if(view==="dms")renderDMPage();
   if(view==="friends")renderFriendsPage();
+  if(view==="calls")renderCallsPage();
+  if(view==="live")renderLivePage();
+  if(view==="events")renderEventsPage();
+  if(view==="projects")renderProjectsPage();
+  if(view==="files")renderFilesPage();
+  if(view==="ai")renderAIPage();
   if(view==="notifications")renderNotificationsPage();
   if(view==="saved")renderSavedPage();
   if(view==="explore")renderExplorePage();
@@ -1166,7 +1180,7 @@ function setView(view){
   orbitUI.view=view;
   document.querySelectorAll(".rail-nav[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
   const global=$("#global-page"),chat=$("#chat-view");
-  const globalViews=["home","server-home","discover","dms","friends","notifications","saved","explore","settings"];
+  const globalViews=["home","server-home","communities","discover","dms","friends","calls","live","events","projects","files","ai","notifications","saved","explore","settings"];
   if(globalViews.includes(view)){
     global.classList.remove("hidden");
     chat.classList.add("hidden");
@@ -1504,6 +1518,123 @@ function renderHomePage(){
   $("#qa-poll").onclick=openPoll;
   $("#qa-friends").onclick=()=>setView("friends");
   loadPulse();
+}
+
+/* ===== ORBIT PRODUCT EXPANSION / SOCIAL OS MODULES ===== */
+function readLocalJson(key, fallback){
+  try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):fallback}catch{return fallback}
+}
+function writeLocalJson(key,value){localStorage.setItem(key,JSON.stringify(value))}
+function orbitDate(value){
+  const d=new Date(value); return Number.isNaN(d.getTime())?String(value||""):d.toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})
+}
+function renderCommunitiesPage(){
+  $("#page-actions").innerHTML='<button id="communities-create">+ Create community</button><button id="communities-discover">Discover</button>';
+  const rows=(servers||[]).map(s=>{
+    const active=String(s.id)===String(currentServer?.id);
+    return '<button class="os-list-row '+(active?'active':'')+'" data-open-community="'+escapeHtml(s.id)+'"><div class="os-icon">◈</div><div><strong>'+escapeHtml(s.name)+'</strong><span>'+((s.memberCount||0))+' members · '+(active?'Active workspace':'Community')+'</span></div><b>'+((s.owner_id&&String(s.owner_id)===String(me?.id))?'OWNER':'MEMBER')+'</b></button>';
+  }).join('');
+  $("#page-body").innerHTML=
+    '<div class="os-hero"><div><span class="eyebrow">COMMUNITY NETWORK</span><h2>Your communities.</h2><p>Every community is a world with its own Spaces, roles, conversations and live rooms.</p></div><div class="os-stat"><strong>'+servers.length+'</strong><span>connected</span></div></div>'+
+    '<div class="os-toolbar"><div><strong>Connected communities</strong><span>Open a workspace or discover a new one.</span></div><button id="communities-new-inline">Create community</button></div>'+
+    '<div class="os-list">'+(rows||'<div class="os-empty"><strong>No communities yet</strong><span>Create one to start your first Space.</span></div>')+'</div>'+
+    '<div class="os-feature-grid"><div class="os-feature"><span>PUBLIC</span><strong>Discoverable communities</strong><small>Community discovery UI is ready; discovery ranking can be connected to a real recommendation service.</small></div><div class="os-feature"><span>SPACES</span><strong>Chat · Forum · Voice · Media</strong><small>Use the current channel engine as the first Space layer while richer Space types are added.</small></div><div class="os-feature"><span>CONTROL</span><strong>Permissions & audit</strong><small>Use Control Center for roles, moderation, bans, security and audit actions.</small></div></div>';
+  $("#communities-create").onclick=()=>$("#new-server").click();
+  $("#communities-new-inline").onclick=()=>$("#new-server").click();
+  $("#communities-discover").onclick=()=>setView("discover");
+  document.querySelectorAll("[data-open-community]").forEach(b=>b.onclick=async()=>{const ss=servers.find(x=>String(x.id)===String(b.dataset.openCommunity));if(ss)await selectServer(ss);goChat()});
+}
+
+function renderCallsPage(){
+  const voice=(channels||[]).filter(c=>c.type==="voice");
+  $("#page-actions").innerHTML='<button id="calls-start">Start video call</button><button id="calls-voice">Start voice</button>';
+  const items=voice.map(c=>'<div class="os-call-row"><div class="os-call-pulse"></div><div><strong>'+escapeHtml(c.name)+'</strong><span>Voice Space · '+(String(c.id)===String(currentChannel?.id)?'selected':'ready to join')+'</span></div><button data-join-call="'+escapeHtml(c.id)+'">Join</button></div>').join('');
+  $("#page-body").innerHTML=
+    '<div class="os-hero"><div><span class="eyebrow">COMMUNICATION</span><h2>Calls, without friction.</h2><p>Jump into voice and video from any Space. The existing WebRTC layer remains the live transport.</p></div><div class="os-live-badge">LIVE MEDIA</div></div>'+
+    '<div class="os-feature-grid"><div class="os-feature"><span>VOICE</span><strong>Push-to-talk ready</strong><small>Noise suppression, device selection, quality controls and connection telemetry are already available.</small></div><div class="os-feature"><span>VIDEO</span><strong>1080p / 1440p presets</strong><small>Video quality and layout controls connect directly to the current call engine.</small></div><div class="os-feature"><span>SCREEN</span><strong>Screen sharing</strong><small>Share screen from the call room with the existing browser capture flow.</small></div></div>'+
+    '<div class="os-section-title"><strong>Available voice Spaces</strong><span>'+voice.length+' rooms</span></div>'+
+    '<div class="os-call-list">'+(items||'<div class="os-empty"><strong>No voice Spaces yet</strong><span>Create a Voice Space from the workspace sidebar.</span></div>')+'</div>';
+  $("#calls-start").onclick=()=>{if(currentChannel?.type!=="voice")return orbitToast("Video call","Select a Voice Space first.","error");startCall("video")};
+  $("#calls-voice").onclick=()=>{if(currentChannel?.type!=="voice")return orbitToast("Voice call","Select a Voice Space first.","error");startCall("voice")};
+  document.querySelectorAll("[data-join-call]").forEach(b=>b.onclick=async()=>{const c=voice.find(x=>String(x.id)===String(b.dataset.joinCall));if(!c)return;await selectChannel(c);startCall("voice")});
+}
+
+function renderLivePage(){
+  $("#page-actions").innerHTML='<button id="live-start">Go live</button><button id="live-attach">Share screen</button>';
+  const demo=[
+    ["Orbit Studio","Creator","Design review · 4 viewers"],
+    ["Night Ops","Gaming","Ranked squad · 18 viewers"],
+    ["Study Room","Education","Exam prep · 31 viewers"],
+    ["Build Session","Technology","Shipping v0.9 · 9 viewers"]
+  ];
+  $("#page-body").innerHTML=
+    '<div class="os-hero os-live-hero"><div><span class="eyebrow">LIVE NETWORK</span><h2>Watch what is happening now.</h2><p>Native live rooms are the next transport layer. Today, the call studio provides the production-grade capture surface.</p></div><div class="os-live-badge">● LIVE</div></div>'+
+    '<div class="os-stream-grid">'+demo.map(x=>'<button class="os-stream-card" data-stream="'+escapeHtml(x[0])+'"><div class="os-stream-art"><span>LIVE</span></div><div><strong>'+escapeHtml(x[0])+'</strong><span>'+escapeHtml(x[1])+' · '+escapeHtml(x[2])+'</span></div></button>').join("")+'</div>'+
+    '<div class="os-note"><strong>Streaming architecture</strong><span>RTMP/WebRTC ingest, transcoding and CDN delivery require a streaming provider or media server. The UI and producer flow are ready without pretending that browser-only WebRTC is a public broadcast backend.</span></div>';
+  $("#live-start").onclick=()=>{if(currentChannel?.type!=="voice")return orbitToast("Go live","Select a Voice Space, then launch the studio.","error");startCall("video");orbitToast("Live studio","Broadcast mode is ready as a capture surface. Connect an ingest provider for public streaming.")};
+  $("#live-attach").onclick=()=>{if(callState.active)toggleScreenShare();else orbitToast("Screen share","Start a live studio first.","error")};
+  document.querySelectorAll("[data-stream]").forEach(b=>b.onclick=()=>orbitToast("Live preview",b.dataset.stream+" is a demo broadcast card until a streaming transport is connected."));
+}
+
+function renderEventsPage(){
+  let events=readLocalJson("orbit_events_v1",[]);
+  $("#page-actions").innerHTML='<button id="events-create">+ Create event</button>';
+  const now=Date.now();
+  events=events.filter(e=>new Date(e.when).getTime()>now-86400000*2);
+  writeLocalJson("orbit_events_v1",events);
+  const cards=events.sort((a,b)=>new Date(a.when)-new Date(b.when)).map((e,i)=>
+    '<div class="os-event-card"><div class="os-event-date"><strong>'+escapeHtml(new Date(e.when).toLocaleDateString([], {day:"2-digit"}))+'</strong><span>'+escapeHtml(new Date(e.when).toLocaleDateString([], {month:"short"}))+'</span></div><div><strong>'+escapeHtml(e.title)+'</strong><span>'+escapeHtml(e.type)+' · '+escapeHtml(e.description||"Community event")+'</span><small>'+escapeHtml(orbitDate(e.when))+' · '+(e.rsvp?"Going":"Not joined")+'</small></div><button data-event-rsvp="'+i+'">'+(e.rsvp?"Going":"RSVP")+'</button></div>'
+  ).join("");
+  $("#page-body").innerHTML=
+    '<div class="os-hero"><div><span class="eyebrow">EVENTS</span><h2>Spaces become experiences.</h2><p>Schedule classes, tournaments, watch parties, meetings and community moments.</p></div><div class="os-stat"><strong>'+events.length+'</strong><span>upcoming</span></div></div>'+
+    '<div class="os-event-compose"><input id="os-event-title" placeholder="Event title"><input id="os-event-when" type="datetime-local"><select id="os-event-type"><option>Community</option><option>Gaming</option><option>Class</option><option>Meeting</option><option>Watch party</option></select><button id="os-event-add">Create event</button></div>'+
+    '<div class="os-list">'+(cards||'<div class="os-empty"><strong>No upcoming events</strong><span>Create the first event for your community.</span></div>')+'</div>'+
+    '<div class="os-note"><strong>Calendar integrations</strong><span>The first version stores event state locally for the workspace. A production calendar integration can connect Google/Outlook/ICS and server-side reminders.</span></div>';
+  $("#events-create").onclick=()=>document.querySelector("#os-event-title")?.focus();
+  $("#os-event-add").onclick=()=>{const title=$("#os-event-title").value.trim(),when=$("#os-event-when").value,type=$("#os-event-type").value;if(!title||!when)return orbitToast("Create event","Add a title and date/time.","error");events.push({id:"evt_"+Date.now(),title,when,type,description:"Created from Orbit Events",rsvp:false});writeLocalJson("orbit_events_v1",events);orbitToast("Event created","Your event was added to the workspace.","success");renderEventsPage()};
+  document.querySelectorAll("[data-event-rsvp]").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.eventRsvp);events[i].rsvp=!events[i].rsvp;writeLocalJson("orbit_events_v1",events);renderEventsPage()});
+}
+
+function renderProjectsPage(){
+  let tasks=readLocalJson("orbit_projects_v1",[
+    {id:"p1",title:"Design the community home",status:"in-progress",label:"Product"},
+    {id:"p2",title:"Set up welcome flow",status:"backlog",label:"Community"},
+    {id:"p3",title:"Test voice room",status:"done",label:"Realtime"}
+  ]);
+  $("#page-actions").innerHTML='<button id="project-add">+ Add task</button>';
+  const col=(key,label)=>'<section class="os-kanban-col"><header><strong>'+label+'</strong><span>'+tasks.filter(t=>t.status===key).length+'</span></header>'+tasks.filter(t=>t.status===key).map(t=>'<button class="os-task" data-task="'+t.id+'"><span>'+escapeHtml(t.label||"Task")+'</span><strong>'+escapeHtml(t.title)+'</strong><small>Click to move →</small></button>').join("")+'</section>';
+  $("#page-body").innerHTML=
+    '<div class="os-hero"><div><span class="eyebrow">PROJECTS</span><h2>Turn communities into teams.</h2><p>Kanban is the first project surface. Connect it to server-side projects and permissions as the workspace model grows.</p></div><div class="os-stat"><strong>'+tasks.filter(t=>t.status!=="done").length+'</strong><span>active tasks</span></div></div>'+
+    '<div class="os-project-compose"><input id="os-task-title" placeholder="New task"><select id="os-task-status"><option value="backlog">Backlog</option><option value="in-progress">In progress</option><option value="done">Done</option></select><button id="os-task-add">Add task</button></div>'+
+    '<div class="os-kanban">'+col("backlog","Backlog")+col("in-progress","In progress")+col("done","Done")+'</div>';
+  const next={backlog:"in-progress","in-progress":"done",done:"backlog"};
+  $("#project-add").onclick=()=>$("#os-task-title").focus();
+  $("#os-task-add").onclick=()=>{const title=$("#os-task-title").value.trim();if(!title)return orbitToast("Project task","Type a task name first.","error");tasks.push({id:"task_"+Date.now(),title,status:$("#os-task-status").value,label:"Workspace"});writeLocalJson("orbit_projects_v1",tasks);renderProjectsPage()};
+  document.querySelectorAll("[data-task]").forEach(b=>b.onclick=()=>{const t=tasks.find(x=>x.id===b.dataset.task);if(!t)return;t.status=next[t.status];writeLocalJson("orbit_projects_v1",tasks);renderProjectsPage()});
+}
+
+function renderFilesPage(){
+  const recent=readLocalJson("orbit_recent_files_v1",[]);
+  $("#page-actions").innerHTML='<button id="files-upload">Upload file</button><button id="files-chat">Open composer</button>';
+  const rows=recent.map(f=>'<div class="os-file-row"><div class="os-file-icon">'+(String(f.type||"").startsWith("image/")?"IMG":(String(f.type||"").includes("pdf")?"PDF":"FILE"))+'</div><div><strong>'+escapeHtml(f.name||"file")+'</strong><span>'+escapeHtml(f.type||"file")+' · '+Math.max(0,Math.round(Number(f.size||0)/1024))+' KB</span></div><a href="/api/uploads/'+encodeURIComponent(f.id)+'" target="_blank" rel="noopener">Open</a></div>').join("");
+  $("#page-body").innerHTML=
+    '<div class="os-hero"><div><span class="eyebrow">FILES</span><h2>Your shared workspace files.</h2><p>Upload from here or attach directly inside a conversation. Files are served by Orbit and inherit the current guest-mode upload limits.</p></div><div class="os-stat"><strong>'+recent.length+'</strong><span>recent</span></div></div>'+
+    '<div class="os-file-drop" id="os-file-drop"><span>DROP</span><strong>Drop files here</strong><small>Images, video, audio, PDF and common documents.</small><button id="os-file-browse">Browse</button></div>'+
+    '<div class="os-section-title"><strong>Recent files</strong><span>Local index · server file endpoint</span></div>'+
+    '<div class="os-list">'+(rows||'<div class="os-empty"><strong>No files indexed yet</strong><span>Upload a file to create your first workspace item.</span></div>')+'</div>';
+  const upload=()=>{const input=document.createElement("input");input.type="file";input.accept="image/*,video/*,audio/*,.pdf,.zip,.txt,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.json,.js,.ts,.md";input.onchange=()=>{const file=input.files?.[0];if(!file)return;if(file.size>1_500_000)return orbitToast("File too large","Guest mode limit is 1.5 MB for this workspace.","error");const fr=new FileReader();fr.onload=async()=>{try{const up=await api("/api/uploads",{method:"POST",body:JSON.stringify({name:file.name,type:file.type||"application/octet-stream",size:file.size,data:String(fr.result),purpose:"workspace-file"})});const saved=readLocalJson("orbit_recent_files_v1",[]).filter(x=>x.id!==up.file.id);saved.unshift(up.file);writeLocalJson("orbit_recent_files_v1",saved.slice(0,40));orbitToast("File uploaded",file.name,"success");renderFilesPage()}catch(err){orbitToast("Upload failed",err.message,"error")}};fr.readAsDataURL(file)};input.click()};
+  $("#files-upload").onclick=upload;$("#files-browse").onclick=upload;$("#files-chat").onclick=()=>{goChat();$("#attach").click()};
+}
+
+function renderAIPage(){
+  const history=readLocalJson("orbit_ai_demo_v1",[{role:"assistant",text:"I’m ORBIT. The workspace assistant is ready for navigation, search and lightweight organization. Connect a model provider to enable full AI answers."}]);
+  $("#page-actions").innerHTML='<button id="ai-clear">Clear</button>';
+  $("#page-body").innerHTML=
+    '<div class="os-hero os-ai-hero"><div><span class="eyebrow">ORBIT INTELLIGENCE</span><h2>AI, inside the workspace.</h2><p>Ask about navigation, find a Space, summarize a local project, or hand off to your connected model provider.</p></div><div class="os-ai-orb">✧</div></div>'+
+    '<div class="os-ai-shell"><div id="os-ai-log">'+history.map(m=>'<div class="os-ai-msg '+m.role+'"><span>'+escapeHtml(m.role==="assistant"?"ORBIT":"YOU")+'</span><p>'+escapeHtml(m.text)+'</p></div>').join("")+'</div><form id="os-ai-form" class="os-ai-form"><input id="os-ai-input" placeholder="Ask ORBIT… e.g. “open settings” or “show files”"><button>Send</button></form></div>'+
+    '<div class="os-note"><strong>AI boundary</strong><span>This build intentionally does not fake an external model. Full answers, semantic search and document analysis require an AI provider/key on the server. The shell below still supports useful local commands.</span></div>';
+  $("#ai-clear").onclick=()=>{writeLocalJson("orbit_ai_demo_v1",[]);renderAIPage()};
+  $("#os-ai-form").onsubmit=e=>{e.preventDefault();const input=$("#os-ai-input").value.trim();if(!input)return;let h=readLocalJson("orbit_ai_demo_v1",[]);h.push({role:"user",text:input});const q=input.toLowerCase();let reply="I can handle local workspace commands now. Connect an AI provider for generative answers.";if(q.includes("open settings"))reply="Opening Settings.";else if(q.includes("show files"))reply="Opening Files.";else if(q.includes("open calls")||q.includes("calls"))reply="Opening Calls.";else if(q.includes("events"))reply="Opening Events.";else if(q.includes("projects"))reply="Opening Projects.";else if(q.startsWith("search "))reply="Opening global search for: "+input.slice(7);h.push({role:"assistant",text:reply});writeLocalJson("orbit_ai_demo_v1",h);renderAIPage();if(reply==="Opening Settings.")setView("settings");else if(reply==="Opening Files.")setView("files");else if(reply==="Opening Calls.")setView("calls");else if(reply==="Opening Events.")setView("events");else if(reply==="Opening Projects.")setView("projects");else if(q.startsWith("search "))openSearchModal(input.slice(7))};
 }
 
 function renderDiscoverPage(){
@@ -2023,7 +2154,7 @@ function openCommandPalette(){
 function closeCommandPalette(){$("#command-palette").classList.add("hidden")}
 function renderCommandResults(q){
   const commands=[
-    ["⌂","Home","home"],["✦","Discover","discover"],["◌","Direct messages","dms"],["◎","Friends","friends"],["◇","Notifications","notifications"],["⌑","Saved","saved"],["⌖","Explore","explore"],["⚙","Settings","settings"],["+","Create server","create-server"],["#","Create channel","create-channel"],["☎","Start voice call","voice"],["▣","Start video call","video"],["↗","Share screen","share"],["⌕","Search","search"]
+    ["⌂","Home","home"],["◈","Communities","communities"],["◌","Messages","dms"],["☎","Calls","calls"],["●","Live","live"],["◷","Events","events"],["◫","Projects","projects"],["□","Files","files"],["✧","ORBIT AI","ai"],["✦","Discover","discover"],["◎","Friends","friends"],["◇","Notifications","notifications"],["⌑","Saved","saved"],["⌖","Explore","explore"],["⚙","Settings","settings"],["+","Create server","create-server"],["#","Create channel","create-channel"],["☎","Start voice call","voice"],["▣","Start video call","video"],["↗","Share screen","share"],["⌕","Search","search"]
   ].filter(x=>(x[1]+" "+x[2]).toLowerCase().includes(String(q||"").toLowerCase()));
   $("#command-results").innerHTML=(commands.length?commands:[["⌕","No matches",""]]).map((x,i)=>'<button class="command-item" data-command-index="'+i+'"><span class="command-icon">'+x[0]+'</span><div><strong>'+x[1]+'</strong><span>'+x[2]+'</span></div><span>↵</span></button>').join("");
   document.querySelectorAll("[data-command-index]").forEach((b,i)=>b.onclick=()=>runCommand(commands[i]));
@@ -2032,7 +2163,7 @@ function runCommand(item){
   if(!item)return;
   closeCommandPalette();
   const a=item[2];
-  if(["home","discover","dms","friends","notifications","saved","explore","settings"].includes(a))return setView(a);
+  if(["home","communities","discover","dms","friends","calls","live","events","projects","files","ai","notifications","saved","explore","settings"].includes(a))return setView(a);
   if(a==="create-server")return $("#new-server").click();
   if(a==="create-channel")return $("#new-channel").click();
   if(a==="voice")return goChat(),startCall("voice");
