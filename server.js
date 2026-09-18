@@ -1812,6 +1812,12 @@ io.on("connection", socket => {
     const room = callRoomFor(channelId);
     if (!socket.rooms.has(room)) return;
     const channel = memory.channels.get(String(channelId));
+    const activeLive=[...memory.liveSessions.values()].find(s=>s.status==="live"&&String(s.channelId)===String(channelId)&&String(s.hostUserId)===String(socket.user.id));
+    if(activeLive){
+      activeLive.status="ended";
+      activeLive.endedAt=now();
+      emitToServer(activeLive.serverId,"live:ended",{sessionId:activeLive.id});
+    }
     socket.leave(room);
     socket.to(room).emit("call:participant-left", {
       socketId: socket.id,
@@ -1933,6 +1939,13 @@ io.on("connection", socket => {
   });
 
   socket.on("disconnect", () => {
+    for(const session of memory.liveSessions.values()){
+      if(session.status==="live" && String(session.hostUserId)===String(socket.user.id)){
+        session.status="ended";
+        session.endedAt=now();
+        emitToServer(session.serverId,"live:ended",{sessionId:session.id});
+      }
+    }
     socket.user.status = "offline";
     socket.user.activity = "Offline";
     socket.user.activityChannelId = null;
