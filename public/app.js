@@ -250,7 +250,8 @@ function connectRealtime() {
     console.error("[orbit] realtime connect error", err);
     if (callState.active) setCallIndicator("RECONNECTING");
   });
-  socket.on("error:toast", payload => orbitToast("Server", payload?.message || "Action blocked."));\n  socket.on("server:removed", payload => {
+  socket.on("error:toast", payload => orbitToast("Server", payload?.message || "Action blocked."));
+  socket.on("server:removed", payload => {
     if (String(payload?.action || "").toLowerCase() === "ban") {
       if (callState.active) leaveCall();
       currentServer = null;
