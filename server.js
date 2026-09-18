@@ -17,6 +17,7 @@ const PORT = Number(process.env.PORT || 8080);
 const JWT_SECRET = process.env.JWT_SECRET || "orbit-guest-dev-secret";
 const ADMIN_CONTROL_KEY = String(process.env.ADMIN_CONTROL_KEY || "").trim();
 const adminKeyAttempts = new Map();
+const AVATAR_DECORATIONS = new Set(["none","halo","crown","orbit","spark","fire","ice","cyber","royal"]);
 
 const memory = {
   users: new Map(),
@@ -361,7 +362,10 @@ function createGuest(username, existingId) {
     username: uniqueUsername(requested),
     displayName: cleanName(username, requested),
     status: "online",
-    createdAt: now()
+    createdAt: now(),
+    avatarUrl: null,
+    avatarDecoration: "none",
+    avatarDecorationUrl: null
   };
   if (!existing) {
     user.username = uniqueUsername(requested, user.id);
@@ -981,6 +985,18 @@ app.patch("/api/me", auth, (req, res) => {
       return res.status(400).json({ error: "Invalid avatar" });
     }
     req.user.avatarUrl = avatarUrl || null;
+  }
+  if (req.body?.avatarDecoration !== undefined) {
+    const decoration = String(req.body.avatarDecoration || "none").trim().toLowerCase();
+    if (!AVATAR_DECORATIONS.has(decoration)) return res.status(400).json({ error: "Invalid avatar decoration" });
+    req.user.avatarDecoration = decoration;
+  }
+  if (req.body?.avatarDecorationUrl !== undefined) {
+    const decorationUrl = String(req.body.avatarDecorationUrl || "").trim();
+    if (decorationUrl && !/^\/api\/avatar\/[A-Za-z0-9_-]+$/.test(decorationUrl)) {
+      return res.status(400).json({ error: "Invalid avatar decoration" });
+    }
+    req.user.avatarDecorationUrl = decorationUrl || null;
   }
   res.json({ user: publicUser(req.user) });
 });
