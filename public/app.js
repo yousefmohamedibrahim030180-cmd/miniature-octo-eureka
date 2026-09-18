@@ -128,15 +128,25 @@ function connectRealtime() {
     updateCallMeta();
   });
 
-  socket.on("call:media-state", ({ socketId, muted }) => {
+  socket.on("call:media-state", ({ socketId, muted, cameraOff, screenShare }) => {
     const tile = document.querySelector('.call-tile[data-peer="' + socketId + '"]');
-    if (tile) tile.classList.toggle("remote-muted", muted);
+    if (tile) {
+      tile.classList.toggle("remote-muted", muted);
+      tile.classList.toggle("voice-only", Boolean(cameraOff));
+      if (screenShare) tile.classList.add("screen-sharing"); else tile.classList.remove("screen-sharing");
+    }
   });
 
   socket.on("rtc:offer", async ({ from, fromUser, offer }) => {
     try {
       const pc = await ensurePeer(from, false, fromUser);
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      const item = callState.peers.get(from);
+      if (item?.pendingCandidates?.length) {
+        for (const candidate of item.pendingCandidates.splice(0)) {
+          try { await pc.addIceCandidate(candidate); } catch (err) { console.warn("queued ICE", err); }
+        }
+      }
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       socket.emit("rtc:answer", { to: from, answer: pc.localDescription });
@@ -148,13 +158,26 @@ function connectRealtime() {
   socket.on("rtc:answer", async ({ from, answer }) => {
     const item = callState.peers.get(from);
     if (!item?.pc) return;
-    try { await item.pc.setRemoteDescription(new RTCSessionDescription(answer)); } catch (err) { console.error(err); }
+    try {
+      await item.pc.setRemoteDescription(new RTCSessionDescription(answer));
+      if (item.pendingCandidates?.length) {
+        for (const candidate of item.pendingCandidates.splice(0)) {
+          try { await item.pc.addIceCandidate(candidate); } catch (err) { console.warn("queued ICE", err); }
+        }
+      }
+    } catch (err) { console.error(err); }
   });
 
   socket.on("rtc:ice", async ({ from, candidate }) => {
     const item = callState.peers.get(from);
     if (!item?.pc || !candidate) return;
-    try { await item.pc.addIceCandidate(candidate); } catch (err) { console.error(err); }
+    try {
+      if (!item.pc.remoteDescription) {
+        item.pendingCandidates.push(candidate);
+        return;
+      }
+      await item.pc.addIceCandidate(candidate);
+    } catch (err) { console.error("ICE candidate", err); }
   });
 
   socket.on("disconnect", () => {
@@ -331,6 +354,23 @@ async function loadMembers() {
 /* ============================
    WebRTC Call System
    ============================ */
+let realtimeIceServers = [
+  { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+  { urls: "stun:stun.cloudflare.com:3478" }
+];
+let realtimeConfigPromise = null;
+
+async function loadRealtimeConfig() {
+  if (realtimeConfigPromise) return realtimeConfigPromise;
+  realtimeConfigPromise = api("/api/realtime-config").then(data => {
+    if (Array.isArray(data?.iceServers) && data.iceServers.length) realtimeIceServers = data.iceServers;
+    return realtimeIceServers;
+  }).catch(err => {
+    console.warn("realtime config fallback", err);
+    return realtimeIceServers;
+  });
+  return realtimeConfigPromise;
+}
 
 async function startCall(mode = "video") {
   if (!currentChannel) return;
@@ -352,9 +392,11 @@ async function startCall(mode = "video") {
   document.body.classList.add("call-open");
 
   try {
+    await loadRealtimeConfig();
     await setupLocalMedia(mode);
     ensureSelfTile();
-    socket.emit("call:join", callState.roomId);
+    socket.emit("call:join", { channelId: callState.roomId, mode });
+    socket.emit("call:media-state", { channelId: callState.roomId, muted: false, cameraOff: mode === "voice", screenShare: false });
     setCallIndicator("LIVE");
     updateCallMeta();
   } catch (err) {
@@ -418,7 +460,7 @@ async function ensurePeer(socketId, initiator, info = {}) {
   if (callState.peers.has(socketId)) return callState.peers.get(socketId).pc;
 
   const pc = new RTCPeerConnection({
-    iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }],
+    iceServers: realtimeIceServers,
     bundlePolicy: "max-bundle",
     rtcpMuxPolicy: "require"
   });
@@ -550,7 +592,7 @@ function toggleMic() {
   callState.micTrack.enabled = !callState.micTrack.enabled;
   $("#mic-btn").classList.toggle("active", callState.micTrack.enabled);
   $("#mic-btn").classList.toggle("off", !callState.micTrack.enabled);
-  if (socket && callState.roomId) socket.emit("call:mute", { channelId: callState.roomId, muted: !callState.micTrack.enabled });
+  if (socket && callState.roomId) socket.emit("call:media-state", { channelId: callState.roomId, muted: !callState.micTrack.enabled, cameraOff: callState.cameraTrack ? !callState.cameraTrack.enabled : true, screenShare: Boolean(callState.screenTrack) });
 }
 function toggleCamera() {
   if (!callState.cameraTrack) return;
@@ -559,6 +601,7 @@ function toggleCamera() {
   $("#camera-btn").classList.toggle("off", !callState.cameraTrack.enabled);
   const selfTile = document.querySelector('.call-tile[data-peer="self"]');
   selfTile?.classList.toggle("voice-only", !callState.cameraTrack.enabled);
+  if (socket && callState.roomId) socket.emit("call:media-state", { channelId: callState.roomId, muted: callState.micTrack ? !callState.micTrack.enabled : true, cameraOff: !callState.cameraTrack.enabled, screenShare: Boolean(callState.screenTrack) });
 }
 async function toggleScreenShare() {
   if (!callState.active) return;
@@ -594,6 +637,7 @@ async function toggleScreenShare() {
 
     callState.screenTrack.onended = stopScreenShare;
     $("#share-btn").classList.add("active");
+    if (socket && callState.roomId) socket.emit("call:media-state", { channelId: callState.roomId, muted: callState.micTrack ? !callState.micTrack.enabled : true, cameraOff: !callState.cameraTrack?.enabled, screenShare: true });
   } catch (err) {
     if (err.name !== "AbortError") showError("Screen sharing failed: " + err.message);
   }
@@ -610,6 +654,7 @@ async function stopScreenShare() {
   }
   ensureSelfTile();
   $("#share-btn").classList.remove("active");
+  if (socket && callState.roomId) socket.emit("call:media-state", { channelId: callState.roomId, muted: callState.micTrack ? !callState.micTrack.enabled : true, cameraOff: callState.cameraTrack ? !callState.cameraTrack.enabled : true, screenShare: false });
 }
 async function applyQuality(name, fps) {
   if (name) callState.settings.quality = name;
