@@ -208,7 +208,7 @@ function connectRealtime() {
     const incomingChannel = channels.find(c => String(c.id) === String(call.channelId));
     $("#incoming-title").textContent = (call.username || "Guest") + " is calling";
     $("#incoming-subtitle").textContent = (call.mode === "voice" ? "Voice call" : "Video call") + " · " + (incomingChannel ? "#" + incomingChannel.name : "Orbit room");
-    $("#incoming-avatar").textContent = avatar(call.username || "G");
+    applyAvatarNode($("#incoming-avatar"),knownAvatarUsers.get(String(call.userId))||{id:call.userId,username:call.username||"G"});
     box.classList.remove("hidden");
   });
 
@@ -451,9 +451,10 @@ document.addEventListener("click", async e => {
 async function loadMembers() {
   if (!currentServer) return;
   const data = await api("/api/servers/" + currentServer.id + "/members");
+  rememberAvatarUsers(data.members);
   $("#member-list").innerHTML = data.members.map(m =>
     '<div class="member" data-user="' + m.id + '">' +
-    '<div class="avatar">' + escapeHtml(avatar(m.username)) + '</div>' +
+    avatarHtml(m) +
     '<div class="member-info"><strong>' + escapeHtml(m.username) + '</strong>' +
     '<span class="presence">' + m.status + " · " + m.role + "</span></div></div>"
   ).join("");
@@ -1259,6 +1260,7 @@ function pulseUserCard(user){
 function renderPulse(){
   const panel=$("#pulse-panel");
   if(!panel)return;
+  rememberAvatarUsers(pulseState.users);
   const liveUsers=pulseState.users.filter(u=>(u.status||"online")!=="offline");
   const calls=pulseState.calls||[];
   const activities=pulseState.activity||[];
@@ -1304,7 +1306,7 @@ async function openPulseProfile(userId){
   const activity=user.activity||user.status||"Online";
   openModal("Profile",
     '<div class="pulse-profile-modal">'+
-      '<div class="pulse-profile-top"><div class="pulse-big-avatar">'+escapeHtml(avatar(user.username))+'</div><div><strong>'+escapeHtml(user.display_name||user.username)+'</strong><span>'+escapeHtml(user.handle||("@"+user.username))+'</span><em>'+escapeHtml(activity)+'</em></div></div>'+
+      '<div class="pulse-profile-top"><div class="pulse-big-avatar">'+avatarHtml(user,'pulse-profile-avatar')+'</div><div><strong>'+escapeHtml(user.display_name||user.username)+'</strong><span>'+escapeHtml(user.handle||("@"+user.username))+'</span><em>'+escapeHtml(activity)+'</em></div></div>'+
       '<div class="pulse-profile-actions"><button class="primary" id="pulse-message-user">Message</button><button id="pulse-add-user">Add friend</button></div>'+
     '</div>');
   $("#pulse-message-user").onclick=async()=>{
@@ -1404,12 +1406,13 @@ function renderDMList(){
     const u=dm.otherUser||{};
     return !q||String(u.username||"").toLowerCase().includes(q)||String(u.display_name||"").toLowerCase().includes(q);
   });
+  rememberAvatarUsers(rows.map(dm=>dm.otherUser).filter(Boolean));
   root.innerHTML=rows.length?rows.map(dm=>{
     const u=dm.otherUser||{},active=String(dm.id)===String(dmState.activeId),unread=Number(dm.unreadCount||0);
     const preview=dm.lastMessage?.content||"No messages yet";
     const online=dmUserStatus(u)==="Online";
     return '<button class="dm-conversation '+(active?"active":"")+'" data-dm-open="'+escapeHtml(dm.id)+'">'+
-      '<div class="dm-list-avatar"><div class="avatar">'+escapeHtml(avatar(u.username))+'</div><i class="'+(online?"online":"offline")+'"></i></div>'+
+      '<div class="dm-list-avatar">'+avatarHtml(u)+'<i class="'+(online?"online":"offline")+'"></i></div>'+
       '<div class="dm-list-copy"><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>@'+escapeHtml(u.username||"guest")+'</span><p>'+escapeHtml(preview)+'</p></div>'+
       '<div class="dm-list-meta">'+(dm.lastMessage?.created_at?'<time>'+escapeHtml(formatDMTime(dm.lastMessage.created_at))+'</time>':"")+(unread?'<b>'+unread+'</b>':"")+'</div></button>';
   }).join(""):'<div class="dm-list-empty"><div class="dm-empty-icon">◌</div><strong>No conversations</strong><span>Start a private chat with a friend.</span></div>';
@@ -1505,15 +1508,18 @@ async function renderFriendsPage(){
   $("#refresh-friends-page").onclick=renderFriendsPage;
   try{
     const d=await api("/api/friends");
+    rememberAvatarUsers(d.friends);
+    rememberAvatarUsers(d.incoming.map(x=>x.fromUser).filter(Boolean));
+    rememberAvatarUsers(d.outgoing.map(x=>x.toUser).filter(Boolean));
     $("#page-body").innerHTML=
       '<div class="section-block"><div class="section-heading"><h3>Friends</h3><span>'+d.friends.length+'</span></div><div class="list-card">'+
-      (d.friends.length?d.friends.map(u=>'<div class="list-row"><div class="avatar">'+avatar(u.username)+'</div><div><strong>'+escapeHtml(u.username)+'</strong><span>'+escapeHtml(u.status)+'</span></div><button data-dm-friend="'+escapeHtml(u.username)+'">Message</button></div>').join(""):'<div class="content-card"><h4>No friends yet</h4><p>Send a request to another guest.</p></div>')+
+      (d.friends.length?d.friends.map(u=>'<div class="list-row">'+avatarHtml(u)+'<div><strong>'+escapeHtml(u.username)+'</strong><span>'+escapeHtml(u.status)+'</span></div><button data-dm-friend="'+escapeHtml(u.username)+'">Message</button></div>').join(""):'<div class="content-card"><h4>No friends yet</h4><p>Send a request to another guest.</p></div>')+
       '</div></div>'+
       '<div class="section-block"><div class="section-heading"><h3>Requests</h3><span>'+d.incoming.length+' incoming</span></div><div class="list-card">'+
-      d.incoming.map(r=>'<div class="list-row"><div class="avatar">'+avatar(r.fromUser?.username)+'</div><div><strong>'+escapeHtml(r.fromUser?.username||"Guest")+'</strong><span>Friend request · incoming</span></div><div class="row-actions"><button data-accept="'+r.id+'">Accept</button><button data-reject="'+r.id+'">Decline</button></div></div>').join("")+
+      d.incoming.map(r=>'<div class="list-row">'+avatarHtml(r.fromUser||{username:r.fromUser?.username||"Guest"})+'<div><strong>'+escapeHtml(r.fromUser?.username||"Guest")+'</strong><span>Friend request · incoming</span></div><div class="row-actions"><button data-accept="'+r.id+'">Accept</button><button data-reject="'+r.id+'">Decline</button></div></div>').join("")+
       '</div></div>'+
       '<div class="section-block"><div class="section-heading"><h3>Outgoing</h3><span>'+d.outgoing.length+' pending</span></div><div class="list-card">'+
-      (d.outgoing.length?d.outgoing.map(r=>'<div class="list-row"><div class="avatar">'+avatar(r.toUser?.username)+'</div><div><strong>'+escapeHtml(r.toUser?.username||"Guest")+'</strong><span>Friend request · waiting</span></div><span class="chip">Pending</span></div>').join(""):'<div class="content-card"><p>No pending outgoing requests.</p></div>')+
+      (d.outgoing.length?d.outgoing.map(r=>'<div class="list-row">'+avatarHtml(r.toUser||{username:r.toUser?.username||"Guest"})+'<div><strong>'+escapeHtml(r.toUser?.username||"Guest")+'</strong><span>Friend request · waiting</span></div><span class="chip">Pending</span></div>').join(""):'<div class="content-card"><p>No pending outgoing requests.</p></div>')+
       '</div></div>';
     document.querySelectorAll("[data-accept]").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request/"+encodeURIComponent(b.dataset.accept)+"/accept",{method:"POST",body:"{}"});orbitToast("Friend added","Request accepted.","success");renderFriendsPage()}catch(err){orbitToast("Request failed",err.message,"error")}});
     document.querySelectorAll("[data-reject]").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request/"+encodeURIComponent(b.dataset.reject)+"/reject",{method:"POST",body:"{}"});orbitToast("Request declined","The request was rejected.","");renderFriendsPage()}catch(err){orbitToast("Request failed",err.message,"error")}});
@@ -1866,7 +1872,8 @@ async function runGlobalSearch(q){
     const users=d.users||[], serversFound=d.servers||[], channelsFound=d.channels||[], messages=d.messages||[];
     const empty='<div class="search-empty"><div class="search-empty-icon">⌕</div><strong>No results</strong><span>Try another word, username or channel.</span></div>';
     const section=(title,count,body,cls="")=>'<section class="search-section '+cls+'"><div class="search-section-head"><strong>'+title+'</strong><span>'+count+'</span></div>'+(body||empty)+'</section>';
-    const bodyUsers=users.map(u=>'<button class="search-result user-result" data-search-user="'+escapeHtml(u.username)+'"><div class="avatar">'+avatar(u.username)+'</div><div><strong>'+escapeHtml(u.display_name||u.username)+'</strong><span>'+escapeHtml(u.handle||("@"+u.username))+' · '+escapeHtml(u.status)+'</span></div><b>Profile</b></button>').join("");
+    rememberAvatarUsers(users);
+    const bodyUsers=users.map(u=>'<button class="search-result user-result" data-search-user="'+escapeHtml(u.username)+'">'+avatarHtml(u)+<div><strong>'+escapeHtml(u.display_name||u.username)+'</strong><span>'+escapeHtml(u.handle||("@"+u.username))+' · '+escapeHtml(u.status)+'</span></div><b>Profile</b></button>').join("");
     const bodyServers=serversFound.map(x=>'<div class="search-result"><div class="search-type-icon">◈</div><div><strong>'+escapeHtml(x.name)+'</strong><span>'+x.memberCount+' members</span></div></div>').join("");
     const bodyChannels=channelsFound.map(x=>'<div class="search-result"><div class="search-type-icon">'+(x.type==="voice"?"◉":"#")+'</div><div><strong>'+escapeHtml(x.name)+'</strong><span>'+escapeHtml(x.type)+' channel</span></div></div>').join("");
     const bodyMessages=messages.map(m=>'<div class="search-result"><div class="search-type-icon">◫</div><div><strong>'+escapeHtml(m.username)+'</strong><span>'+escapeHtml(m.content)+'</span></div></div>').join("");
@@ -2072,12 +2079,12 @@ async function openThread(el){
     $("#thread-panel").classList.remove("hidden");$("#thread-panel").dataset.messageId=idValue;
     $("#thread-root").innerHTML='<div class="content-card"><strong>'+escapeHtml(el.querySelector(".msg-head strong")?.textContent||"Message")+'</strong><p>'+escapeHtml(el.querySelector(".msg-body")?.textContent||"")+'</p></div>';
     $("#thread-meta").textContent=(d.thread.replies?.length||0)+" replies";
-    $("#thread-messages").innerHTML=(d.thread.replies||[]).map(r=>'<div class="message"><div class="avatar">'+avatar(r.username)+'</div><div><div class="msg-head"><strong>'+escapeHtml(r.username)+'</strong><time>now</time></div><div class="msg-body">'+escapeHtml(r.content)+'</div></div></div>').join("");
+    $("#thread-messages").innerHTML=(d.thread.replies||[]).map(r=>'<div class="message">'+avatarHtml(knownAvatarUsers.get(String(r.user_id))||{id:r.user_id,username:r.username})+<div><div class="msg-head"><strong>'+escapeHtml(r.username)+'</strong><time>now</time></div><div class="msg-body">'+escapeHtml(r.content)+'</div></div></div>').join("");
   }catch(e){orbitToast("Thread failed",e.message,"error")}
 }
 $("#thread-composer")?.addEventListener("submit",async e=>{
   e.preventDefault();const idValue=$("#thread-panel").dataset.messageId,content=$("#thread-input").value.trim();if(!idValue||!content)return;
-  try{const d=await api("/api/messages/"+encodeURIComponent(idValue)+"/thread",{method:"POST",body:JSON.stringify({content})});const r=d.reply;$("#thread-messages").insertAdjacentHTML("beforeend",'<div class="message"><div class="avatar">'+avatar(r.username)+'</div><div><div class="msg-head"><strong>'+escapeHtml(r.username)+'</strong><time>now</time></div><div class="msg-body">'+escapeHtml(r.content)+'</div></div></div>');$("#thread-input").value="";$("#thread-meta").textContent=(d.thread.replies?.length||0)+" replies"}catch(err){orbitToast("Reply failed",err.message,"error")}
+  try{const d=await api("/api/messages/"+encodeURIComponent(idValue)+"/thread",{method:"POST",body:JSON.stringify({content})});const r=d.reply;$("#thread-messages").insertAdjacentHTML("beforeend",'<div class="message">'+avatarHtml(knownAvatarUsers.get(String(r.user_id))||{id:r.user_id,username:r.username})+<div><div class="msg-head"><strong>'+escapeHtml(r.username)+'</strong><time>now</time></div><div class="msg-body">'+escapeHtml(r.content)+'</div></div></div>');$("#thread-input").value="";$("#thread-meta").textContent=(d.thread.replies?.length||0)+" replies"}catch(err){orbitToast("Reply failed",err.message,"error")}
 });
 function openMessageMore(el){
   openModal("Message actions",'<div class="list-card"><button class="list-row" id="msg-edit-action"><span>✎ Edit message</span></button><button class="list-row" id="msg-delete-action"><span>× Delete message</span></button></div>');
