@@ -104,7 +104,7 @@ function applyAvatarNode(node,user,nameOverride=""){
 function avatarHtml(userOrName,className=""){
   const u=typeof userOrName==="object"&&userOrName?rememberAvatarUser(userOrName):(knownAvatarUsers.get(String(userOrName))||{username:userOrName||"G"});
   const image=avatarImageUrl(u),deco=avatarDecoration(u),decoUrl=avatarDecorationUrl(u);
-  return '<div class="avatar '+escapeHtml(className)+' '+(image?"has-image ":"")+(decoUrl?"has-decoration-image":"")+'" data-avatar-decoration="'+escapeHtml(deco)+'" data-avatar-decoration-url="'+escapeHtml(decoUrl)+'"'+(decoUrl?' style="--avatar-decoration-image:url(\\''+escapeHtml(decoUrl)+'\\')"':'')+'>'+(image?'<img src="'+escapeHtml(image)+'" alt="">':'<span>'+escapeHtml(avatar(u.username||"G"))+'</span>')+'</div>';
+  return '<div class="avatar '+escapeHtml(className)+' '+(image?"has-image ":"")+(decoUrl?"has-decoration-image":"")+'" data-avatar-decoration="'+escapeHtml(deco)+'" data-avatar-decoration-url="'+escapeHtml(decoUrl)+'"'+(decoUrl?' style="--avatar-decoration-image:url('+escapeHtml(decoUrl)+')"':'')+'>'+(image?'<img src="'+escapeHtml(image)+'" alt="">':'<span>'+escapeHtml(avatar(u.username||"G"))+'</span>')+'</div>';
 }
 function renderOwnAvatar(){
   const node=$("#me-avatar");
