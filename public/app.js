@@ -140,6 +140,7 @@ function connectRealtime() {
     document.querySelectorAll("[data-user='" + x.userId + "'] .presence").forEach(n => n.textContent = x.status + (x.activity ? " · " + x.activity : ""));
     const user=pulseState.users.find(u=>String(u.id)===String(x.userId))||{id:x.userId,username:x.username||"Guest"};
     upsertPulseUser({...user,status:x.status,activity:x.activity||x.status},x.activity||x.status);
+    if(dmState.active?.otherUser&&String(dmState.active.otherUser.id)===String(x.userId)){dmState.active.otherUser.status=x.status;if(orbitUI.view==="dms"){renderDMHeader();renderDMList()}}
     if(orbitUI.view==="home")renderPulse();
   });
   socket.on("pulse:snapshot", data => {
@@ -1042,6 +1043,16 @@ async function refreshDevicesOnPermission() {
 /* ===========================
    ORBIT FUNCTIONAL EXTENSIONS
    =========================== */
+const dmState = {
+  list: [],
+  activeId: null,
+  active: null,
+  messages: [],
+  query: "",
+  typingTimer: null,
+  drafts: JSON.parse(localStorage.getItem("orbit_dm_drafts") || "{}")
+};
+
 const orbitUI = {
   view: "home",
   saved: JSON.parse(localStorage.getItem("orbit_saved") || "[]"),
@@ -1293,31 +1304,132 @@ function renderDiscoverPage(){
   document.querySelectorAll(".discover-view").forEach(b=>b.onclick=()=>orbitToast("Community preview",b.dataset.name));
 }
 
-async function renderDMPage(){
-  $("#page-actions").innerHTML='<button id="new-dm-page">New message</button><button id="refresh-dm-page">Refresh</button>';
-  $("#page-body").innerHTML='<div class="list-card"><div class="content-card"><h4>Loading conversations…</h4></div></div>';
-  $("#new-dm-page").onclick=()=>openModal("New direct message",'<input id="dm-target" placeholder="Exact guest username"><button class="primary" id="dm-create">Start conversation</button>');
+function formatDMTime(ts){
+  if(!ts)return "";
+  const d=new Date(ts), nowDate=new Date();
+  if(d.toDateString()===nowDate.toDateString()) return d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+  return d.toLocaleDateString([], {month:"short",day:"numeric"})+" "+d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+}
+function dmCurrentOther(){return dmState.active?.otherUser||null}
+function dmUserStatus(user){
+  if(!user)return "Offline";
+  const live=pulseState.users.find(u=>String(u.id)===String(user.id));
+  return String(live?.status||user.status||"offline").toLowerCase()==="online"?"Online":"Offline";
+}
+function saveDMDraft(){
+  if(!dmState.activeId)return;
+  const value=$("#dm-input")?.value||"";
+  if(value)dmState.drafts[dmState.activeId]=value;else delete dmState.drafts[dmState.activeId];
+  localStorage.setItem("orbit_dm_drafts",JSON.stringify(dmState.drafts));
+}
+function dmMessageMarkup(m){
+  const own=String(m.user_id)===String(me?.id);
+  return '<article class="dm-message '+(own?"own":"")+'" data-dm-message-id="'+escapeHtml(m.id)+'">'+
+    (!own?'<div class="dm-message-avatar">'+escapeHtml(avatar(m.username))+'</div>':"")+
+    '<div class="dm-message-stack"><div class="dm-message-bubble">'+escapeHtml(m.content)+'</div>'+
+    '<div class="dm-message-meta">'+escapeHtml(formatDMTime(m.created_at))+(own&&m.seen_at?' · Seen':"")+(m.edited_at?' · edited':"")+'</div></div></article>';
+}
+function renderDMMessageFeed(scrollBottom){
+  const feed=$("#dm-messages");if(!feed)return;
+  const other=dmCurrentOther();
+  feed.innerHTML=dmState.messages.map(dmMessageMarkup).join("")||
+    '<div class="dm-empty-chat"><div class="dm-empty-icon">◌</div><strong>Start the conversation</strong><span>Send a message to '+escapeHtml(other?.display_name||other?.username||"your friend")+'.</span></div>';
+  if(scrollBottom)requestAnimationFrame(()=>feed.scrollTop=feed.scrollHeight);
+}
+function renderDMList(){
+  const root=$("#dm-list");if(!root)return;
+  const q=dmState.query.trim().toLowerCase();
+  const rows=dmState.list.filter(dm=>{
+    const u=dm.otherUser||{};
+    return !q||String(u.username||"").toLowerCase().includes(q)||String(u.display_name||"").toLowerCase().includes(q);
+  });
+  root.innerHTML=rows.length?rows.map(dm=>{
+    const u=dm.otherUser||{},active=String(dm.id)===String(dmState.activeId),unread=Number(dm.unreadCount||0);
+    const preview=dm.lastMessage?.content||"No messages yet";
+    const online=dmUserStatus(u)==="Online";
+    return '<button class="dm-conversation '+(active?"active":"")+'" data-dm-open="'+escapeHtml(dm.id)+'">'+
+      '<div class="dm-list-avatar"><div class="avatar">'+escapeHtml(avatar(u.username))+'</div><i class="'+(online?"online":"offline")+'"></i></div>'+
+      '<div class="dm-list-copy"><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>@'+escapeHtml(u.username||"guest")+'</span><p>'+escapeHtml(preview)+'</p></div>'+
+      '<div class="dm-list-meta">'+(dm.lastMessage?.created_at?'<time>'+escapeHtml(formatDMTime(dm.lastMessage.created_at))+'</time>':"")+(unread?'<b>'+unread+'</b>':"")+'</div></button>';
+  }).join(""):'<div class="dm-list-empty"><div class="dm-empty-icon">◌</div><strong>No conversations</strong><span>Start a private chat with a friend.</span></div>';
+  root.querySelectorAll("[data-dm-open]").forEach(b=>b.onclick=()=>openDM(b.dataset.dmOpen));
+}
+function renderDMHeader(){
+  const u=dmCurrentOther(),title=$("#dm-active-name"),meta=$("#dm-active-meta"),av=$("#dm-active-avatar"),dot=$("#dm-active-status");
+  if(!title||!meta||!av)return;
+  if(!u){title.textContent="Select a conversation";meta.textContent="Choose a friend from the left to start chatting.";av.textContent="O";dot?.classList.remove("online");return;}
+  title.textContent=u.display_name||u.username||"Guest";
+  meta.textContent=(dmUserStatus(u)==="Online"?"Online":"Offline")+" · @"+(u.username||"guest");
+  av.textContent=avatar(u.username);
+  dot?.classList.toggle("online",dmUserStatus(u)==="Online");
+}
+function renderDMPageShell(){
+  $("#page-body").innerHTML='<div class="dm-shell">'+
+    '<aside class="dm-list-pane">'+
+      '<div class="dm-list-head"><div><span class="eyebrow">PRIVATE</span><strong>Messages</strong><span>1:1 conversations</span></div><button id="dm-new-inline" title="New message">+</button></div>'+
+      '<label class="dm-search"><span>⌕</span><input id="dm-list-search" placeholder="Search conversations"></label>'+
+      '<div id="dm-list" class="dm-list"></div>'+
+    '</aside>'+
+    '<section class="dm-chat-pane">'+
+      '<div class="dm-chat-header"><div class="dm-active-profile"><div id="dm-active-avatar" class="dm-active-avatar"><span>O</span></div><span id="dm-active-status" class="dm-active-dot"></span><div><strong id="dm-active-name">Select a conversation</strong><span id="dm-active-meta">Choose a friend from the left to start chatting.</span></div></div><div class="dm-chat-actions"><button id="dm-refresh-inline" title="Refresh">↻</button><button id="dm-profile-inline" title="Profile">◉</button></div></div>'+
+      '<div id="dm-messages" class="dm-messages"><div class="dm-empty-chat"><div class="dm-empty-icon">◌</div><strong>Your private space</strong><span>Select a conversation and start talking.</span></div></div>'+
+      '<div id="dm-typing" class="dm-typing"></div>'+
+      '<form id="dm-form" class="dm-composer"><textarea id="dm-input" rows="1" maxlength="4000" placeholder="Write a message…"></textarea><div class="dm-composer-bottom"><span class="dm-hint">Enter to send · Shift+Enter for a new line</span><div><button type="button" id="dm-emoji" class="dm-tool" title="Quick emoji">☺</button><button class="dm-send" type="submit">Send ↗</button></div></div></form>'+
+    '</section></div>';
+}
+function bindDMPage(){
+  $("#dm-new-inline")?.addEventListener("click",()=>openModal("New direct message",'<input id="dm-target" placeholder="Exact guest username"><button class="primary" id="dm-create">Start conversation</button>'));
+  $("#dm-refresh-inline")?.addEventListener("click",()=>renderDMPage());
+  $("#dm-list-search")?.addEventListener("input",e=>{dmState.query=e.target.value;renderDMList()});
+  $("#dm-profile-inline")?.addEventListener("click",()=>{const u=dmCurrentOther();if(u)openPulseProfile(u.id)});
+  $("#dm-emoji")?.addEventListener("click",()=>{const input=$("#dm-input");if(!input)return;const start=input.selectionStart??input.value.length;input.value=input.value.slice(0,start)+"🙂"+input.value.slice(input.selectionEnd??start);input.focus();input.selectionStart=input.selectionEnd=start+2;saveDMDraft()});
+  $("#dm-input")?.addEventListener("input",()=>{
+    const input=$("#dm-input");saveDMDraft();input.style.height="auto";input.style.height=Math.min(input.scrollHeight,130)+"px";
+    if(!dmState.activeId||!socket)return;
+    socket.emit("dm:typing",{dmId:dmState.activeId,isTyping:true});
+    clearTimeout(dmState.typingTimer);
+    dmState.typingTimer=setTimeout(()=>socket?.emit("dm:typing",{dmId:dmState.activeId,isTyping:false}),900);
+  });
+  $("#dm-input")?.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("#dm-form")?.requestSubmit()}});
+  $("#dm-form")?.addEventListener("submit",async e=>{
+    e.preventDefault();
+    const input=$("#dm-input"),value=input?.value.trim();
+    if(!dmState.activeId)return orbitToast("Choose a conversation","Select your friend first.","error");
+    if(!value)return;
+    try{
+      await api("/api/dms/"+encodeURIComponent(dmState.activeId)+"/messages",{method:"POST",body:JSON.stringify({content:value})});
+      delete dmState.drafts[dmState.activeId];localStorage.setItem("orbit_dm_drafts",JSON.stringify(dmState.drafts));
+      input.value="";input.style.height="auto";
+      socket?.emit("dm:typing",{dmId:dmState.activeId,isTyping:false});
+    }catch(err){orbitToast("Message failed",err.message,"error")}
+  });
+}
+async function renderDMPage(selectId=null){
+  $("#page-actions").innerHTML='<button id="new-dm-page">+ New message</button><button id="refresh-dm-page">Refresh</button>';
+  renderDMPageShell();bindDMPage();
+  $("#new-dm-page").onclick=()=>$("#dm-new-inline")?.click();
   $("#refresh-dm-page").onclick=renderDMPage;
   try{
-    const d=await api("/api/dms");
-    const rows=d.dms||[];
-    $("#page-body").innerHTML='<div class="list-card">'+(rows.length?rows.map(dm=>
-      '<div class="list-row"><div class="avatar">'+avatar(dm.otherUser?.username||"G")+'</div><div><strong>'+escapeHtml(dm.otherUser?.username||"Group")+'</strong><span>'+escapeHtml(dm.lastMessage?.content||"No messages yet")+'</span></div><button data-open-dm="'+dm.id+'">Open</button></div>'
-    ).join(""):'<div class="content-card"><h4>No direct messages</h4><p>Create a DM to start a private conversation.</p></div>')+'</div>';
-    document.querySelectorAll("[data-open-dm]").forEach(b=>b.onclick=()=>openDM(b.dataset.openDm));
-  }catch(e){$("#page-body").innerHTML='<div class="content-card"><h4>Could not load DMs</h4><p>'+escapeHtml(e.message)+'</p></div>'}
+    const d=await api("/api/dms");dmState.list=d.dms||[];renderDMList();
+    const preferred=selectId||dmState.activeId||dmState.list[0]?.id;
+    if(preferred)await openDM(preferred);else renderDMHeader();
+  }catch(e){$("#dm-list").innerHTML='<div class="dm-list-empty"><strong>Could not load conversations</strong><span>'+escapeHtml(e.message)+'</span></div>'}
 }
 async function openDM(idValue){
   try{
+    const dm=dmState.list.find(x=>String(x.id)===String(idValue));if(!dm)return;
+    if(dmState.activeId&&String(dmState.activeId)!==String(idValue))socket?.emit("dm:typing",{dmId:dmState.activeId,isTyping:false});
+    dmState.activeId=dm.id;dmState.active=dm;dmState.messages=[];
+    renderDMList();renderDMHeader();
     const d=await api("/api/dms/"+encodeURIComponent(idValue)+"/messages");
-    const dm=(await api("/api/dms")).dms.find(x=>String(x.id)===String(idValue));
-    const name=dm?.otherUser?.username||"Direct message";
-    openModal("Direct message · "+name,'<div id="dm-feed" class="list-card" style="max-height:360px;overflow:auto">'+(d.messages||[]).map(m=>'<div class="list-row"><div class="avatar">'+avatar(m.username)+'</div><div><strong>'+escapeHtml(m.username)+'</strong><span>'+escapeHtml(m.content)+'</span></div></div>').join("")+'</div><form id="dm-form" class="thread-composer"><input id="dm-input" placeholder="Write a message"><button>Send</button></form>');
-    socket?.emit("dm:join",idValue);
-    $("#dm-form").onsubmit=async e=>{e.preventDefault();const v=$("#dm-input").value.trim();if(!v)return;try{const x=await api("/api/dms/"+encodeURIComponent(idValue)+"/messages",{method:"POST",body:JSON.stringify({content:v})});$("#dm-feed").insertAdjacentHTML("beforeend",'<div class="list-row"><div class="avatar">'+avatar(x.message.username)+'</div><div><strong>'+escapeHtml(x.message.username)+'</strong><span>'+escapeHtml(x.message.content)+'</span></div></div>');$("#dm-input").value="";$("#dm-feed").scrollTop=$("#dm-feed").scrollHeight}catch(err){orbitToast("DM failed",err.message,"error")}};
+    dmState.messages=d.messages||[];renderDMMessageFeed(true);
+    socket?.emit("dm:join",idValue);socket?.emit("dm:read",idValue);
+    api("/api/dms/"+encodeURIComponent(idValue)+"/read",{method:"POST",body:"{}"}).catch(()=>{});
+    const input=$("#dm-input"),draft=dmState.drafts[idValue]||"";
+    if(input){input.value=draft;input.style.height="auto";input.style.height=Math.min(input.scrollHeight,130)+"px";requestAnimationFrame(()=>input.focus())}
+    dmState.active.unreadCount=0;renderDMList();
   }catch(e){orbitToast("DM failed",e.message,"error")}
 }
-
 async function renderFriendsPage(){
   $("#page-actions").innerHTML='<button id="add-friend-page">+ Add friend</button><button id="refresh-friends-page">Refresh</button>';
   $("#page-body").innerHTML='<div class="content-card"><h4>Loading friends…</h4></div>';
@@ -1598,8 +1710,8 @@ function openSearchModal(seed=""){
 }
 async function openDMForUsername(username){
   try{
-    await api("/api/dms",{method:"POST",body:JSON.stringify({username})});
-    closeModal(); setView("dms"); renderDMPage();
+    const result=await api("/api/dms",{method:"POST",body:JSON.stringify({username})});
+    closeModal();setView("dms");await renderDMPage(result.dm?.id);
     orbitToast("Conversation ready","Direct message with @"+username+".","success");
   }catch(e){orbitToast("Could not open DM",e.message,"error")}
 }
@@ -1672,7 +1784,7 @@ $("#quick-search")?.addEventListener("blur",()=>$("#sidebar-search")?.classList.
       try{if(raw.includes("invite="))code=new URL(raw).searchParams.get("invite")||raw}catch{}
       try{await api("/api/invites/"+encodeURIComponent(code)+"/accept",{method:"POST",body:"{}"});closeModal();await loadServers();orbitToast("Joined community","Server added to your workspace.","success")}catch(err){orbitToast("Invite failed",err.message,"error")}
     }
-    if(e.target.id==="dm-create"){try{await api("/api/dms",{method:"POST",body:JSON.stringify({username:$("#dm-target").value.trim()})});closeModal();renderDMPage();orbitToast("DM created","Conversation is ready.","success")}catch(err){orbitToast("DM failed",err.message,"error")}}
+    if(e.target.id==="dm-create"){try{const result=await api("/api/dms",{method:"POST",body:JSON.stringify({username:$("#dm-target").value.trim()})});closeModal();setView("dms");await renderDMPage(result.dm?.id);orbitToast("DM created","Conversation is ready.","success")}catch(err){orbitToast("DM failed",err.message,"error")}}
     if(e.target.id==="friend-create"){
       try{
         const username=$("#friend-target").value.trim();
@@ -1732,8 +1844,25 @@ connectRealtime=function(){
     box.innerHTML=Object.entries(reactions||{}).map(([emoji,ids])=>'<button class="reaction-chip">'+escapeHtml(emoji)+' '+ids.length+'</button>').join("");
   });
   socket.on("poll:new",p=>renderPoll(p));
+  socket.on("dm:typing",x=>{
+    if(!x||String(x.dmId)!==String(dmState.activeId))return;
+    const typing=$("#dm-typing");if(typing)typing.textContent=x.isTyping?(x.username||"Your friend")+" is typing…":"";
+  });
   socket.on("dm:message",m=>{
-    const feed=$("#dm-feed");if(feed)feed.insertAdjacentHTML("beforeend",'<div class="list-row"><div class="avatar">'+avatar(m.username)+'</div><div><strong>'+escapeHtml(m.username)+'</strong><span>'+escapeHtml(m.content)+'</span></div></div>');
+    const existing=dmState.list.find(d=>String(d.id)===String(m.dm_id));
+    if(existing){existing.lastMessage=m;if(String(m.user_id)!==String(me?.id)&&String(dmState.activeId)!==String(m.dm_id))existing.unreadCount=Number(existing.unreadCount||0)+1;}
+    if(String(dmState.activeId)===String(m.dm_id)){
+      if(!dmState.messages.some(x=>String(x.id)===String(m.id))){dmState.messages.push(m);renderDMMessageFeed(true);}
+      if(String(m.user_id)!==String(me?.id)){socket?.emit("dm:read",m.dm_id);api("/api/dms/"+encodeURIComponent(m.dm_id)+"/read",{method:"POST",body:"{}"}).catch(()=>{});}
+    }else if(String(m.user_id)!==String(me?.id)){
+      orbitToast("New message",(m.username||"Your friend")+": "+String(m.content||"").slice(0,90),"success");
+    }
+    if(orbitUI.view==="dms")renderDMList();
+  });
+  socket.on("dm:read",event=>{
+    if(!event||String(event.dmId)!==String(dmState.activeId))return;
+    dmState.messages.forEach(m=>{if(String(m.user_id)===String(me?.id)&&String(event.readerId)!==String(me?.id))m.seen_at=event.readAt});
+    renderDMMessageFeed(false);
   });
 };
 
