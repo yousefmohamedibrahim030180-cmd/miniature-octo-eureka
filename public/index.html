@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Orbit — Realtime Community</title>
+<meta name="theme-color" content="#0a0c10">
+<title>Orbit — Community, Chat & Calls</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
@@ -11,128 +12,137 @@
 <body>
 <div id="app" class="app">
   <aside class="server-rail">
-    <div class="rail-logo">◈</div>
+    <div class="brand-shell"><div class="rail-logo">◈</div><span class="brand-name">ORBIT</span></div>
+    <nav class="global-nav" aria-label="Global">
+      <button class="rail-nav active" data-view="home" title="Home">⌂</button>
+      <button class="rail-nav" data-view="discover" title="Discover">✦</button>
+      <button class="rail-nav" data-view="dms" title="Direct Messages">◌</button>
+      <button class="rail-nav" data-view="friends" title="Friends">◎</button>
+      <button class="rail-nav" data-view="notifications" title="Notifications"><span class="nav-glyph">◇</span><b class="nav-badge" id="notification-badge">3</b></button>
+      <button class="rail-nav" data-view="saved" title="Saved">⌑</button>
+      <button class="rail-nav" data-view="explore" title="Explore">⌖</button>
+    </nav>
+    <div class="rail-divider"></div>
     <div id="server-list" class="server-list"></div>
     <button id="new-server" class="rail-btn" title="Create server">+</button>
+    <button id="join-server" class="rail-btn join" title="Join server">↗</button>
+    <button id="settings-nav" class="rail-nav bottom-nav" data-view="settings" title="Settings">⚙</button>
   </aside>
 
   <aside class="sidebar">
     <div class="workspace-head">
-      <div><strong id="workspace-name">Orbit Lobby</strong><span id="workspace-role">guest</span></div>
-      <button id="workspace-menu" class="icon-btn">⋯</button>
+      <div class="workspace-brand"><div class="workspace-avatar" id="workspace-avatar">O</div><div><strong id="workspace-name">Orbit Lobby</strong><span id="workspace-role">guest</span></div></div>
+      <button id="workspace-menu" class="icon-btn" title="Community menu">⋯</button>
     </div>
-    <div class="section-title">CHANNELS <button id="new-channel" title="Create channel">+</button></div>
+
+    <div class="sidebar-search" id="sidebar-search"><span>⌕</span><input id="quick-search" placeholder="Search or jump to..."><kbd>Ctrl K</kbd></div>
+
+    <div class="section-title"><span>CHANNELS</span><button id="new-channel" title="Create channel">+</button></div>
     <div class="channel-list" id="channel-list"></div>
-    <div class="section-title voice-section-title">VOICE CHANNELS <button id="new-voice-channel" title="Create voice channel">+</button></div>
+
+    <div class="section-title voice-section-title"><span>VOICE ROOMS</span><button id="new-voice-channel" title="Create voice channel">+</button></div>
     <div class="channel-list voice-list" id="voice-channel-list"></div>
+
     <div id="voice-dock" class="voice-dock hidden">
-      <div class="voice-dock-status"><span class="dock-dot"></span><div><strong>Voice connected</strong><span id="voice-dock-name">general</span></div></div>
+      <div class="voice-dock-status"><span class="dock-dot"></span><div><strong>Voice connected</strong><span id="voice-dock-name">Lounge</span></div></div>
       <div class="voice-dock-actions"><button id="dock-mic">🎙</button><button id="dock-screen">▣</button><button id="dock-leave" class="dock-danger">×</button></div>
     </div>
+
     <div class="sidebar-bottom">
-      <div class="profile">
+      <button id="profile-card-btn" class="profile">
         <div class="avatar" id="me-avatar">G</div>
         <div><strong id="me-name">Guest</strong><span id="me-status">online · guest</span></div>
-        <button id="rename-guest" class="profile-action" title="Change name">✎</button>
-      </div>
+        <span class="profile-spark">✦</span>
+      </button>
     </div>
   </aside>
 
-  <main class="chat">
-    <header class="chat-head">
-      <div class="channel-title">
-        <span class="hash">#</span>
-        <div><strong id="channel-name">general</strong><span id="channel-meta">Realtime conversation</span></div>
+  <main class="content">
+    <div id="global-page" class="global-page hidden">
+      <div class="page-head">
+        <div><span class="eyebrow" id="page-eyebrow">ORBIT</span><h1 id="page-title">Home</h1><p id="page-subtitle">Your communities, conversations, and live rooms in one place.</p></div>
+        <div class="page-actions" id="page-actions"></div>
       </div>
-      <div class="head-actions">
-        <button id="voice-call-btn" class="head-action"><span>☎</span> Voice</button>
-        <button id="video-call-btn" class="head-action primary-soft"><span>▣</span> Video</button>
-        <button id="quick-share-btn" class="head-action"><span>↗</span> Share</button>
-        <button id="invite-btn" class="head-action">Invite</button>
-        <button id="members-btn" class="head-action">Members</button>
-        <button id="admin-btn" class="head-action">Control</button>
-      </div>
-    </header>
+      <div id="page-body" class="page-body"></div>
+    </div>
 
-    <section id="messages" class="messages">
-      <div class="empty">
-        <div class="empty-icon">✦</div>
-        <h2>Welcome to Orbit.</h2>
-        <p>No account required. Chat, start a call, or share your screen.</p>
-      </div>
-    </section>
+    <div id="chat-view" class="chat">
+      <header class="chat-head">
+        <div class="channel-title">
+          <span class="hash" id="channel-symbol">#</span>
+          <div><strong id="channel-name">general</strong><span id="channel-meta">Realtime conversation</span></div>
+        </div>
+        <div class="head-actions">
+          <button id="voice-call-btn" class="head-action"><span>☎</span> Voice</button>
+          <button id="video-call-btn" class="head-action primary-soft"><span>▣</span> Video</button>
+          <button id="quick-share-btn" class="head-action"><span>↗</span> Share</button>
+          <button id="invite-btn" class="head-action">Invite</button>
+          <button id="members-btn" class="head-action">Members</button>
+          <button id="admin-btn" class="head-action">Control</button>
+        </div>
+      </header>
 
-    <div id="typing" class="typing"></div>
-    <form id="composer" class="composer">
-      <button type="button" id="attach" class="composer-icon" title="More tools">+</button>
-      <input id="message" placeholder="Message #general" autocomplete="off">
-      <button class="send">Send</button>
-    </form>
+      <div class="chat-body">
+        <section id="messages" class="messages">
+          <div class="empty"><div class="empty-icon">✦</div><h2>Your community is waiting.</h2><p>Send the first message, start a call, or share your screen.</p></div>
+        </section>
+        <div id="typing" class="typing"></div>
+      </div>
+
+      <form id="composer" class="composer">
+        <button type="button" id="attach" class="composer-icon" title="More tools">+</button>
+        <button type="button" id="poll-btn" class="composer-tool" title="Create poll">◫</button>
+        <input id="message" placeholder="Message #general" autocomplete="off">
+        <button class="send">Send</button>
+      </form>
+    </div>
+
+    <div id="members-panel" class="members-panel hidden">
+      <div class="panel-head"><strong>Members</strong><button id="close-members">×</button></div>
+      <div class="member-tools"><input id="member-filter" placeholder="Search members"></div>
+      <div id="member-list"></div>
+    </div>
+
+    <aside id="thread-panel" class="thread-panel hidden">
+      <div class="panel-head"><div><strong>Thread</strong><span id="thread-meta">0 replies</span></div><button id="close-thread">×</button></div>
+      <div id="thread-root" class="thread-root"></div>
+      <div id="thread-messages" class="thread-messages"></div>
+      <form id="thread-composer" class="thread-composer"><input id="thread-input" placeholder="Reply in thread"><button>Send</button></form>
+    </aside>
   </main>
-
-  <aside id="members-panel" class="members-panel hidden">
-    <div class="panel-head"><strong>Members</strong><button id="close-members">×</button></div>
-    <div id="member-list"></div>
-  </aside>
 </div>
 
 <section id="call-panel" class="call-panel hidden" aria-label="Orbit call">
   <div class="call-topbar">
-    <div class="call-room">
-      <div class="call-live-dot"></div>
-      <div><strong id="call-title">general</strong><span id="call-subtitle">Voice & video room</span></div>
-      <div class="call-duration" id="call-duration">00:00</div>
-    </div>
-    <div class="call-top-actions">
-      <div class="live-stat" id="call-quality-indicator">CONNECTING</div>
-      <div class="live-stat muted-stat" id="call-network-indicator">NETWORK —</div>
-      <button id="minimize-call" class="glass-btn" title="Minimize">—</button>
-      <button id="close-call" class="glass-btn danger" title="Leave call">×</button>
-    </div>
+    <div class="call-room"><div class="call-live-dot"></div><div><strong id="call-title">Lounge</strong><span id="call-subtitle">Voice & video room</span></div><div class="call-duration" id="call-duration">00:00</div></div>
+    <div class="call-top-actions"><div class="live-stat" id="call-quality-indicator">CONNECTING</div><div class="live-stat muted-stat" id="call-network-indicator">NETWORK —</div><button id="minimize-call" class="glass-btn">—</button><button id="close-call" class="glass-btn danger">×</button></div>
   </div>
-
   <div id="call-stage" class="call-stage layout-grid frame-soft"></div>
   <div id="call-toast" class="call-toast hidden"></div>
-  <div class="call-empty hidden" id="call-empty">
-    <div class="call-empty-icon">◉</div>
-    <strong>You're the first one here</strong>
-    <span>Invite someone or share the room link.</span>
-  </div>
-
+  <div class="call-empty hidden" id="call-empty"><div class="call-empty-icon">◉</div><strong>You're the first one here</strong><span>Invite someone or share the room link.</span></div>
   <div class="call-toolbar">
-    <div class="toolbar-left">
-      <button id="mic-btn" class="call-btn active" title="Mute microphone">🎙</button>
-      <button id="camera-btn" class="call-btn active" title="Turn camera off">◉</button>
-      <button id="share-btn" class="call-btn" title="Share screen">▣</button>
-    </div>
-    <div class="toolbar-center">
-      <button id="layout-btn" class="call-btn wide" title="Change layout">Layout</button>
-      <button id="quality-btn" class="call-btn wide" title="Quality settings">Quality</button>
-      <button id="frames-btn" class="call-btn wide" title="Video frame">Frame</button>
-      <button id="settings-btn" class="call-btn wide" title="Call settings">Settings</button>
-      <button id="more-call-btn" class="call-btn wide" title="More">More</button>
-    </div>
-    <div class="toolbar-right">
-      <button id="participants-btn" class="call-btn wide" title="Participants">People <span id="participant-count">1</span></button>
-      <button id="hangup-btn" class="hangup-btn" title="Leave call">Leave</button>
-    </div>
+    <div class="toolbar-left"><button id="mic-btn" class="call-btn active" title="Mute microphone">🎙</button><button id="camera-btn" class="call-btn active" title="Turn camera off">◉</button><button id="share-btn" class="call-btn" title="Share screen">▣</button></div>
+    <div class="toolbar-center"><button id="layout-btn" class="call-btn wide">Layout</button><button id="quality-btn" class="call-btn wide">Quality</button><button id="frames-btn" class="call-btn wide">Frame</button><button id="settings-btn" class="call-btn wide">Settings</button><button id="more-call-btn" class="call-btn wide">More</button></div>
+    <div class="toolbar-right"><button id="participants-btn" class="call-btn wide">People <span id="participant-count">1</span></button><button id="hangup-btn" class="hangup-btn">Leave</button></div>
   </div>
-
   <div id="call-popover" class="call-popover hidden"></div>
 </section>
 
-<div id="incoming-call" class="incoming-call hidden">
-  <div class="incoming-avatar" id="incoming-avatar">G</div>
-  <div class="incoming-copy"><strong id="incoming-title">Incoming call</strong><span id="incoming-subtitle">Someone is calling</span></div>
-  <div class="incoming-actions"><button id="incoming-accept">Accept</button><button id="incoming-decline">Decline</button></div>
-</div>
+<div id="incoming-call" class="incoming-call hidden"><div class="incoming-avatar" id="incoming-avatar">G</div><div class="incoming-copy"><strong id="incoming-title">Incoming call</strong><span id="incoming-subtitle">Someone is calling</span></div><div class="incoming-actions"><button id="incoming-accept">Accept</button><button id="incoming-decline">Decline</button></div></div>
 
-<div id="modal" class="modal hidden">
-  <div class="modal-card">
-    <div class="modal-head"><strong id="modal-title"></strong><button id="modal-close">×</button></div>
-    <div id="modal-body"></div>
+<div id="context-menu" class="context-menu hidden"></div>
+
+<div id="command-palette" class="command-palette hidden">
+  <div class="command-card">
+    <div class="command-search"><span>⌕</span><input id="command-input" placeholder="Search commands, pages, channels..."><kbd>ESC</kbd></div>
+    <div id="command-results" class="command-results"></div>
+    <div class="command-footer"><span>Navigate</span><span>Enter to open</span><span>Ctrl K</span></div>
   </div>
 </div>
+
+<div id="toast-stack" class="toast-stack"></div>
+
+<div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><div><strong id="modal-title"></strong><span id="modal-subtitle"></span></div><button id="modal-close">×</button></div><div id="modal-body"></div></div></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="/app.js"></script>

@@ -150,6 +150,55 @@ app.get("/api/me", auth, (req, res) => {
   res.json({ user: publicUser(req.user) });
 });
 
+app.get("/api/platform/summary", auth, (req, res) => {
+  let totalMessages = 0;
+  for (const list of memory.messages.values()) totalMessages += list.length;
+  const serverRows = [...memory.servers.values()].map(s => ({
+    id: s.id,
+    name: s.name,
+    memberCount: s.members.size,
+    channelCount: s.channels.length
+  }));
+  res.json({
+    users: memory.users.size,
+    servers: memory.servers.size,
+    messages: totalMessages,
+    calls: [...io.sockets.adapter.rooms.keys()].filter(k => k.startsWith(CALL_EVENT_PREFIX)).length,
+    serverRows,
+    uptime: Math.floor(process.uptime())
+  });
+});
+
+app.get("/api/search", auth, (req, res) => {
+  const q = String(req.query.q || "").trim().toLowerCase();
+  if (!q) return res.json({ users: [], servers: [], channels: [], messages: [] });
+
+  const users = [...memory.users.values()]
+    .filter(u => u.username.toLowerCase().includes(q))
+    .slice(0, 20)
+    .map(publicUser);
+
+  const servers = [...memory.servers.values()]
+    .filter(s => s.name.toLowerCase().includes(q))
+    .slice(0, 20)
+    .map(s => ({ id: s.id, name: s.name, owner_id: s.ownerId, memberCount: s.members.size }));
+
+  const channels = [...memory.channels.values()]
+    .filter(c => c.name.toLowerCase().includes(q))
+    .slice(0, 30)
+    .map(c => ({ id: c.id, serverId: c.serverId, name: c.name, type: c.type }));
+
+  const messages = [];
+  for (const list of memory.messages.values()) {
+    for (const message of list) {
+      if (message.content.toLowerCase().includes(q)) messages.push(message);
+      if (messages.length >= 50) break;
+    }
+    if (messages.length >= 50) break;
+  }
+  res.json({ users, servers, channels, messages });
+});
+
 app.get("/api/realtime-config", auth, (req, res) => {
   const turnUrls = String(process.env.TURN_URLS || "")
     .split(",")
