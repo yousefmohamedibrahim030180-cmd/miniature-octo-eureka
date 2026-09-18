@@ -286,7 +286,8 @@ $("#new-channel").onclick = () => {
     '<input id="channel-name-input" placeholder="general"><select id="channel-type"><option value="text">Text</option><option value="announcement">Announcement</option></select><button class="primary" id="create-channel">Create channel</button>'
   );
 };
-$("#rename-guest").onclick = () => openModal(
+const renameGuestBtn = $("#rename-guest");
+if (renameGuestBtn) renameGuestBtn.onclick = () => openModal(
   "Change guest name",
   '<input id="guest-name-input" value="' + escapeHtml(me?.username || "") + '" maxlength="24"><button class="primary" id="save-guest-name">Save name</button>'
 );
