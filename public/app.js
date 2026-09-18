@@ -1071,9 +1071,16 @@ const orbitUI = {
     displayName: "",
     status: "Online",
     bio: "Building in public with Orbit.",
-    accent: "#7652e8"
+    accent: "#7652e8",
+    avatarMotion: "aurora"
   }
 };
+
+function applyAvatarMotion(){
+  const mode=String(orbitUI?.profile?.avatarMotion||"aurora");
+  document.body.dataset.avatarMotion=mode;
+}
+applyAvatarMotion();
 
 function orbitToast(title, body="", kind="") {
   const stack=$("#toast-stack");
@@ -1618,8 +1625,13 @@ function renderSettingsPage(section="appearance"){
       '<div class="username-field"><span>@</span><input id="profile-username" value="'+escapeHtml(me?.username||"")+'" maxlength="20" placeholder="username"><button id="check-username" type="button">Check</button></div>'+
       '<div id="username-status" class="field-note">Use 4–20 letters, numbers, dots, underscores or dashes.</div>'+
       '<input id="profile-name" value="'+escapeHtml(orbitUI.profile.displayName||me?.display_name||me?.username||"Guest")+'" placeholder="Display name">'+
-      '<textarea id="profile-bio" placeholder="Bio">'+escapeHtml(orbitUI.profile.bio||"")+'</textarea><select id="profile-status"><option>Online</option><option>Idle</option><option>Do Not Disturb</option><option>Invisible</option></select><button class="primary" id="save-profile">Save profile</button>';
+      '<textarea id="profile-bio" placeholder="Bio">'+escapeHtml(orbitUI.profile.bio||"")+'</textarea>'+
+      '<select id="profile-status"><option>Online</option><option>Idle</option><option>Do Not Disturb</option><option>Invisible</option></select>'+
+      '<div class="setting-row avatar-motion-setting"><div><strong>Animated avatar</strong><span>Give your Orbit avatar a live visual effect.</span></div><select id="avatar-motion"><option value="aurora">Aurora</option><option value="neon">Neon Pulse</option><option value="energy">Energy Ring</option><option value="off">Static</option></select></div>'+
+      '<button class="primary" id="save-profile">Save profile</button>';
     $("#profile-status").value=orbitUI.profile.status||"Online";
+    $("#avatar-motion").value=orbitUI.profile.avatarMotion||"aurora";
+    $("#avatar-motion").onchange=e=>{orbitUI.profile.avatarMotion=e.target.value;applyAvatarMotion();};
     $("#check-username").onclick=async()=>{try{const name=$("#profile-username").value.trim();if(!name)return;const r=await api("/api/search?q="+encodeURIComponent(name));const exact=(r.users||[]).find(u=>u.username.toLowerCase()===name.replace(/^@/,"").toLowerCase()&&String(u.id)!==String(me?.id));$("#username-status").textContent=exact?"Username is taken.":"Username looks available.";$("#username-status").classList.toggle("is-good",!exact);$("#username-status").classList.toggle("is-bad",!!exact)}catch{}};
     $("#save-profile").onclick=async()=>{try{
       const username=$("#profile-username").value.trim().replace(/^@+/,"").toLowerCase();
