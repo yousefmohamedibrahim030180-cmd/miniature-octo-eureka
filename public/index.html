@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Orbit — Realtime Community</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -13,22 +15,109 @@
     <div id="server-list" class="server-list"></div>
     <button id="new-server" class="rail-btn" title="Create server">+</button>
   </aside>
+
   <aside class="sidebar">
-    <div class="workspace-head"><div><strong id="workspace-name">Orbit Lobby</strong><span id="workspace-role">guest</span></div><button id="workspace-menu">⋯</button></div>
+    <div class="workspace-head">
+      <div><strong id="workspace-name">Orbit Lobby</strong><span id="workspace-role">guest</span></div>
+      <button id="workspace-menu" class="icon-btn">⋯</button>
+    </div>
     <div class="section-title">CHANNELS <button id="new-channel" title="Create channel">+</button></div>
     <div id="channel-list" class="channel-list"></div>
     <div class="sidebar-bottom">
-      <div class="profile"><div class="avatar" id="me-avatar">G</div><div><strong id="me-name">Guest</strong><span id="me-status">online</span></div><button id="rename-guest" title="Change name">✎</button></div>
+      <div class="profile">
+        <div class="avatar" id="me-avatar">G</div>
+        <div><strong id="me-name">Guest</strong><span id="me-status">online · guest</span></div>
+        <button id="rename-guest" class="profile-action" title="Change name">✎</button>
+      </div>
     </div>
   </aside>
+
   <main class="chat">
-    <header class="chat-head"><div><span class="hash">#</span><div><strong id="channel-name">general</strong><span id="channel-meta">Realtime conversation</span></div></div><div class="head-actions"><button id="invite-btn">Invite</button><button id="members-btn">Members</button><button id="admin-btn">Control</button></div></header>
-    <section id="messages" class="messages"><div class="empty"><div class="empty-icon">✦</div><h2>Welcome to Orbit.</h2><p>No account required. Pick a channel and start chatting.</p></div></section>
+    <header class="chat-head">
+      <div class="channel-title">
+        <span class="hash">#</span>
+        <div><strong id="channel-name">general</strong><span id="channel-meta">Realtime conversation</span></div>
+      </div>
+      <div class="head-actions">
+        <button id="voice-call-btn" class="head-action"><span>☎</span> Voice</button>
+        <button id="video-call-btn" class="head-action primary-soft"><span>▣</span> Video</button>
+        <button id="invite-btn" class="head-action">Invite</button>
+        <button id="members-btn" class="head-action">Members</button>
+        <button id="admin-btn" class="head-action">Control</button>
+      </div>
+    </header>
+
+    <section id="messages" class="messages">
+      <div class="empty">
+        <div class="empty-icon">✦</div>
+        <h2>Welcome to Orbit.</h2>
+        <p>No account required. Chat, start a call, or share your screen.</p>
+      </div>
+    </section>
+
     <div id="typing" class="typing"></div>
-    <form id="composer" class="composer"><button type="button" id="attach">+</button><input id="message" placeholder="Message #general" autocomplete="off"><button class="send">Send</button></form>
+    <form id="composer" class="composer">
+      <button type="button" id="attach" class="composer-icon" title="More tools">+</button>
+      <input id="message" placeholder="Message #general" autocomplete="off">
+      <button class="send">Send</button>
+    </form>
   </main>
-  <aside id="members-panel" class="members-panel hidden"><div class="panel-head"><strong>Members</strong><button id="close-members">×</button></div><div id="member-list"></div></aside>
+
+  <aside id="members-panel" class="members-panel hidden">
+    <div class="panel-head"><strong>Members</strong><button id="close-members">×</button></div>
+    <div id="member-list"></div>
+  </aside>
 </div>
-<div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><strong id="modal-title"></strong><button id="modal-close">×</button></div><div id="modal-body"></div></div></div>
-<script src="/socket.io/socket.io.js"></script><script src="/app.js"></script>
-</body></html>
+
+<section id="call-panel" class="call-panel hidden" aria-label="Orbit call">
+  <div class="call-topbar">
+    <div class="call-room">
+      <div class="call-live-dot"></div>
+      <div><strong id="call-title">general</strong><span id="call-subtitle">Voice & video room</span></div>
+    </div>
+    <div class="call-top-actions">
+      <div class="live-stat" id="call-quality-indicator">CONNECTING</div>
+      <button id="minimize-call" class="glass-btn" title="Minimize">—</button>
+      <button id="close-call" class="glass-btn danger" title="Leave call">×</button>
+    </div>
+  </div>
+
+  <div id="call-stage" class="call-stage layout-grid frame-soft"></div>
+  <div class="call-empty hidden" id="call-empty">
+    <div class="call-empty-icon">◉</div>
+    <strong>You're the first one here</strong>
+    <span>Invite someone or share the room link.</span>
+  </div>
+
+  <div class="call-toolbar">
+    <div class="toolbar-left">
+      <button id="mic-btn" class="call-btn active" title="Mute microphone">🎙</button>
+      <button id="camera-btn" class="call-btn active" title="Turn camera off">◉</button>
+      <button id="share-btn" class="call-btn" title="Share screen">▣</button>
+    </div>
+    <div class="toolbar-center">
+      <button id="layout-btn" class="call-btn wide" title="Change layout">Layout</button>
+      <button id="quality-btn" class="call-btn wide" title="Quality settings">Quality</button>
+      <button id="frames-btn" class="call-btn wide" title="Video frame">Frame</button>
+      <button id="settings-btn" class="call-btn wide" title="Call settings">Settings</button>
+    </div>
+    <div class="toolbar-right">
+      <button id="participants-btn" class="call-btn wide" title="Participants">People <span id="participant-count">1</span></button>
+      <button id="hangup-btn" class="hangup-btn" title="Leave call">Leave</button>
+    </div>
+  </div>
+
+  <div id="call-popover" class="call-popover hidden"></div>
+</section>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head"><strong id="modal-title"></strong><button id="modal-close">×</button></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

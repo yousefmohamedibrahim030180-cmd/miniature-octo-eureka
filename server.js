@@ -14,6 +14,7 @@ const io = new Server(server, {
 
 const PORT = Number(process.env.PORT || 8080);
 const JWT_SECRET = process.env.JWT_SECRET || "orbit-guest-dev-secret";
+
 const memory = {
   users: new Map(),
   servers: new Map(),
@@ -21,6 +22,9 @@ const memory = {
   messages: new Map(),
   invites: new Map()
 };
+
+const CALL_EVENT_PREFIX = "call:";
+const callRoomFor = channelId => CALL_EVENT_PREFIX + String(channelId);
 
 function now() { return new Date().toISOString(); }
 function id(prefix) { return prefix + "_" + crypto.randomUUID(); }
@@ -39,9 +43,8 @@ function readToken(req) {
   return (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
 }
 function auth(req, res, next) {
-  const token = readToken(req);
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(readToken(req), JWT_SECRET);
     const user = memory.users.get(payload.id);
     if (!user) return res.status(401).json({ error: "Guest session expired" });
     user.status = "online";
@@ -74,7 +77,9 @@ function ensureDefaultServer(user) {
     memory.messages.set(channelId, []);
   } else {
     for (const s of memory.servers.values()) {
-      if (!s.members.has(user.id) && s.name === "Orbit Lobby") s.members.set(user.id, "member");
+      if (!s.members.has(user.id) && s.name === "Orbit Lobby") {
+        s.members.set(user.id, "member");
+      }
     }
   }
 }
@@ -122,6 +127,7 @@ app.get("/health", (req, res) => {
     db: false,
     users: memory.users.size,
     servers: memory.servers.size,
+    calls: [...io.sockets.adapter.rooms.keys()].filter(k => k.startsWith(CALL_EVENT_PREFIX)).length,
     time: now()
   });
 });
@@ -145,13 +151,12 @@ app.get("/api/servers", auth, (req, res) => {
   for (const s of memory.servers.values()) {
     const role = s.members.get(req.user.id);
     if (role) {
-      const firstChannel = s.channels[0];
       servers.push({
         id: s.id,
         name: s.name,
         owner_id: s.ownerId,
         role,
-        default_channel_id: firstChannel || null
+        default_channel_id: s.channels[0] || null
       });
     }
   }
@@ -181,6 +186,7 @@ app.post("/api/servers", auth, (req, res) => {
     position: 0
   });
   memory.messages.set(channelId, []);
+
   res.status(201).json({
     server: {
       id: s.id,
@@ -205,9 +211,17 @@ app.get("/api/servers/:id/channels", auth, (req, res) => {
 
 app.post("/api/servers/:id/channels", auth, (req, res) => {
   const access = member(req.params.id, req.user.id);
-  if (!access || !canManage(access.role)) return res.status(403).json({ error: "Permission denied" });
-  const name = String(req.body?.name || "").trim().toLowerCase().replace(/[^a-z0-9-_]/g, "-").slice(0, 50);
-  const type = ["text", "announcement"].includes(req.body?.type) ? req.body.type : "text";
+  if (!access || !canManage(access.role)) {
+    return res.status(403).json({ error: "Permission denied" });
+  }
+  const name = String(req.body?.name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]/g, "-")
+    .slice(0, 50);
+  const type = ["text", "announcement"].includes(req.body?.type)
+    ? req.body.type
+    : "text";
   if (!name) return res.status(400).json({ error: "Channel name is required" });
 
   const channelId = id("channel");
@@ -227,32 +241,35 @@ app.post("/api/servers/:id/channels", auth, (req, res) => {
 app.get("/api/channels/:id/messages", auth, (req, res) => {
   const channel = memory.channels.get(req.params.id);
   if (!channel) return res.status(404).json({ error: "Channel not found" });
-  if (!member(channel.serverId, req.user.id)) return res.status(403).json({ error: "Not a member" });
-  const messages = (memory.messages.get(channel.id) || []).slice(-100);
-  res.json({ messages });
+  if (!member(channel.serverId, req.user.id)) {
+    return res.status(403).json({ error: "Not a member" });
+  }
+  res.json({ messages: (memory.messages.get(channel.id) || []).slice(-100) });
 });
 
 app.post("/api/servers/:id/invites", auth, (req, res) => {
   const access = member(req.params.id, req.user.id);
-  if (!access || !canManage(access.role)) return res.status(403).json({ error: "Permission denied" });
+  if (!access || !canManage(access.role)) {
+    return res.status(403).json({ error: "Permission denied" });
+  }
   const code = crypto.randomBytes(6).toString("base64url");
+  const expires = Date.now() + 7 * 24 * 60 * 60 * 1000;
   memory.invites.set(code, {
     code,
     serverId: access.server.id,
-    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    expiresAt: expires,
     uses: 0
   });
   res.status(201).json({
-    invite: {
-      code,
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-    }
+    invite: { code, expires_at: new Date(expires).toISOString() }
   });
 });
 
 app.post("/api/invites/:code/accept", auth, (req, res) => {
   const invite = memory.invites.get(req.params.code);
-  if (!invite || invite.expiresAt < Date.now()) return res.status(404).json({ error: "Invite expired or invalid" });
+  if (!invite || invite.expiresAt < Date.now()) {
+    return res.status(404).json({ error: "Invite expired or invalid" });
+  }
   const server = memory.servers.get(invite.serverId);
   if (!server) return res.status(404).json({ error: "Server not found" });
   if (!server.members.has(req.user.id)) server.members.set(req.user.id, "member");
@@ -263,6 +280,7 @@ app.post("/api/invites/:code/accept", auth, (req, res) => {
 app.get("/api/servers/:id/members", auth, (req, res) => {
   const access = member(req.params.id, req.user.id);
   if (!access) return res.status(403).json({ error: "Not a member" });
+
   const members = [];
   for (const [userId, role] of access.server.members.entries()) {
     const user = memory.users.get(userId);
@@ -277,10 +295,16 @@ app.get("/api/servers/:id/members", auth, (req, res) => {
 
 app.patch("/api/servers/:id/members/:userId/role", auth, (req, res) => {
   const access = member(req.params.id, req.user.id);
-  if (!access || !["owner", "admin"].includes(access.role)) return res.status(403).json({ error: "Permission denied" });
+  if (!access || !["owner", "admin"].includes(access.role)) {
+    return res.status(403).json({ error: "Permission denied" });
+  }
   const target = member(req.params.id, req.params.userId);
-  if (!target || target.role === "owner") return res.status(400).json({ error: "Member cannot be changed" });
-  const role = ["member", "moderator", "admin"].includes(req.body?.role) ? req.body.role : null;
+  if (!target || target.role === "owner") {
+    return res.status(400).json({ error: "Member cannot be changed" });
+  }
+  const role = ["member", "moderator", "admin"].includes(req.body?.role)
+    ? req.body.role
+    : null;
   if (!role) return res.status(400).json({ error: "Unsupported role" });
   target.server.members.set(req.params.userId, role);
   res.json({ ok: true });
@@ -293,8 +317,7 @@ app.use((err, req, res, next) => {
 
 io.use((socket, next) => {
   try {
-    const token = socket.handshake.auth?.token;
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(socket.handshake.auth?.token, JWT_SECRET);
     const user = memory.users.get(payload.id);
     if (!user) return next(new Error("Guest session expired"));
     socket.user = user;
@@ -305,13 +328,21 @@ io.use((socket, next) => {
   }
 });
 
-io.on("connection", (socket) => {
+function callParticipant(socket) {
+  return {
+    socketId: socket.id,
+    userId: socket.user.id,
+    username: socket.user.username
+  };
+}
+
+io.on("connection", socket => {
   socket.broadcast.emit("presence:update", {
     userId: socket.user.id,
     status: "online"
   });
 
-  socket.on("channel:join", (channelId) => {
+  socket.on("channel:join", channelId => {
     const channel = memory.channels.get(String(channelId));
     if (!channel || !member(channel.serverId, socket.user.id)) return;
     for (const room of socket.rooms) {
@@ -344,12 +375,78 @@ io.on("connection", (socket) => {
       user_id: socket.user.id,
       username: socket.user.username
     };
-
     const list = memory.messages.get(channel.id) || [];
     list.push(message);
     if (list.length > 500) list.splice(0, list.length - 500);
     memory.messages.set(channel.id, list);
     io.to("channel:" + channel.id).emit("message:new", message);
+  });
+
+  socket.on("call:join", channelId => {
+    const channel = memory.channels.get(String(channelId));
+    if (!channel || !member(channel.serverId, socket.user.id)) return;
+
+    const room = callRoomFor(channel.id);
+    for (const existingRoom of socket.rooms) {
+      if (existingRoom.startsWith(CALL_EVENT_PREFIX)) socket.leave(existingRoom);
+    }
+
+    const existingIds = [...(io.sockets.adapter.rooms.get(room) || [])]
+      .filter(idValue => idValue !== socket.id);
+
+    socket.join(room);
+
+    socket.emit("call:participants", existingIds.map(idValue => {
+      const peer = io.sockets.sockets.get(idValue);
+      return peer ? callParticipant(peer) : null;
+    }).filter(Boolean));
+
+    socket.to(room).emit("call:participant-joined", callParticipant(socket));
+  });
+
+  socket.on("call:leave", channelId => {
+    const room = callRoomFor(channelId);
+    if (!socket.rooms.has(room)) return;
+    socket.leave(room);
+    socket.to(room).emit("call:participant-left", {
+      socketId: socket.id,
+      userId: socket.user.id
+    });
+  });
+
+  socket.on("rtc:offer", ({ to, offer }) => {
+    const peer = io.sockets.sockets.get(to);
+    if (!peer || !offer) return;
+    peer.emit("rtc:offer", {
+      from: socket.id,
+      fromUser: callParticipant(socket),
+      offer
+    });
+  });
+
+  socket.on("rtc:answer", ({ to, answer }) => {
+    const peer = io.sockets.sockets.get(to);
+    if (!peer || !answer) return;
+    peer.emit("rtc:answer", {
+      from: socket.id,
+      answer
+    });
+  });
+
+  socket.on("rtc:ice", ({ to, candidate }) => {
+    const peer = io.sockets.sockets.get(to);
+    if (!peer || !candidate) return;
+    peer.emit("rtc:ice", {
+      from: socket.id,
+      candidate
+    });
+  });
+
+  socket.on("call:mute", ({ channelId, muted }) => {
+    socket.to(callRoomFor(channelId)).emit("call:media-state", {
+      socketId: socket.id,
+      muted: Boolean(muted)
+    });
   });
 
   socket.on("disconnect", () => {
@@ -358,12 +455,18 @@ io.on("connection", (socket) => {
       userId: socket.user.id,
       status: "offline"
     });
+
+    for (const room of socket.rooms) {
+      if (room.startsWith(CALL_EVENT_PREFIX)) {
+        socket.to(room).emit("call:participant-left", {
+          socketId: socket.id,
+          userId: socket.user.id
+        });
+      }
+    }
   });
 });
 
-(async () => {
-  // Intentionally starts without PostgreSQL. Data lives in memory until PostgreSQL is enabled.
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log("[orbit] guest mode listening on " + PORT);
-  });
-})();
+server.listen(PORT, "0.0.0.0", () => {
+  console.log("[orbit] guest mode listening on " + PORT);
+});
