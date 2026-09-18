@@ -1,19 +1,58 @@
 const $=s=>document.querySelector(s);
 let token=localStorage.getItem("orbit_guest_token")||"";
 const serverId=new URLSearchParams(location.search).get("server")||"";
+const adminSessionKey="orbit_admin_token_"+serverId;
+let adminToken=sessionStorage.getItem(adminSessionKey)||"";
 let state=null,activeTab="overview",refreshTimer=null;
 
 function esc(x){return String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
-function api(url,opts={}){opts.headers={...(opts.headers||{}),...(token?{Authorization:"Bearer "+token}:{})};if(opts.body&&!opts.headers["Content-Type"])opts.headers["Content-Type"]="application/json";return fetch(url,opts).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Request failed");return d;});}
+function api(url,opts={}){opts.headers={...(opts.headers||{}),...(token?{Authorization:"Bearer "+token}:{}),...(adminToken?{"X-Admin-Token":adminToken}:{})};if(opts.body&&!opts.headers["Content-Type"])opts.headers["Content-Type"]="application/json";return fetch(url,opts).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Request failed");return d;});}
 function toast(msg,bad=false){const el=$("#toast");el.textContent=msg;el.className=bad?"show bad":"show";clearTimeout(toast.t);toast.t=setTimeout(()=>el.className="",2800);}
 function fmt(ts){return new Date(ts).toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});}
 function roleBadge(role){return '<span class="role '+esc(role)+'">'+esc(role)+'</span>';}
 function metric(title,value,note,icon){return '<div class="metric"><span class="metric-icon">'+icon+'</span><div><strong>'+esc(value)+'</strong><span>'+esc(title)+'</span><small>'+esc(note||"")+'</small></div></div>';}
 function isOwnerAdmin(){return ["owner","admin"].includes(String(state?.server?.role));}
 function can(k){return Boolean(state?.permissions?.[k]);}
+function showKeyGate(message=""){
+  $("#key-gate").classList.remove("hidden");
+  $("#admin-shell").classList.add("hidden");
+  $("#key-error").textContent=message||"";
+  setTimeout(()=>$("#admin-key-input")?.focus(),50);
+}
+function showAdminShell(){
+  $("#key-gate").classList.add("hidden");
+  $("#admin-shell").classList.remove("hidden");
+}
+async function unlockWithKey(key){
+  const data=await fetch("/api/servers/"+encodeURIComponent(serverId)+"/admin/auth",{
+    method:"POST",
+    headers:{"Content-Type":"application/json",...(token?{Authorization:"Bearer "+token}: {})},
+    body:JSON.stringify({key})
+  }).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Unable to unlock");return d;});
+  adminToken=data.token;
+  sessionStorage.setItem(adminSessionKey,adminToken);
+  showAdminShell();
+  await load();
+}
+function lockAdmin(){
+  sessionStorage.removeItem(adminSessionKey);
+  adminToken="";
+  state=null;
+  if(refreshTimer)clearInterval(refreshTimer);
+  refreshTimer=null;
+  showKeyGate("Control center locked.");
+}
+async function validateSession(){
+  if(!token||!serverId)return showDenied("Missing session or server.");
+  if(!adminToken)return showKeyGate();
+  try{state=await api("/api/servers/"+encodeURIComponent(serverId)+"/admin/dashboard");showAdminShell();renderAll();scheduleRefresh();return true;}
+  catch(e){sessionStorage.removeItem(adminSessionKey);adminToken="";showKeyGate("Session expired. Enter your key again.");return false;}
+}
+function scheduleRefresh(){if(refreshTimer)clearInterval(refreshTimer);refreshTimer=setInterval(load,8000);}
 
 async function load(){
   if(!token||!serverId)return showDenied("Missing session or server.");
+  if(!adminToken)return showKeyGate();
   try{
     $("#refresh-state").textContent="SYNCING";
     state=await api("/api/servers/"+encodeURIComponent(serverId)+"/admin/dashboard");
@@ -22,7 +61,12 @@ async function load(){
     $("#server-meta").textContent=String(state.server.role).toUpperCase()+" · "+state.stats.members+" members · "+state.stats.channels+" channels";
     $("#refresh-state").textContent="LIVE · "+new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
     renderAll();
-  }catch(e){showDenied(e.message);}
+  }catch(e){
+    if(String(e.message||"").toLowerCase().includes("admin key")||String(e.message||"").toLowerCase().includes("expired")) {
+      sessionStorage.removeItem(adminSessionKey); adminToken=""; showKeyGate("Session expired. Enter your key again."); return;
+    }
+    showDenied(e.message);
+  }
 }
 function showDenied(msg){$("#dashboard").classList.add("hidden");$("#denied").classList.remove("hidden");$("#denied p").textContent=msg||"Access denied.";}
 function renderAll(){renderOverview();renderMembers();renderChannels();renderMessages();renderCalls();renderAudit();renderSecurity();}
@@ -96,5 +140,19 @@ document.addEventListener("input",e=>{if(e.target.id==="member-search")filterMem
 function filterMembers(){const q=String($("#member-search")?.value||"").toLowerCase(),st=String($("#member-status-filter")?.value||"all");$("#member-table-wrap").innerHTML=memberTable(state.members.filter(m=>(!q||m.username.toLowerCase().includes(q))&&(st==="all"||m.status===st)));}
 function filterMessages(){const q=String($("#message-search")?.value||"").toLowerCase();$("#message-list").innerHTML=state.messages.filter(m=>!q||m.content.toLowerCase().includes(q)||m.username.toLowerCase().includes(q)||String(m.channel_name||"").toLowerCase().includes(q)).map(messageRow).join("")||'<div class="empty-block">No messages match.</div>';}
 async function saveSettings(patch){const result=await api("/api/servers/"+serverId+"/admin/settings",{method:"PATCH",body:JSON.stringify(patch)});if(state?.server)state.server.settings=result.settings;toast("Security settings saved");renderOverview();renderSecurity();}
-async function boot(){await load();refreshTimer=setInterval(load,8000);}
+$("#admin-login-form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const input=$("#admin-key-input");
+  const btn=e.submitter||document.querySelector(".key-submit");
+  const key=String(input.value||"").trim();
+  if(!key){$("#key-error").textContent="Enter your administrator key.";return;}
+  btn.disabled=true;btn.classList.add("loading");$("#key-error").textContent="";
+  try{await unlockWithKey(key);input.value="";}
+  catch(err){$("#key-error").textContent=err.message||"Invalid admin key.";input.select();}
+  finally{btn.disabled=false;btn.classList.remove("loading");}
+});
+$("#toggle-key").onclick=()=>{const i=$("#admin-key-input");const visible=i.type==="text";i.type=visible?"password":"text";$("#toggle-key").textContent=visible?"Show":"Hide";};
+$("#logout-btn").onclick=()=>lockAdmin();
+
+async function boot(){await validateSession();}
 boot().catch(e=>showDenied(e.message));
