@@ -194,13 +194,6 @@ function connectRealtime() {
     } catch (err) { console.error("ICE candidate", err); }
   });
 
-  socket.on("call:decline", ({ channelId, callerSocketId }) => {
-    const channel = memory.channels.get(String(channelId));
-    if (!channel || !member(channel.serverId, socket.user.id)) return;
-    const caller = io.sockets.sockets.get(String(callerSocketId));
-    if (caller) caller.emit("call:declined", { userId: socket.user.id, username: socket.user.username });
-  });
-
   socket.on("disconnect", () => {
     if (callState.active) setCallIndicator("RECONNECTING");
   });
