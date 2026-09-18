@@ -925,7 +925,9 @@ app.post("/api/uploads", auth, (req,res)=>{
   if(!data || data.length>2_500_000) return res.status(400).json({error:"File is missing or too large"});
   const type=String(req.body?.type||"application/octet-stream").slice(0,120);
   const size=Number(req.body?.size||0);
-  if (size>2_000_000 || (!type.startsWith("image/") && req.body?.purpose==="avatar")) return res.status(400).json({error:"Avatar must be an image up to 2 MB"});
+  const purpose=String(req.body?.purpose||"file");
+  if (purpose==="avatar" && (size>2_000_000 || !type.startsWith("image/"))) return res.status(400).json({error:"Avatar must be an image up to 2 MB"});
+  if (purpose==="avatar-decoration" && (size>1_000_000 || !type.startsWith("image/"))) return res.status(400).json({error:"Avatar decoration must be an image up to 1 MB"});
   const item={id:id("file"),name:String(req.body?.name||"file").slice(0,180),type,size,data,created_at:now(),user_id:req.user.id};
   memory.uploads.set(item.id,item);
   res.status(201).json({file:{id:item.id,name:item.name,type:item.type,size:item.size}});
