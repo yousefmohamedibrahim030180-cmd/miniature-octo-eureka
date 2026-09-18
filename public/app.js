@@ -70,6 +70,17 @@ function api(url, opts = {}) {
 }
 function fmt(ts) { return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
 function avatar(name) { return (name || "G").slice(0, 1).toUpperCase(); }
+function avatarImageUrl(user){
+  return user?.avatar_url ? String(user.avatar_url) : "";
+}
+function renderOwnAvatar(){
+  const node=$("#me-avatar");
+  if(!node) return;
+  const url=avatarImageUrl(me);
+  node.innerHTML=url?'<img src="'+escapeHtml(url)+'" alt="">':escapeHtml(avatar(me?.username||"G"));
+  node.classList.toggle("has-image",Boolean(url));
+}
+
 function escapeHtml(x) {
   return String(x ?? "").replace(/[&<>"']/g, m => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -102,7 +113,7 @@ async function enterAsGuest() {
   me = data.user;
   saveGuest();
   $("#me-name").textContent = me.display_name || me.username;
-  $("#me-avatar").textContent = avatar(me.username);
+  renderOwnAvatar();
   $("#me-status").textContent = "online · @" + (me.username || "guest");
   connectRealtime();
   await loadServers();
@@ -1079,6 +1090,7 @@ const orbitUI = {
 function applyAvatarMotion(){
   const mode=String(orbitUI?.profile?.avatarMotion||"aurora");
   document.body.dataset.avatarMotion=mode;
+  renderOwnAvatar();
 }
 applyAvatarMotion();
 
@@ -1625,6 +1637,7 @@ function renderSettingsPage(section="appearance"){
       '<div class="username-field"><span>@</span><input id="profile-username" value="'+escapeHtml(me?.username||"")+'" maxlength="20" placeholder="username"><button id="check-username" type="button">Check</button></div>'+
       '<div id="username-status" class="field-note">Use 4–20 letters, numbers, dots, underscores or dashes.</div>'+
       '<div class="avatar-profile-editor">'+
+      '<div class="avatar-upload-row"><div class="orbit-avatar-preview" id="avatar-upload-preview"><span>'+escapeHtml(avatar(me?.username||"G"))+'</span></div><div><strong>Profile avatar</strong><span>Upload GIF, PNG, JPG or WebP up to 2 MB.</span></div><button type="button" id="avatar-upload-btn">Upload</button><button type="button" id="avatar-remove-btn">Remove</button></div>'+
       '<div class="avatar-profile-preview"><div class="orbit-avatar-preview"><span>'+escapeHtml(avatar(me?.username||"G"))+'</span></div><div><strong>Animated avatar</strong><span>Your avatar now has a live effect across Orbit.</span></div></div>'+
       '<div class="avatar-style-grid">'+
       '<button type="button" class="avatar-style-card" data-avatar-style="aurora"><span class="style-preview style-aurora"></span><strong>Aurora</strong><small>Flowing color</small></button>'+
@@ -1637,6 +1650,43 @@ function renderSettingsPage(section="appearance"){
       '<select id="profile-status"><option>Online</option><option>Idle</option><option>Do Not Disturb</option><option>Invisible</option></select>'+
       '<button class="primary" id="save-profile">Save profile</button>';
     $("#profile-status").value=orbitUI.profile.status||"Online";
+    const currentAvatarUrl=avatarImageUrl(me);
+    const preview=$("#avatar-upload-preview");
+    if(currentAvatarUrl) preview.innerHTML='<img src="'+escapeHtml(currentAvatarUrl)+'" alt="">';
+    $("#avatar-upload-btn").onclick=()=>{
+      const input=document.createElement("input");
+      input.type="file"; input.accept="image/png,image/jpeg,image/webp,image/gif,image/avif";
+      input.onchange=async()=>{
+        const file=input.files?.[0]; if(!file)return;
+        if(file.size>2_000_000){orbitToast("Avatar","Image must be 2 MB or smaller.","error");return;}
+        const fr=new FileReader();
+        fr.onload=async()=>{
+          try{
+            const up=await api("/api/uploads",{method:"POST",body:JSON.stringify({name:file.name,type:file.type,size:file.size,data:String(fr.result),purpose:"avatar"})});
+            const avatarUrl="/api/avatar/"+encodeURIComponent(up.file.id);
+            const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({avatarUrl})});
+            me=updated.user; saveGuest(); renderOwnAvatar();
+            orbitUI.profile.avatarUrl=avatarUrl;
+            localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));
+            preview.innerHTML='<img src="'+escapeHtml(avatarUrl)+'" alt="">';
+            orbitToast("Avatar updated","Your uploaded avatar is now active.","success");
+          }catch(err){orbitToast("Avatar upload failed",err.message,"error")}
+        };
+        fr.readAsDataURL(file);
+      };
+      input.click();
+    };
+    $("#avatar-remove-btn").onclick=async()=>{
+      try{
+        const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({avatarUrl:""})});
+        me=updated.user; saveGuest(); renderOwnAvatar();
+        delete orbitUI.profile.avatarUrl;
+        localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));
+        preview.innerHTML='<span>'+escapeHtml(avatar(me?.username||"G"))+'</span>';
+        orbitToast("Avatar removed","Your default animated avatar is back.","success");
+      }catch(err){orbitToast("Avatar remove failed",err.message,"error")}
+    };
+
     const avatarMotion=orbitUI.profile.avatarMotion||"aurora";
     document.querySelectorAll("[data-avatar-style]").forEach(b=>{
       b.classList.toggle("active",b.dataset.avatarStyle===avatarMotion);
