@@ -1317,14 +1317,86 @@ async function openPulseProfile(userId){
     try{await api("/api/friends/request",{method:"POST",body:JSON.stringify({username:user.username})});closeModal();orbitToast("Friend request sent","Request sent to @"+user.username+".","success")}catch(e){orbitToast("Friend request failed",e.message,"error")}
   };
 }
+function applyServerTheme(theme={}){
+  document.documentElement.style.setProperty("--server-accent",String(theme.accent||"#7c5cff"));
+  document.documentElement.style.setProperty("--server-secondary",String(theme.secondary||"#14b8a6"));
+}
+function uploadServerImage(purpose){
+  return new Promise((resolve,reject)=>{
+    const input=document.createElement("input");
+    input.type="file"; input.accept="image/png,image/jpeg,image/webp,image/gif,image/avif";
+    input.onchange=()=>{
+      const file=input.files?.[0];
+      if(!file)return resolve(null);
+      if(file.size>2_000_000)return reject(new Error("Image must be 2 MB or smaller."));
+      if(!file.type.startsWith("image/"))return reject(new Error("Please choose an image file."));
+      const fr=new FileReader();
+      fr.onload=async()=>{
+        try{
+          const up=await api("/api/uploads",{method:"POST",body:JSON.stringify({name:file.name,type:file.type,size:file.size,data:String(fr.result),purpose})});
+          resolve("/api/avatar/"+encodeURIComponent(up.file.id));
+        }catch(err){reject(err)}
+      };
+      fr.onerror=()=>reject(new Error("Could not read image."));
+      fr.readAsDataURL(file);
+    };
+    input.click();
+  });
+}
+function openServerCustomizer(serverId, theme={}){
+  const t=theme||{};
+  openModal("Customize community",
+    '<div class="server-customizer">'+
+      '<div class="customizer-cover" '+(t.banner_url?'style="background-image:url(&quot;'+escapeHtml(t.banner_url)+'&quot;)"':'')+'></div>'+
+      '<div class="customizer-grid">'+
+        '<label><span>Accent</span><input id="server-accent" type="color" value="'+escapeHtml(t.accent||"#7c5cff")+'"></label>'+
+        '<label><span>Secondary</span><input id="server-secondary" type="color" value="'+escapeHtml(t.secondary||"#14b8a6")+'"></label>'+
+      '</div>'+
+      '<label class="customizer-field"><span>Community description</span><textarea id="server-description" maxlength="500" placeholder="What is this community about?">'+escapeHtml(t.description||"")+'</textarea></label>'+
+      '<label class="customizer-field"><span>Welcome message</span><textarea id="server-welcome" maxlength="700" placeholder="Welcome to the community…">'+escapeHtml(t.welcomeMessage||"")+'</textarea></label>'+
+      '<div class="customizer-upload-row"><div><strong>Server icon</strong><small>Square image, up to 2 MB.</small></div><button id="server-icon-upload">Upload</button><button id="server-icon-clear">Clear</button></div>'+
+      '<div class="customizer-upload-row"><div><strong>Server banner</strong><small>Wide image, up to 2 MB.</small></div><button id="server-banner-upload">Upload</button><button id="server-banner-clear">Clear</button></div>'+
+      '<div class="customizer-preview"><div class="customizer-preview-icon" id="server-icon-preview">'+(t.icon_url?'<img src="'+escapeHtml(t.icon_url)+'" alt="">':'O')+'</div><div><strong>'+escapeHtml(currentServer?.name||"Community")+'</strong><span id="server-preview-desc">'+escapeHtml(t.description||"Your Orbit community")+'</span></div></div>'+
+      '<button class="primary" id="server-customizer-save">Save changes</button>'+
+    '</div>');
+  let draft={...t};
+  $("#server-icon-upload").onclick=async()=>{try{draft.icon_url=await uploadServerImage("server-icon");if(draft.icon_url)$("#server-icon-preview").innerHTML='<img src="'+escapeHtml(draft.icon_url)+'" alt="">';}catch(err){orbitToast("Server icon",err.message,"error")}};
+  $("#server-icon-clear").onclick=()=>{draft.icon_url=null;$("#server-icon-preview").textContent=(currentServer?.name||"O").slice(0,1).toUpperCase()};
+  $("#server-banner-upload").onclick=async()=>{try{draft.banner_url=await uploadServerImage("server-banner");}catch(err){orbitToast("Server banner",err.message,"error")}};
+  $("#server-banner-clear").onclick=()=>{draft.banner_url=null};
+  $("#server-description").oninput=e=>$("#server-preview-desc").textContent=e.target.value||"Your Orbit community";
+  $("#server-customizer-save").onclick=async()=>{
+    try{
+      const payload={
+        accent:$("#server-accent").value,
+        secondary:$("#server-secondary").value,
+        description:$("#server-description").value.trim(),
+        welcomeMessage:$("#server-welcome").value.trim(),
+        iconUrl:draft.icon_url||"",
+        bannerUrl:draft.banner_url||""
+      };
+      const result=await api("/api/servers/"+encodeURIComponent(serverId)+"/community",{method:"PATCH",body:JSON.stringify(payload)});
+      applyServerTheme(result.theme||payload);
+      closeModal();
+      orbitToast("Community updated","Server branding and welcome settings are saved.","success");
+      renderServerHomePage();
+    }catch(err){orbitToast("Community update failed",err.message,"error")}
+  };
+}
+
 async function renderServerHomePage(){
   if(!currentServer){
     goChat();
     return;
   }
   const serverId=String(currentServer.id);
-  const data=await api("/api/servers/"+encodeURIComponent(serverId)+"/members");
+  const [community,data]=await Promise.all([
+    api("/api/servers/"+encodeURIComponent(serverId)+"/community"),
+    api("/api/servers/"+encodeURIComponent(serverId)+"/members")
+  ]);
   const memberRows=(data.members||[]);
+  const theme=community.theme||{};
+  applyServerTheme(theme);
   const textChannels=channels.filter(c=>c.type!=="voice");
   const voiceChannels=channels.filter(c=>c.type==="voice");
   const onlineMembers=memberRows.filter(m=>String(m.status||"").toLowerCase()==="online");
@@ -1337,12 +1409,12 @@ async function renderServerHomePage(){
   $("#page-eyebrow").textContent="SERVER / HOME";
   $("#page-title").textContent=currentServer.name;
   $("#page-subtitle").textContent="Your community command center.";
-  $("#page-actions").innerHTML='<button id="server-home-chat" class="primary">Open chat</button><button id="server-home-invite">Invite</button>';
+  $("#page-actions").innerHTML='<button id="server-home-chat" class="primary">Open chat</button><button id="server-home-invite">Invite</button>'+(canManage?'<button id="server-home-customize">Customize</button>':'');
   $("#page-body").innerHTML=
     '<div class="server-home-hero">'+
-      '<div class="server-home-hero-copy"><span class="eyebrow">ORBIT WORLD</span><h2>'+escapeHtml(currentServer.name)+'</h2><p>Welcome back. Jump into the conversation, meet members, or personalize your community.</p>'+
+      '<div class="server-home-hero-copy"><span class="eyebrow">ORBIT WORLD</span><h2>'+escapeHtml(currentServer.name)+'</h2><p>'+escapeHtml(theme.description||theme.welcomeMessage||"Welcome back. Jump into the conversation, meet members, or personalize your community.")+'</p>'+
       '<div class="server-home-hero-actions"><button class="hero-action" id="server-home-open-chat">Open #'+escapeHtml(currentChannel?.name||textChannels[0]?.name||"general")+'</button><button class="hero-action soft" id="server-home-members">Browse members</button></div></div>'+
-      '<div class="server-orbit-badge"><span>'+escapeHtml(currentServer.name.slice(0,2).toUpperCase())+'</span><i></i></div>'+
+      '<div class="server-orbit-badge" '+(theme.banner_url?'style="background-image:url(&quot;'+escapeHtml(theme.banner_url)+'&quot;)"':'')+'><span>'+(theme.icon_url?'<img src="'+escapeHtml(theme.icon_url)+'" alt="">':escapeHtml(currentServer.name.slice(0,2).toUpperCase()))+'</span><i></i></div>'+
     '</div>'+
     (!onboardingDone?
       '<div class="server-onboarding"><div><span class="eyebrow">QUICK START</span><h3>Make Orbit yours</h3><p>Three small steps to get this server feeling like home.</p></div><div class="onboarding-steps">'+
@@ -1360,7 +1432,7 @@ async function renderServerHomePage(){
       '<section class="server-home-card"><div class="section-heading"><h3>Channels</h3><span>'+textChannels.length+' text · '+voiceChannels.length+' voice</span></div>'+
       '<div class="server-channel-home-list">'+channels.slice(0,10).map(c=>'<button class="server-channel-home" data-home-channel="'+escapeHtml(c.id)+'"><span class="home-channel-icon">'+(c.type==="voice"?"◉":"#")+'</span><div><strong>'+escapeHtml(c.name)+'</strong><small>'+escapeHtml(c.type==="voice"?"Voice room":"Text channel")+'</small></div><b>Open</b></button>').join("")+'</div></section>'+
       '<section class="server-home-card"><div class="section-heading"><h3>Members</h3><span>'+memberRows.length+' total</span></div>'+
-      '<div class="server-member-grid">'+topMembers.map(m=>'<button class="server-member-card" data-home-user="'+escapeHtml(m.id)+'"><div class="avatar '+(m.avatar_url?"has-image":"")+'">'+(m.avatar_url?'<img src="'+escapeHtml(m.avatar_url)+'" alt="">':escapeHtml(avatar(m.username)))+'</div><div><strong>'+escapeHtml(m.display_name||m.username)+'</strong><small>@'+escapeHtml(m.username)+' · '+escapeHtml(m.role)+'</small></div><i class="'+(String(m.status||"").toLowerCase()==="online"?"online":"offline")+'"></i></button>').join("")+'</div></section>'+
+      '<div class="server-member-grid">'+topMembers.map(m=>'<button class="server-member-card" data-home-user="'+escapeHtml(m.id)+'"><div class="avatar '+(m.avatar_url?"has-image":"")+'">'+(m.avatar_url?'<img src="'+escapeHtml(m.avatar_url)+'" alt="">':escapeHtml(avatar(m.username)))+'</div><div><strong>'+escapeHtml(m.display_name||m.username)+'</strong><small>@'+escapeHtml(m.username)+' · '+escapeHtml(m.role)+'</small><em>'+escapeHtml(m.activity||"Online")+'</em></div><i class="'+(String(m.status||"").toLowerCase()==="online"?"online":"offline")+'"></i></button>').join("")+'</div></section>'+
     '</div>'+
     '<div class="server-home-card server-role-card"><div class="section-heading"><h3>Roles</h3><span>Current role: '+escapeHtml(role)+'</span></div>'+
       '<div class="role-chip-row"><span class="role-chip owner">OWNER <small>Full control</small></span><span class="role-chip admin">ADMIN <small>Manage community</small></span><span class="role-chip moderator">MODERATOR <small>Moderation tools</small></span><span class="role-chip member">MEMBER <small>Community access</small></span></div>'+
@@ -1371,6 +1443,7 @@ async function renderServerHomePage(){
   $("#server-home-chat").onclick=goChat;
   $("#server-home-open-chat").onclick=goChat;
   $("#server-home-invite").onclick=()=>$("#invite-btn")?.click();
+  if($("#server-home-customize"))$("#server-home-customize").onclick=()=>openServerCustomizer(serverId,theme);
   $("#server-home-members").onclick=()=>{$("#members-panel")?.classList.remove("hidden");loadMembers().catch(()=>{})};
   document.querySelectorAll("[data-home-channel]").forEach(b=>b.onclick=async()=>{
     const ch=channels.find(c=>String(c.id)===String(b.dataset.homeChannel));
@@ -1380,7 +1453,7 @@ async function renderServerHomePage(){
     const u=memberRows.find(x=>String(x.id)===String(b.dataset.homeUser));
     if(!u)return;
     openModal("Profile",
-      '<div class="profile-card-pro"><div class="profile-card-cover"></div><div class="profile-card-avatar '+(u.avatar_url?"has-image":"")+'">'+(u.avatar_url?'<img src="'+escapeHtml(u.avatar_url)+'" alt="">':escapeHtml(avatar(u.username)))+'</div><div class="profile-card-main"><strong>'+escapeHtml(u.display_name||u.username)+'</strong><span>@'+escapeHtml(u.username)+'</span><em>'+escapeHtml(u.status||"online")+' · '+escapeHtml(u.role)+'</em></div><div class="profile-card-bio">'+escapeHtml(u.activity||"Member of "+currentServer.name)+'</div><div class="profile-card-actions"><button class="primary" id="home-profile-message">Message</button><button id="home-profile-friend">Add friend</button></div></div>');
+      '<div class="profile-card-pro"><div class="profile-card-cover" '+(theme.banner_url?'style="background-image:url(&quot;'+escapeHtml(theme.banner_url)+'&quot;)"':'')+'></div><div class="profile-card-avatar '+(u.avatar_url?"has-image":"")+'">'+(u.avatar_url?'<img src="'+escapeHtml(u.avatar_url)+'" alt="">':escapeHtml(avatar(u.username)))+'</div><div class="profile-card-main"><strong>'+escapeHtml(u.display_name||u.username)+'</strong><span>@'+escapeHtml(u.username)+'</span><em>'+escapeHtml(u.status||"online")+' · '+escapeHtml(u.activity||"Online")+' · '+escapeHtml(u.role)+'</em></div><div class="profile-badge-row">'+(u.badges||[]).map(b=>'<span class="profile-badge" title="'+escapeHtml(b.label)+'">'+escapeHtml(b.icon||"✦")+' '+escapeHtml(b.label)+'</span>').join("")+'</div><div class="profile-card-bio">'+escapeHtml(u.activity||"Member of "+currentServer.name)+'</div><div class="profile-card-actions"><button class="primary" id="home-profile-message">Message</button><button id="home-profile-friend">Add friend</button></div></div>');
     $("#home-profile-message").onclick=async()=>{try{await api("/api/dms",{method:"POST",body:JSON.stringify({username:u.username})});closeModal();setView("dms");renderDMPage()}catch(err){orbitToast("DM failed",err.message,"error")}};
     $("#home-profile-friend").onclick=async()=>{try{await api("/api/friends/request",{method:"POST",body:JSON.stringify({username:u.username})});closeModal();orbitToast("Friend request sent","Request sent to @"+u.username+".","success")}catch(err){orbitToast("Friend request failed",err.message,"error")}};
   });
@@ -1778,9 +1851,11 @@ function renderSettingsPage(section="appearance"){
       '</div></div></div>'+
       '<input id="profile-name" value="'+escapeHtml(orbitUI.profile.displayName||me?.display_name||me?.username||"Guest")+'" placeholder="Display name">'+
       '<textarea id="profile-bio" placeholder="Bio">'+escapeHtml(orbitUI.profile.bio||"")+'</textarea>'+
+      '<div class="activity-editor"><div><strong>Activity status</strong><span>Show people what you are doing.</span></div><div class="activity-presets"><button type="button" data-activity-type="Gaming">🎮 Gaming</button><button type="button" data-activity-type="Coding">💻 Coding</button><button type="button" data-activity-type="Listening">🎧 Listening</button><button type="button" data-activity-type="Watching">📺 Watching</button><button type="button" data-activity-type="Streaming">🔴 Streaming</button></div><input id="profile-activity" maxlength="80" value="'+escapeHtml(me?.activity||"Online")+'" placeholder="Custom activity…"></div>'+
       '<select id="profile-status"><option>Online</option><option>Idle</option><option>Do Not Disturb</option><option>Invisible</option></select>'+
       '<button class="primary" id="save-profile">Save profile</button>';
     $("#profile-status").value=orbitUI.profile.status||"Online";
+    document.querySelectorAll("[data-activity-type]").forEach(b=>b.onclick=()=>$("#profile-activity").value=b.dataset.activityType);
     const currentAvatarUrl=avatarImageUrl(me);
     const preview=$("#avatar-upload-preview");
     if(currentAvatarUrl) preview.innerHTML='<img src="'+escapeHtml(currentAvatarUrl)+'" alt="">';
@@ -1902,12 +1977,14 @@ function renderSettingsPage(section="appearance"){
       const displayName=$("#profile-name").value.trim()||username||"Guest";
       const bio=$("#profile-bio").value.trim();
       const status=$("#profile-status").value;
-      const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({username,displayName})});
-      me=updated.user; guestName=me.username; saveGuest();
+      const activity=$("#profile-activity").value.trim()||"Online";
+      const activityType=(activity==="Online"?"custom":"custom");
+      const updated=await api("/api/me",{method:"PATCH",body:JSON.stringify({username,displayName,bio,activity,activityType})});
+      me=updated.user; guestName=me.username; saveGuest(); renderOwnAvatar();
       orbitUI.profile.displayName=displayName;orbitUI.profile.bio=bio;orbitUI.profile.status=status;
       localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));
       $("#me-name").textContent=displayName;$("#me-status").textContent=status.toLowerCase()+" · @"+me.username;
-      orbitToast("Profile updated","Your unique @"+me.username+" is saved.","success");
+      orbitToast("Profile updated","Your profile, activity and identity are saved.","success");
     }catch(err){
       if(err.message==="Username is already taken"&&err.suggested) $("#username-status").textContent="Taken. Try @"+err.suggested;
       else orbitToast("Profile update failed",err.message,"error");
