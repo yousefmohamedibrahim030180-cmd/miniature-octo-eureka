@@ -1499,3 +1499,27 @@ body[data-avatar-motion="off"] .pulse-big-avatar{
   body[data-avatar-motion] .dm-active-avatar,
   body[data-avatar-motion] .pulse-big-avatar{animation:none!important}
 }
+
+/* ===== Visible animated avatar profile picker ===== */
+.avatar-profile-editor{margin:14px 0 16px;padding:16px;border:1px solid #252d3a;border-radius:16px;background:linear-gradient(180deg,#0e141d,#0a0f15)}
+.avatar-profile-preview{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.orbit-avatar-preview{width:68px;height:68px;border-radius:20px;display:grid;place-items:center;flex:none;overflow:hidden;position:relative;isolation:isolate;background:#7652e8;box-shadow:0 12px 30px #0005}
+.orbit-avatar-preview span{position:relative;z-index:2;font-weight:900;font-size:20px;color:#fff}
+.avatar-profile-preview strong{display:block;font-size:13px}
+.avatar-profile-preview span{display:block;color:#7f8a9d;font-size:10px;margin-top:4px}
+body[data-avatar-motion="aurora"] .orbit-avatar-preview{background:linear-gradient(130deg,#5d43d6,#267ed8,#20d4b4,#8a57ff,#5d43d6);background-size:260% 260%;animation:orbitAvatarAurora 5s ease-in-out infinite}
+body[data-avatar-motion="neon"] .orbit-avatar-preview{background:linear-gradient(125deg,#ff3cac,#784ba0,#2b86c5,#00e5ff,#ff3cac);background-size:260% 260%;animation:orbitAvatarNeon 2.8s linear infinite}
+body[data-avatar-motion="energy"] .orbit-avatar-preview{background:radial-gradient(circle at 30% 20%,#ffffff55 0 6%,transparent 7%),linear-gradient(135deg,#5e35d8,#1c8fff,#7c4dff,#00d4a8);background-size:260% 260%;animation:orbitAvatarEnergy 3.2s ease-in-out infinite}
+body[data-avatar-motion="off"] .orbit-avatar-preview{animation:none!important}
+.avatar-style-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.avatar-style-card{border:1px solid #252d3a;background:#0b1017;color:#dfe5ef;border-radius:12px;padding:10px;cursor:pointer;text-align:left;transition:.18s}
+.avatar-style-card:hover{border-color:#5f46a2;transform:translateY(-1px)}
+.avatar-style-card.active{border-color:#8b5cf6;background:linear-gradient(180deg,#1d1632,#111722);box-shadow:0 0 0 1px #8b5cf633 inset}
+.avatar-style-card strong{display:block;font-size:11px}
+.avatar-style-card small{display:block;color:#758197;font-size:9px;margin-top:3px}
+.style-preview{display:block;width:100%;height:48px;border-radius:9px;margin-bottom:8px;background:#202735}
+.style-aurora{background:linear-gradient(130deg,#5d43d6,#267ed8,#20d4b4,#8a57ff,#5d43d6);background-size:260% 260%;animation:orbitAvatarAurora 5s ease-in-out infinite}
+.style-neon{background:linear-gradient(125deg,#ff3cac,#784ba0,#2b86c5,#00e5ff,#ff3cac);background-size:260% 260%;animation:orbitAvatarNeon 2.8s linear infinite}
+.style-energy{background:linear-gradient(135deg,#5e35d8,#1c8fff,#7c4dff,#00d4a8);background-size:260% 260%;animation:orbitAvatarEnergy 3.2s ease-in-out infinite}
+.style-off{background:linear-gradient(135deg,#2a3240,#171d27)}
+@media(max-width:700px){.avatar-style-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
