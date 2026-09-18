@@ -250,6 +250,7 @@ function connectRealtime() {
     console.error("[orbit] realtime connect error", err);
     if (callState.active) setCallIndicator("RECONNECTING");
   });
+  socket.on("error:toast", payload => orbitToast("Server", payload?.message || "Action blocked."));
   socket.on("disconnect", () => {
     if (callState.active) setCallIndicator("RECONNECTING");
   });
@@ -383,13 +384,10 @@ document.addEventListener("click", async e => {
       return;
     }
     if (e.target.id === "admin-btn" && currentServer) {
-      openModal("Control center",
-        '<div class="control-grid">' +
-        '<div class="control-row"><strong>Server</strong><span>' + escapeHtml(currentServer.name) + '</span></div>' +
-        '<div class="control-row"><strong>Access</strong><span>No account required — guest sessions only</span></div>' +
-        '<div class="control-row"><strong>Voice / Video</strong><span>WebRTC mesh, screen share and quality presets</span></div>' +
-        '<div class="control-row"><strong>Storage</strong><span>Live memory mode until PostgreSQL is connected</span></div>' +
-        '</div>');
+      if (!["owner","admin","moderator"].includes(String(currentServer.role || ""))) {
+        return orbitToast("Admin access", "You do not have permission to open the server control center.");
+      }
+      location.href = "/admin.html?server=" + encodeURIComponent(currentServer.id);
       return;
     }
   } catch (err) { showError(err.message); }
