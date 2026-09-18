@@ -957,6 +957,16 @@ app.delete("/api/servers/:id/admin/channels/:channelId", auth, (req, res) => {
   res.json({ok:true});
 });
 
+app.get("/api/files", auth, (req,res)=>{
+  const limit=Math.max(1,Math.min(100,Number(req.query.limit||40)));
+  const files=[...memory.uploads.values()]
+    .filter(file=>String(file.user_id)===String(req.user.id))
+    .sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))
+    .slice(0,limit)
+    .map(file=>({id:file.id,name:file.name,type:file.type,size:file.size,created_at:file.created_at,download_url:"/api/uploads/"+encodeURIComponent(file.id)}));
+  res.json({files});
+});
+
 app.post("/api/uploads", auth, (req,res)=>{
   const data=String(req.body?.data||"");
   if(!data || data.length>2_500_000) return res.status(400).json({error:"File is missing or too large"});
