@@ -2491,3 +2491,531 @@ body.reduced-motion .server-item.active::after,
 body.reduced-motion .workspace-avatar::after,
 body.reduced-motion .rail-logo::after,
 body.reduced-motion .profile-card-cover::after{animation:none!important}
+
+
+/* =========================================================
+   ORBIT NEXUS / V4 — SPATIAL COMMUNICATION OS
+   ========================================================= */
+:root{
+  --nexus-a: var(--server-accent,#7c5cff);
+  --nexus-b: var(--server-secondary,#14b8a6);
+  --nexus-white: rgba(255,255,255,.92);
+  --nexus-soft: rgba(255,255,255,.055);
+  --nexus-line: rgba(255,255,255,.09);
+  --nexus-deep: rgba(4,8,14,.72);
+  --nexus-panel: rgba(9,14,22,.72);
+  --nexus-shadow: 0 28px 90px rgba(0,0,0,.42);
+}
+
+/* Universe shell */
+html,body{background:#02050a}
+body{
+  perspective:1400px;
+  background:
+    radial-gradient(1000px 700px at 50% 50%,color-mix(in srgb,var(--nexus-a) 6%,transparent),transparent 60%),
+    radial-gradient(700px 500px at 5% 5%,color-mix(in srgb,var(--nexus-a) 14%,transparent),transparent 68%),
+    radial-gradient(700px 500px at 100% 100%,color-mix(in srgb,var(--nexus-b) 10%,transparent),transparent 68%),
+    #02050a;
+}
+body::before{
+  background-image:
+    radial-gradient(circle,rgba(255,255,255,.13) 0 1px,transparent 1.4px),
+    linear-gradient(rgba(255,255,255,.012) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px);
+  background-size:96px 96px,52px 52px,52px 52px;
+  opacity:.62;
+  animation:nexusStars 30s linear infinite;
+}
+body::after{
+  content:"";
+  position:fixed;
+  inset:-35%;
+  pointer-events:none;
+  z-index:0;
+  background:
+    conic-gradient(from 210deg at 50% 50%,transparent 0deg,color-mix(in srgb,var(--nexus-a) 7%,transparent) 70deg,transparent 140deg,color-mix(in srgb,var(--nexus-b) 5%,transparent) 220deg,transparent 300deg);
+  filter:blur(32px);
+  animation:nexusAurora 18s ease-in-out infinite alternate;
+  opacity:.85;
+}
+@keyframes nexusStars{to{background-position:192px -96px,-52px 52px,52px 0}}
+@keyframes nexusAurora{0%{transform:rotate(-4deg) scale(1)}100%{transform:rotate(5deg) scale(1.08)}}
+
+/* One-piece command shell */
+.app{
+  grid-template-columns:96px 292px minmax(0,1fr);
+  gap:14px;
+  padding:14px;
+  isolation:isolate;
+}
+.app::after{
+  content:"";
+  position:absolute;
+  inset:14px;
+  pointer-events:none;
+  border-radius:30px;
+  border:1px solid rgba(255,255,255,.035);
+  box-shadow:inset 0 0 100px rgba(255,255,255,.018);
+}
+
+/* Orbital dock */
+.server-rail{
+  border-radius:28px;
+  background:
+    radial-gradient(circle at 50% 12%,color-mix(in srgb,var(--nexus-a) 15%,transparent),transparent 28%),
+    linear-gradient(180deg,rgba(10,16,25,.94),rgba(3,7,12,.91));
+  border:1px solid rgba(255,255,255,.11);
+  box-shadow:var(--nexus-shadow),inset 0 1px 0 rgba(255,255,255,.05);
+}
+.server-rail::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:105px;
+  width:72px;
+  height:calc(100% - 228px);
+  transform:translateX(-50%);
+  border:1px solid rgba(255,255,255,.045);
+  border-radius:999px;
+  box-shadow:0 0 45px color-mix(in srgb,var(--nexus-a) 8%,transparent),inset 0 0 30px rgba(255,255,255,.018);
+  pointer-events:none;
+}
+.brand-shell{gap:7px;padding-top:3px}
+.rail-logo{
+  width:54px;height:54px;border-radius:20px;
+  font-size:26px;
+  box-shadow:0 14px 40px color-mix(in srgb,var(--nexus-a) 32%,transparent),inset 0 1px 0 rgba(255,255,255,.2);
+}
+.brand-name{
+  font-size:7px;
+  letter-spacing:.36em;
+  color:#98a2b4;
+}
+.global-nav{
+  margin-top:8px;
+  gap:8px;
+}
+.rail-nav{
+  width:50px;height:50px;
+  margin:auto;
+  border-radius:18px;
+  font-size:17px;
+}
+.rail-nav::after{
+  content:"";
+  position:absolute;
+  inset:3px;
+  border-radius:15px;
+  border:1px solid transparent;
+  transition:border-color .2s ease,box-shadow .2s ease;
+}
+.rail-nav:hover::after{
+  border-color:rgba(255,255,255,.06);
+  box-shadow:inset 0 0 18px rgba(255,255,255,.025);
+}
+.rail-nav.active{
+  transform:translateY(-1px) scale(1.03);
+  box-shadow:0 14px 30px color-mix(in srgb,var(--nexus-a) 24%,transparent),inset 0 1px 0 rgba(255,255,255,.08);
+}
+.rail-nav.active::before{left:-15px;width:4px;box-shadow:0 0 20px var(--nexus-a)}
+.rail-divider{width:44px;margin:8px auto;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent)}
+.server-list{
+  position:relative;
+  padding:10px 0 4px;
+  gap:14px;
+  perspective:500px;
+}
+.server-item{
+  width:50px;height:50px;
+  border-radius:19px;
+  background:rgba(8,13,21,.72);
+  border-color:rgba(255,255,255,.065);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 8px 20px rgba(0,0,0,.2);
+  transition:transform .22s cubic-bezier(.2,.75,.2,1),box-shadow .22s ease,border-color .22s ease;
+}
+.server-item:nth-child(odd){transform:translateX(-2px)}
+.server-item:nth-child(even){transform:translateX(2px)}
+.server-item:hover{
+  transform:translateY(-4px) scale(1.06);
+  border-color:rgba(255,255,255,.17);
+  box-shadow:0 16px 34px rgba(0,0,0,.3),0 0 22px color-mix(in srgb,var(--nexus-a) 11%,transparent);
+}
+.server-item.active{
+  transform:scale(1.08);
+  border-radius:21px;
+  box-shadow:0 18px 38px color-mix(in srgb,var(--nexus-a) 30%,transparent),inset 0 1px 0 rgba(255,255,255,.14);
+}
+.server-item.active::before{
+  inset:-6px;
+  border-radius:23px;
+  opacity:.65;
+}
+.server-item.active::after{
+  inset:-13px;
+  border-width:1px;
+  border-style:dashed;
+  animation:nexusOrbitRing 7s linear infinite;
+  box-shadow:0 0 26px color-mix(in srgb,var(--nexus-a) 18%,transparent);
+}
+@keyframes nexusOrbitRing{to{transform:rotate(360deg)}}
+.rail-btn{
+  width:50px;height:44px;
+  border-radius:17px;
+  background:rgba(255,255,255,.025);
+  border:1px solid rgba(255,255,255,.09);
+}
+.rail-btn:hover{
+  transform:translateY(-2px);
+  background:color-mix(in srgb,var(--nexus-a) 10%,rgba(255,255,255,.025));
+  box-shadow:0 12px 26px rgba(0,0,0,.22);
+}
+.bottom-nav{margin-top:6px}
+
+/* Tactical workspace console */
+.sidebar{
+  border-radius:28px;
+  background:
+    radial-gradient(460px 260px at 15% 0%,color-mix(in srgb,var(--nexus-a) 10%,transparent),transparent 70%),
+    linear-gradient(180deg,rgba(10,16,25,.91),rgba(4,9,15,.9));
+  box-shadow:var(--nexus-shadow),inset 0 1px 0 rgba(255,255,255,.045);
+}
+.workspace-head{
+  min-height:84px;
+  padding:15px 14px;
+}
+.sidebar .workspace-head::after{
+  content:"NEXUS // LIVE";
+  top:12px;
+  right:13px;
+  padding:4px 7px;
+  letter-spacing:.2em;
+  color:#99a4b7;
+  background:rgba(255,255,255,.025);
+  box-shadow:inset 0 0 12px rgba(255,255,255,.015);
+}
+.workspace-brand{gap:12px}
+.workspace-avatar{
+  width:44px;height:44px;border-radius:15px;
+  box-shadow:0 12px 30px color-mix(in srgb,var(--nexus-a) 22%,transparent),inset 0 1px 0 rgba(255,255,255,.18);
+}
+.workspace-brand strong{font-size:12px}
+.workspace-brand span{font-size:8px;text-transform:uppercase;letter-spacing:.1em}
+.sidebar-search{
+  height:44px;
+  margin:14px 14px 6px;
+  border-radius:15px;
+  background:rgba(3,8,13,.64);
+}
+.sidebar-search::after{
+  content:"";
+  position:absolute;
+  left:18px;right:18px;bottom:-2px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--nexus-a),transparent);
+  opacity:.4;
+  pointer-events:none;
+}
+.section-title{
+  padding:13px 15px 7px;
+  letter-spacing:.18em;
+}
+.channel{
+  margin:3px 11px;
+  padding:11px 12px;
+  border-radius:14px;
+  min-height:42px;
+}
+.channel.active{
+  background:
+    linear-gradient(90deg,color-mix(in srgb,var(--nexus-a) 16%,transparent),rgba(255,255,255,.025));
+  box-shadow:inset 3px 0 0 var(--nexus-a),inset 0 1px 0 rgba(255,255,255,.025);
+}
+.voice-list{max-height:200px}
+.voice-dock{
+  border-radius:15px;
+  background:linear-gradient(145deg,rgba(18,30,37,.9),rgba(7,13,20,.84));
+  box-shadow:0 18px 34px rgba(0,0,0,.28);
+}
+
+/* Main stage becomes a command chamber */
+.content{gap:14px}
+.global-page,.chat{
+  border-radius:28px;
+  box-shadow:var(--nexus-shadow),inset 0 1px 0 rgba(255,255,255,.045);
+}
+.content::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:min(70vw,920px);
+  height:min(70vw,920px);
+  transform:translate(-50%,-50%);
+  border:1px solid rgba(255,255,255,.025);
+  border-radius:50%;
+  box-shadow:
+    0 0 0 80px rgba(255,255,255,.008),
+    0 0 0 180px rgba(255,255,255,.006),
+    0 0 80px color-mix(in srgb,var(--nexus-a) 6%,transparent);
+  pointer-events:none;
+  z-index:0;
+}
+.content::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:min(35vw,520px);
+  height:min(35vw,520px);
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:radial-gradient(circle,color-mix(in srgb,var(--nexus-a) 6%,transparent),transparent 68%);
+  filter:blur(20px);
+  pointer-events:none;
+  z-index:0;
+}
+.chat,.global-page{z-index:1}
+
+/* Rotating reactor rings behind chat */
+.chat::after{
+  content:"";
+  position:absolute;
+  left:50%;top:50%;
+  width:min(44vw,620px);
+  height:min(44vw,620px);
+  transform:translate(-50%,-50%);
+  border:1px solid rgba(255,255,255,.018);
+  border-radius:50%;
+  box-shadow:
+    0 0 0 36px rgba(255,255,255,.008),
+    0 0 0 92px rgba(255,255,255,.006),
+    0 0 90px color-mix(in srgb,var(--nexus-a) 6%,transparent);
+  pointer-events:none;
+  z-index:0;
+  animation:nexusSlowSpin 24s linear infinite;
+}
+.chat>*{position:relative;z-index:2}
+.chat::before{z-index:1}
+@keyframes nexusSlowSpin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+
+/* Chat header becomes mission control */
+.chat-head{
+  min-height:82px;
+  padding:0 20px;
+  background:linear-gradient(180deg,rgba(15,22,33,.9),rgba(7,12,19,.72));
+}
+.channel-title{gap:13px}
+.channel-title .hash{
+  width:42px;height:42px;border-radius:14px;
+  box-shadow:0 10px 25px color-mix(in srgb,var(--nexus-a) 14%,transparent),inset 0 1px 0 rgba(255,255,255,.08);
+}
+.channel-title strong{
+  font-size:13px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.channel-title span:not(.hash){
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+.head-actions{gap:7px}
+.head-action{
+  min-height:36px;
+  border-radius:12px!important;
+  background:rgba(255,255,255,.028)!important;
+}
+.head-action.primary-soft{
+  background:linear-gradient(135deg,color-mix(in srgb,var(--nexus-a) 28%,#0d1320),rgba(255,255,255,.03))!important;
+}
+
+/* Messages: cards with a subtle "depth plane" */
+.messages{
+  position:relative;
+  padding:30px 30px 18px;
+}
+.messages::after{
+  content:"NEXUS CHANNEL";
+  position:absolute;
+  top:18px;
+  right:24px;
+  font-size:7px;
+  letter-spacing:.25em;
+  color:rgba(255,255,255,.18);
+  pointer-events:none;
+}
+.message{
+  margin:3px 0;
+  padding:11px 10px;
+  border:1px solid transparent;
+  border-radius:15px;
+}
+.message:hover{
+  border-color:rgba(255,255,255,.055);
+  background:linear-gradient(90deg,rgba(255,255,255,.035),transparent 85%);
+  box-shadow:0 10px 30px rgba(0,0,0,.12);
+}
+.message .avatar{
+  width:42px;height:42px;border-radius:15px;
+}
+.msg-body{font-size:12.5px}
+.msg-tag{
+  border-radius:999px;
+  letter-spacing:.04em;
+}
+
+/* Composer becomes the console input */
+.composer{
+  margin:12px 16px 16px;
+  min-height:62px;
+  border-radius:18px;
+  padding:9px;
+  background:
+    linear-gradient(180deg,rgba(11,17,26,.88),rgba(5,10,16,.84));
+  box-shadow:0 24px 50px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.045);
+}
+.composer input{
+  font-size:12px;
+  padding:13px 14px;
+  background:rgba(255,255,255,.025);
+  border-color:rgba(255,255,255,.065);
+}
+.composer .send{
+  min-width:82px;
+  border-radius:13px;
+}
+
+/* Global pages feel like planets */
+.global-page .page-head{
+  min-height:104px;
+  padding:26px 28px;
+}
+.global-page .page-head h1{
+  font-size:34px!important;
+  letter-spacing:-.05em;
+}
+.global-page .page-body{padding:24px}
+.hero-grid{gap:16px}
+.hero-card{
+  border-radius:22px;
+  min-height:210px;
+  padding:22px;
+}
+.hero-card h2{font-size:23px}
+.server-home-hero{
+  min-height:340px;
+  border-radius:26px;
+  box-shadow:0 35px 100px rgba(0,0,0,.35);
+}
+.server-home-hero-copy h2{
+  font-size:56px!important;
+  letter-spacing:-.07em;
+}
+.server-home-columns{gap:16px}
+.server-home-card{
+  border-radius:21px;
+  padding:18px;
+}
+.metric{
+  border-radius:19px!important;
+  padding:16px!important;
+}
+
+/* Members become node cards */
+.server-member-grid{gap:10px}
+.server-member-card{
+  min-height:62px;
+  border-radius:15px;
+  background:linear-gradient(145deg,rgba(18,25,37,.65),rgba(7,12,19,.7));
+}
+.server-member-card:hover{
+  transform:translateY(-3px) scale(1.01);
+  box-shadow:0 20px 34px rgba(0,0,0,.22);
+}
+
+/* Call room — broadcast dome */
+.call-panel{
+  border-radius:30px!important;
+  background:
+    radial-gradient(circle at 50% 20%,color-mix(in srgb,var(--nexus-a) 7%,transparent),transparent 42%),
+    linear-gradient(180deg,rgba(5,10,16,.97),rgba(2,6,10,.98))!important;
+}
+.call-stage{
+  background:
+    radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--nexus-a) 7%,transparent),transparent 42%),
+    linear-gradient(rgba(255,255,255,.01) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.01) 1px,transparent 1px);
+  background-size:auto,42px 42px,42px 42px;
+}
+
+/* Panels */
+.members-panel,.thread-panel,.modal-card,.command-card{
+  border-radius:24px!important;
+  background:rgba(6,11,18,.92)!important;
+  border:1px solid rgba(255,255,255,.1)!important;
+  box-shadow:0 35px 90px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.04)!important;
+  backdrop-filter:blur(24px);
+}
+.command-palette{
+  background:radial-gradient(circle at 50% 45%,rgba(124,92,255,.12),transparent 32%),rgba(0,3,8,.72)!important;
+  backdrop-filter:blur(12px);
+}
+.command-card{
+  width:min(760px,92vw)!important;
+  padding:10px!important;
+}
+.command-search{
+  height:62px!important;
+  border-radius:17px!important;
+}
+.command-results{max-height:55vh}
+
+/* Profile identity */
+.profile-card-pro{
+  border-radius:25px;
+  overflow:hidden;
+}
+.profile-card-cover{height:140px}
+.profile-card-avatar{
+  width:94px;height:94px;
+  margin:-47px 0 0 20px;
+  border-radius:28px;
+}
+
+/* Status / details */
+.page-actions button,.hero-action,.head-action,.composer button{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.045);
+}
+.toast-stack{z-index:100000}
+.modal{backdrop-filter:blur(10px)}
+
+/* Mobile compression without killing the look */
+@media(max-width:1100px){
+  .app{grid-template-columns:82px 244px minmax(0,1fr);gap:9px;padding:9px}
+  .server-rail,.sidebar,.global-page,.chat{border-radius:22px}
+  .server-rail::before{width:58px}
+  .server-item,.rail-nav{width:44px}
+  .server-item{height:44px}
+  .rail-nav{height:44px}
+}
+@media(max-width:850px){
+  .app{grid-template-columns:72px minmax(0,1fr)}
+  .sidebar{position:absolute;left:0;top:0;bottom:0;width:270px;z-index:50;transform:translateX(-105%);transition:transform .24s ease}
+  .sidebar.open{transform:translateX(0)}
+}
+@media(max-width:650px){
+  .app{display:grid;grid-template-columns:64px minmax(0,1fr);padding:0;gap:0}
+  .server-rail{border-radius:0;border-left:0;border-top:0;border-bottom:0}
+  .content{gap:0}
+  .global-page,.chat{border-radius:0;border-left:0;border-right:0}
+  .global-page .page-head{padding:18px}
+  .global-page .page-body{padding:14px}
+  .server-home-hero{min-height:250px}
+  .server-home-hero-copy h2{font-size:34px!important}
+  .messages{padding:22px 14px 12px}
+  .composer{margin:8px 8px 10px}
+  .messages::after{display:none}
+}
+
+/* Reduced motion */
+body.reduced-motion::before,body.reduced-motion::after,
+body.reduced-motion .server-item.active::after,
+body.reduced-motion .chat::after{animation:none!important}
