@@ -1787,10 +1787,36 @@ body[data-avatar-motion="off"] .orbit-avatar-preview{animation:none!important}
 
 @media(max-width:700px){.avatar-frame-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 
-#me-avatar.orbit-frame-custom .orbit-custom-frame{
-  position:absolute;inset:-8px;width:calc(100% + 16px);height:calc(100% + 16px);
-  object-fit:contain;z-index:4;border:0!important;border-radius:0!important;
-  pointer-events:none;display:block;
+#me-avatar.orbit-frame-custom,
+.orbit-avatar-preview.orbit-frame-custom{
+  position:relative;
+  isolation:isolate;
+  overflow:visible;
+}
+#me-avatar.orbit-frame-custom .orbit-custom-frame,
+.orbit-avatar-preview.orbit-frame-custom .orbit-custom-frame{
+  position:absolute;
+  inset:-9%;
+  width:118%;
+  height:118%;
+  object-fit:contain;
+  object-position:center;
+  z-index:4;
+  border:0!important;
+  border-radius:0!important;
+  padding:0!important;
+  margin:0!important;
+  display:block;
+  pointer-events:none;
+}
+#me-avatar.orbit-frame-custom.has-image > img,
+.orbit-avatar-preview.orbit-frame-custom.has-image > img{
+  position:relative;
+  z-index:1;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  border-radius:inherit;
 }
 .avatar-frame-upload-card .frame-upload{
   border:1px dashed #8b7add;background:linear-gradient(135deg,#17132b,#111722);
