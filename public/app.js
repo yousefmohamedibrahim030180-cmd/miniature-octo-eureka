@@ -1613,8 +1613,9 @@ function renderProjectsPage(){
   document.querySelectorAll("[data-task]").forEach(b=>b.onclick=()=>{const t=tasks.find(x=>x.id===b.dataset.task);if(!t)return;t.status=next[t.status];writeLocalJson("orbit_projects_v1",tasks);renderProjectsPage()});
 }
 
-function renderFilesPage(){
-  const recent=readLocalJson("orbit_recent_files_v1",[]);
+async function renderFilesPage(){
+  let recent=readLocalJson("orbit_recent_files_v1",[]);
+  try{const serverFiles=await api("/api/files?limit=40");recent=serverFiles.files||recent;writeLocalJson("orbit_recent_files_v1",recent)}catch{}
   $("#page-actions").innerHTML='<button id="files-upload">Upload file</button><button id="files-chat">Open composer</button>';
   const rows=recent.map(f=>'<div class="os-file-row"><div class="os-file-icon">'+(String(f.type||"").startsWith("image/")?"IMG":(String(f.type||"").includes("pdf")?"PDF":"FILE"))+'</div><div><strong>'+escapeHtml(f.name||"file")+'</strong><span>'+escapeHtml(f.type||"file")+' · '+Math.max(0,Math.round(Number(f.size||0)/1024))+' KB</span></div><a href="/api/uploads/'+encodeURIComponent(f.id)+'" target="_blank" rel="noopener">Open</a></div>').join("");
   $("#page-body").innerHTML=
