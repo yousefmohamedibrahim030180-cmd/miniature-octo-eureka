@@ -1624,14 +1624,28 @@ function renderSettingsPage(section="appearance"){
     card.innerHTML='<h3>Profile</h3><p>Your username is your unique Orbit identity. Friends can find you with it.</p>'+
       '<div class="username-field"><span>@</span><input id="profile-username" value="'+escapeHtml(me?.username||"")+'" maxlength="20" placeholder="username"><button id="check-username" type="button">Check</button></div>'+
       '<div id="username-status" class="field-note">Use 4–20 letters, numbers, dots, underscores or dashes.</div>'+
+      '<div class="avatar-profile-editor">'+
+      '<div class="avatar-profile-preview"><div class="orbit-avatar-preview"><span>'+escapeHtml(avatar(me?.username||"G"))+'</span></div><div><strong>Animated avatar</strong><span>Your avatar now has a live effect across Orbit.</span></div></div>'+
+      '<div class="avatar-style-grid">'+
+      '<button type="button" class="avatar-style-card" data-avatar-style="aurora"><span class="style-preview style-aurora"></span><strong>Aurora</strong><small>Flowing color</small></button>'+
+      '<button type="button" class="avatar-style-card" data-avatar-style="neon"><span class="style-preview style-neon"></span><strong>Neon Pulse</strong><small>Cyber glow</small></button>'+
+      '<button type="button" class="avatar-style-card" data-avatar-style="energy"><span class="style-preview style-energy"></span><strong>Energy Ring</strong><small>Power wave</small></button>'+
+      '<button type="button" class="avatar-style-card" data-avatar-style="off"><span class="style-preview style-off"></span><strong>Static</strong><small>No animation</small></button>'+
+      '</div></div>'+
       '<input id="profile-name" value="'+escapeHtml(orbitUI.profile.displayName||me?.display_name||me?.username||"Guest")+'" placeholder="Display name">'+
       '<textarea id="profile-bio" placeholder="Bio">'+escapeHtml(orbitUI.profile.bio||"")+'</textarea>'+
       '<select id="profile-status"><option>Online</option><option>Idle</option><option>Do Not Disturb</option><option>Invisible</option></select>'+
-      '<div class="setting-row avatar-motion-setting"><div><strong>Animated avatar</strong><span>Give your Orbit avatar a live visual effect.</span></div><select id="avatar-motion"><option value="aurora">Aurora</option><option value="neon">Neon Pulse</option><option value="energy">Energy Ring</option><option value="off">Static</option></select></div>'+
       '<button class="primary" id="save-profile">Save profile</button>';
     $("#profile-status").value=orbitUI.profile.status||"Online";
-    $("#avatar-motion").value=orbitUI.profile.avatarMotion||"aurora";
-    $("#avatar-motion").onchange=e=>{orbitUI.profile.avatarMotion=e.target.value;applyAvatarMotion();};
+    const avatarMotion=orbitUI.profile.avatarMotion||"aurora";
+    document.querySelectorAll("[data-avatar-style]").forEach(b=>{
+      b.classList.toggle("active",b.dataset.avatarStyle===avatarMotion);
+      b.onclick=()=>{
+        orbitUI.profile.avatarMotion=b.dataset.avatarStyle;
+        applyAvatarMotion();
+        document.querySelectorAll("[data-avatar-style]").forEach(x=>x.classList.toggle("active",x===b));
+      };
+    });
     $("#check-username").onclick=async()=>{try{const name=$("#profile-username").value.trim();if(!name)return;const r=await api("/api/search?q="+encodeURIComponent(name));const exact=(r.users||[]).find(u=>u.username.toLowerCase()===name.replace(/^@/,"").toLowerCase()&&String(u.id)!==String(me?.id));$("#username-status").textContent=exact?"Username is taken.":"Username looks available.";$("#username-status").classList.toggle("is-good",!exact);$("#username-status").classList.toggle("is-bad",!!exact)}catch{}};
     $("#save-profile").onclick=async()=>{try{
       const username=$("#profile-username").value.trim().replace(/^@+/,"").toLowerCase();
