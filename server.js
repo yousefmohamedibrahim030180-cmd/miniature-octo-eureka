@@ -830,6 +830,18 @@ io.on("connection", socket => {
     });
   });
 
+  socket.on("call:decline", ({ channelId, callerSocketId }) => {
+    const channel = memory.channels.get(String(channelId));
+    if (!channel || !member(channel.serverId, socket.user.id)) return;
+    const caller = io.sockets.sockets.get(String(callerSocketId));
+    if (caller) {
+      caller.emit("call:declined", {
+        userId: socket.user.id,
+        username: socket.user.username
+      });
+    }
+  });
+
   socket.on("dm:join", dmId => {
     const dm = memory.dms.get(String(dmId));
     if (!dm || !dm.members.includes(String(socket.user.id))) return;
