@@ -1,7 +1,7 @@
 const $=s=>document.querySelector(s);
 let token=localStorage.getItem("orbit_guest_token")||"";
-const serverId=new URLSearchParams(location.search).get("server")||"";
-const adminSessionKey="orbit_admin_token_"+serverId;
+let serverId=new URLSearchParams(location.search).get("server")||"";
+let adminSessionKey=serverId?"orbit_admin_token_"+serverId:"";
 let adminToken=sessionStorage.getItem(adminSessionKey)||"";
 let state=null,activeTab="overview",refreshTimer=null;
 
@@ -154,5 +154,18 @@ $("#admin-login-form").addEventListener("submit",async e=>{
 $("#toggle-key").onclick=()=>{const i=$("#admin-key-input");const visible=i.type==="text";i.type=visible?"password":"text";$("#toggle-key").textContent=visible?"Show":"Hide";};
 $("#logout-btn").onclick=()=>lockAdmin();
 
-async function boot(){await validateSession();}
+async function boot(){
+  if(!token)return showDenied("Open Orbit first so your admin session can be loaded.");
+  if(!serverId){
+    try{
+      const data=await api("/api/servers");
+      const allowed=(data.servers||[]).find(s=>["owner","admin","moderator"].includes(String(s.role||"")));
+      if(!allowed)return showDenied("No server with admin permissions was found.");
+      serverId=String(allowed.id);
+      adminSessionKey="orbit_admin_token_"+serverId;
+      history.replaceState(null,"","/admin.html?server="+encodeURIComponent(serverId));
+    }catch(err){return showDenied(err.message||"Unable to find your admin server.");}
+  }
+  await validateSession();
+}
 boot().catch(e=>showDenied(e.message));
