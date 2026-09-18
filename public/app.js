@@ -123,13 +123,23 @@ function connectRealtime() {
   socket.on("presence:update", x => {
     document.querySelectorAll("[data-user='" + x.userId + "'] .presence").forEach(n => n.textContent = x.status);
   });
+  socket.on("friend:request", payload => {
+    orbitToast("New friend request", (payload?.request?.fromUser?.username || "Someone") + " wants to connect.", "success");
+    if (orbitUI.view === "friends") renderFriendsPage();
+  });
+  socket.on("friend:accepted", payload => {
+    orbitToast("Friend added", (payload?.friend?.username || "A request") + " accepted the connection.", "success");
+    if (orbitUI.view === "friends") renderFriendsPage();
+  });
+
 
   socket.on("call:incoming", call => {
-    if (callState.active) return;
+    if (callState.active || String(call.userId) === String(me?.id)) return;
     pendingIncomingCall = call;
     const box = $("#incoming-call");
+    const incomingChannel = channels.find(c => String(c.id) === String(call.channelId));
     $("#incoming-title").textContent = (call.username || "Guest") + " is calling";
-    $("#incoming-subtitle").textContent = (call.mode === "voice" ? "Voice call" : "Video call") + " in #" + (currentChannel?.name || "channel");
+    $("#incoming-subtitle").textContent = (call.mode === "voice" ? "Voice call" : "Video call") + " · " + (incomingChannel ? "#" + incomingChannel.name : "Orbit room");
     $("#incoming-avatar").textContent = avatar(call.username || "G");
     box.classList.remove("hidden");
   });
@@ -139,8 +149,9 @@ function connectRealtime() {
     updateCallMeta();
   });
 
-  socket.on("call:participant-joined", p => {
+  socket.on("call:participant-joined", async p => {
     addRemoteTile(p.socketId, p);
+    try { await ensurePeer(p.socketId, false, p); } catch (err) { console.error("peer setup", err); }
     updateCallMeta();
   });
 
@@ -384,29 +395,46 @@ async function loadRealtimeConfig() {
   return realtimeConfigPromise;
 }
 
+async function waitForSocket(timeout=5000) {
+  if (socket?.connected) return true;
+  if (!socket) throw new Error("Realtime connection is not ready yet.");
+  await new Promise((resolve, reject) => {
+    let done=false;
+    const finish=(ok,err)=>{if(done)return;done=true;clearTimeout(timer);socket.off("connect",onConnect);socket.off("connect_error",onError);ok?resolve():reject(err||new Error("Realtime connection failed."));};
+    const onConnect=()=>finish(true);
+    const onError=err=>finish(false,err instanceof Error?err:new Error("Realtime connection failed."));
+    const timer=setTimeout(()=>finish(false,new Error("Realtime connection timed out. Refresh Orbit and try again.")),timeout);
+    socket.once("connect",onConnect);
+    socket.once("connect_error",onError);
+  });
+  return true;
+}
+
 async function startCall(mode = "video") {
   if (!currentChannel) return;
   if (!navigator.mediaDevices?.getUserMedia) {
-    return showError("Your browser does not expose camera/microphone APIs here. Use HTTPS and allow permissions.");
+    return showError("Camera and microphone access is unavailable here. Open Orbit over HTTPS and allow microphone/camera access.");
   }
 
   if (callState.active) {
-    if (callState.roomId === currentChannel.id) return;
+    if (String(callState.roomId) === String(currentChannel.id)) return;
     leaveCall();
   }
 
   callState.mode = mode;
   callState.roomId = currentChannel.id;
   callStartedAt = Date.now();
-
   callState.active = true;
   $("#call-panel").classList.remove("hidden");
+  $("#call-panel").classList.remove("minimized");
   $("#call-title").textContent = currentChannel.name;
-  $("#call-subtitle").textContent = mode === "voice" ? "Voice room" : "Video room";
+  $("#call-subtitle").textContent = mode === "voice" ? "Voice room · live audio" : "Video room · live audio & video";
   document.body.classList.add("call-open");
 
   try {
+    await waitForSocket();
     await loadRealtimeConfig();
+    socket.emit("channel:join", currentChannel.id);
     await setupLocalMedia(mode);
     ensureSelfTile();
     socket.emit("call:join", { channelId: callState.roomId, mode });
@@ -415,6 +443,7 @@ async function startCall(mode = "video") {
     startCallTelemetry();
     updateVoiceDock();
     updateCallMeta();
+    orbitCallSounds?.join?.();
   } catch (err) {
     leaveCall();
     showError(err.name === "NotAllowedError" ? "Permission denied. Allow your camera/microphone in the browser." : err.message);
@@ -913,10 +942,21 @@ function closeIncomingCall() {
 $("#incoming-accept").onclick = async () => {
   const pending = pendingIncomingCall;
   closeIncomingCall();
-  if (!pending || !currentChannel || String(currentChannel.id) !== String(pending.channelId)) {
-    return showError("Open the calling channel and try again.");
+  if (!pending) return;
+  try {
+    if (pending.serverId) {
+      const targetServer = servers.find(s => String(s.id) === String(pending.serverId));
+      if (targetServer && String(currentServer?.id) !== String(targetServer.id)) await selectServer(targetServer);
+    }
+    const targetChannel = channels.find(c => String(c.id) === String(pending.channelId));
+    if (!targetChannel) return showError("The calling room is no longer available.");
+    if (String(currentChannel?.id) !== String(targetChannel.id) || currentChannel?.type !== targetChannel.type) {
+      await selectChannel(targetChannel);
+    }
+    if (!callState.active) await startCall(pending.mode || "video");
+  } catch (err) {
+    showError(err.message || "Unable to join the call.");
   }
-  await startCall(pending.mode || "video");
 };
 $("#incoming-decline").onclick = () => {
   const pending = pendingIncomingCall;
@@ -1089,7 +1129,7 @@ async function openDM(idValue){
 async function renderFriendsPage(){
   $("#page-actions").innerHTML='<button id="add-friend-page">+ Add friend</button><button id="refresh-friends-page">Refresh</button>';
   $("#page-body").innerHTML='<div class="content-card"><h4>Loading friends…</h4></div>';
-  $("#add-friend-page").onclick=()=>openModal("Add friend",'<input id="friend-target" placeholder="Exact guest username"><button class="primary" id="friend-create">Send request</button>');
+  $("#add-friend-page").onclick=()=>openModal("Add friend",'<p class="hint">Search the live guest directory, then send a real request.</p><input id="friend-target" list="friend-user-options" placeholder="Search username" autocomplete="off"><datalist id="friend-user-options"></datalist><div id="friend-search-results" class="list-card compact-picker"></div><button class="primary" id="friend-create">Send request</button>');
   $("#refresh-friends-page").onclick=renderFriendsPage;
   try{
     const d=await api("/api/friends");
@@ -1098,9 +1138,29 @@ async function renderFriendsPage(){
       (d.friends.length?d.friends.map(u=>'<div class="list-row"><div class="avatar">'+avatar(u.username)+'</div><div><strong>'+escapeHtml(u.username)+'</strong><span>'+escapeHtml(u.status)+'</span></div><button data-dm-friend="'+escapeHtml(u.username)+'">Message</button></div>').join(""):'<div class="content-card"><h4>No friends yet</h4><p>Send a request to another guest.</p></div>')+
       '</div></div>'+
       '<div class="section-block"><div class="section-heading"><h3>Requests</h3><span>'+d.incoming.length+' incoming</span></div><div class="list-card">'+
-      d.incoming.map(r=>'<div class="list-row"><div class="avatar">'+avatar(r.fromUser?.username)+'</div><div><strong>'+escapeHtml(r.fromUser?.username||"Guest")+'</strong><span>Friend request</span></div><button data-accept="'+r.id+'">Accept</button></div>').join("")+
+      d.incoming.map(r=>'<div class="list-row"><div class="avatar">'+avatar(r.fromUser?.username)+'</div><div><strong>'+escapeHtml(r.fromUser?.username||"Guest")+'</strong><span>Friend request · incoming</span></div><div class="row-actions"><button data-accept="'+r.id+'">Accept</button><button data-reject="'+r.id+'">Decline</button></div></div>').join("")+
+      '</div></div>'+
+      '<div class="section-block"><div class="section-heading"><h3>Outgoing</h3><span>'+d.outgoing.length+' pending</span></div><div class="list-card">'+
+      (d.outgoing.length?d.outgoing.map(r=>'<div class="list-row"><div class="avatar">'+avatar(r.toUser?.username)+'</div><div><strong>'+escapeHtml(r.toUser?.username||"Guest")+'</strong><span>Friend request · waiting</span></div><span class="chip">Pending</span></div>').join(""):'<div class="content-card"><p>No pending outgoing requests.</p></div>')+
       '</div></div>';
     document.querySelectorAll("[data-accept]").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request/"+encodeURIComponent(b.dataset.accept)+"/accept",{method:"POST",body:"{}"});orbitToast("Friend added","Request accepted.","success");renderFriendsPage()}catch(err){orbitToast("Request failed",err.message,"error")}});
+    document.querySelectorAll("[data-reject]").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request/"+encodeURIComponent(b.dataset.reject)+"/reject",{method:"POST",body:"{}"});orbitToast("Request declined","The request was rejected.","");renderFriendsPage()}catch(err){orbitToast("Request failed",err.message,"error")}});
+    const friendSearch=$("#friend-target");
+    if(friendSearch){
+      const loadFriendSuggestions=async()=>{
+        const q=friendSearch.value.trim();
+        if(q.length<1)return;
+        try{
+          const found=await api("/api/search?q="+encodeURIComponent(q));
+          const users=(found.users||[]).filter(u=>String(u.id)!==String(me?.id)).slice(0,8);
+          const options=$("#friend-user-options"), results=$("#friend-search-results");
+          if(options)options.innerHTML=users.map(u=>'<option value="'+escapeHtml(u.username)+'">').join("");
+          if(results)results.innerHTML=users.length?users.map(u=>'<button type="button" class="list-row friend-pick" data-friend-name="'+escapeHtml(u.username)+'"><div class="avatar">'+avatar(u.username)+'</div><div><strong>'+escapeHtml(u.username)+'</strong><span>'+escapeHtml(u.status)+' · guest</span></div><span>Use</span></button>').join(""):'<div class="content-card"><p>No matching live guest.</p></div>';
+          document.querySelectorAll("[data-friend-name]").forEach(btn=>btn.onclick=()=>{friendSearch.value=btn.dataset.friendName;});
+        }catch(err){orbitToast("Search failed",err.message,"error")}
+      };
+      friendSearch.oninput=loadFriendSuggestions;
+    }
     document.querySelectorAll("[data-dm-friend]").forEach(b=>b.onclick=async()=>{try{await api("/api/dms",{method:"POST",body:JSON.stringify({username:b.dataset.dmFriend})});setView("dms");renderDMPage()}catch(err){orbitToast("DM failed",err.message,"error")}});
   }catch(e){$("#page-body").innerHTML='<div class="content-card"><h4>Could not load friends</h4><p>'+escapeHtml(e.message)+'</p></div>'}
 }
@@ -1137,6 +1197,23 @@ function renderExplorePage(){
   $("#explore-file-btn").onclick=()=>{goChat();$("#attach").click()};
 }
 
+const ORBIT_ACCENTS = {
+  purple: { accent: "#7652e8", accent2: "#a184ff" },
+  ocean: { accent: "#3278e8", accent2: "#5aa8ff" },
+  cyan: { accent: "#159fa8", accent2: "#45d6de" },
+  emerald: { accent: "#1e9a68", accent2: "#5ce0a6" },
+  rose: { accent: "#c74e78", accent2: "#f18cae" },
+  amber: { accent: "#b77a21", accent2: "#f0bb59" }
+};
+function applyAccentTheme(nameOrHex){
+  let theme=ORBIT_ACCENTS[nameOrHex] || Object.values(ORBIT_ACCENTS).find(v=>v.accent===nameOrHex) || ORBIT_ACCENTS.purple;
+  const name=Object.keys(ORBIT_ACCENTS).find(k=>ORBIT_ACCENTS[k]===theme) || "purple";
+  document.documentElement.style.setProperty("--accent",theme.accent);
+  document.documentElement.style.setProperty("--accent2",theme.accent2);
+  localStorage.setItem("orbit_theme",name);
+  if(orbitUI?.profile){orbitUI.profile.accent=theme.accent;localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));}
+  document.querySelectorAll("[data-accent-theme]").forEach(b=>b.classList.toggle("active",b.dataset.accentTheme===name));
+}
 function renderSettingsPage(section="appearance"){
   const sections=[["appearance","Appearance"],["profile","Profile"],["privacy","Privacy"],["voice","Voice & Video"],["notifications","Notifications"],["accessibility","Accessibility"],["performance","Performance"],["security","Security"],["advanced","Advanced"]];
   $("#page-actions").innerHTML="";
@@ -1148,8 +1225,11 @@ function renderSettingsPage(section="appearance"){
     card.innerHTML='<h3>Appearance</h3><p>Customize Orbit without affecting your data.</p>'+
       setting("Reduced motion","Reduce transitions and animation.",reduced,"appearance-motion")+
       setting("Compact density","Tighter chat and navigation spacing.",compact,"appearance-density")+
-      '<div class="setting-row"><div><strong>Accent</strong><span>Current '+escapeHtml(orbitUI.profile.accent)+'</span></div><input id="accent-color" type="color" value="'+escapeHtml(orbitUI.profile.accent)+'" style="width:42px;height:30px"></div>';
-    $("#accent-color").onchange=e=>{orbitUI.profile.accent=e.target.value;document.documentElement.style.setProperty("--accent",e.target.value);localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile))};
+      '<div class="setting-row"><div><strong>Theme color</strong><span>Choose an Orbit accent.</span></div></div>'+
+      '<div class="accent-palette">'+Object.entries(ORBIT_ACCENTS).map(([name,t])=>'<button type="button" class="accent-swatch '+((localStorage.getItem("orbit_theme")||"purple")===name?"active":"")+'" data-accent-theme="'+name+'" style="--swatch:'+t.accent+'"><span></span><strong>'+name+'</strong></button>').join("")+'</div>'+
+      '<div class="setting-row"><div><strong>Custom color</strong><span>For a custom accent.</span></div><input id="accent-color" type="color" value="'+escapeHtml(orbitUI.profile.accent)+'" style="width:42px;height:30px"></div>';
+    $("#accent-color").onchange=e=>{document.documentElement.style.setProperty("--accent",e.target.value);document.documentElement.style.setProperty("--accent2",e.target.value);orbitUI.profile.accent=e.target.value;localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));document.querySelectorAll("[data-accent-theme]").forEach(b=>b.classList.remove("active"));};
+    document.querySelectorAll("[data-accent-theme]").forEach(b=>b.onclick=()=>applyAccentTheme(b.dataset.accentTheme));
   }else if(section==="profile"){
     card.innerHTML='<h3>Profile</h3><p>Guest mode keeps signup optional while allowing local customization.</p><input id="profile-name" value="'+escapeHtml(orbitUI.profile.displayName||me?.username||"Guest")+'" placeholder="Display name"><textarea id="profile-bio" placeholder="Bio">'+escapeHtml(orbitUI.profile.bio||"")+'</textarea><select id="profile-status"><option>Online</option><option>Idle</option><option>Do Not Disturb</option><option>Invisible</option></select><button class="primary" id="save-profile">Save profile</button>';
     $("#profile-status").value=orbitUI.profile.status||"Online";
@@ -1278,7 +1358,7 @@ function bindPremiumNavigation(){
       try{await api("/api/invites/"+encodeURIComponent(code)+"/accept",{method:"POST",body:"{}"});closeModal();await loadServers();orbitToast("Joined community","Server added to your workspace.","success")}catch(err){orbitToast("Invite failed",err.message,"error")}
     }
     if(e.target.id==="dm-create"){try{await api("/api/dms",{method:"POST",body:JSON.stringify({username:$("#dm-target").value.trim()})});closeModal();renderDMPage();orbitToast("DM created","Conversation is ready.","success")}catch(err){orbitToast("DM failed",err.message,"error")}}
-    if(e.target.id==="friend-create"){try{await api("/api/friends/request",{method:"POST",body:JSON.stringify({username:$("#friend-target").value.trim()})});closeModal();orbitToast("Friend request sent","Waiting for acceptance.","success")}catch(err){orbitToast("Friend request failed",err.message,"error")}}
+    if(e.target.id==="friend-create"){try{const username=$("#friend-target").value.trim();if(!username)return orbitToast("Add friend","Choose a username first.","error");await api("/api/friends/request",{method:"POST",body:JSON.stringify({username})});closeModal();orbitToast("Friend request sent",username+" will see it in their live inbox.","success")}catch(err){orbitToast("Friend request failed",err.message,"error")}}
     if(e.target.id==="publish-poll"){
       const options=["#poll-a","#poll-b","#poll-c"].map(s=>$(s)?.value.trim()).filter(Boolean);
       try{const d=await api("/api/channels/"+currentChannel.id+"/polls",{method:"POST",body:JSON.stringify({question:$("#poll-q").value.trim(),options})});closeModal();orbitToast("Poll published","Vote collection is live.","success");renderPoll(d.poll)}catch(err){orbitToast("Poll failed",err.message,"error")}
@@ -1402,6 +1482,8 @@ document.addEventListener("click",async e=>{
 bindPremiumNavigation();
 wireEnhancedControls();
 updateVoiceDock();
+
+applyAccentTheme(localStorage.getItem("orbit_theme")||"purple");
 
 (async()=>{
   try{
