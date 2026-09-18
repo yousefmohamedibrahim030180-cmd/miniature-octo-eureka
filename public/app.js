@@ -900,6 +900,8 @@ function setView(view){
 function goChat(){
   setView("chat");
   document.querySelectorAll(".rail-nav[data-view]").forEach(b=>b.classList.remove("active"));
+  document.body.classList.remove("mobile-sidebar-open");
+  $("#sidebar")?.classList.remove("open");
 }
 
 function renderHomePage(){
@@ -1107,7 +1109,17 @@ async function runGlobalSearch(q){
 }
 
 function bindPremiumNavigation(){
-  document.querySelectorAll(".rail-nav[data-view]").forEach(b=>b.onclick=()=>setView(b.dataset.view));
+  document.querySelectorAll(".rail-nav[data-view]").forEach(b=>b.onclick=()=>{
+    setView(b.dataset.view);
+    document.body.classList.remove("mobile-sidebar-open");
+    $("#sidebar")?.classList.remove("open");
+  });
+  $("#mobile-sidebar-btn")?.addEventListener("click",()=>{
+    const sidebar=$("#sidebar");
+    if(!sidebar)return;
+    sidebar.classList.toggle("open");
+    document.body.classList.toggle("mobile-sidebar-open",sidebar.classList.contains("open"));
+  });
   $("#settings-nav")?.addEventListener("click",()=>setView("settings"));
   $("#profile-card-btn")?.addEventListener("click",()=>{setView("settings");renderSettingsPage("profile")});
   $("#sidebar-search")?.addEventListener("click",openCommandPalette);
