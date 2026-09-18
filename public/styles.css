@@ -804,3 +804,63 @@ body{
   .share-screen-btn .share-label{display:none}
   .share-screen-btn{width:42px;padding:0}
 }
+
+
+/* Friend request modal redesign */
+.friend-modal{display:grid;gap:12px}
+.friend-hero{
+  display:flex;align-items:center;gap:12px;padding:14px;
+  border:1px solid #27313e;border-radius:14px;
+  background:linear-gradient(145deg,#141b25,#0f151d);
+}
+.friend-icon{
+  width:42px;height:42px;display:grid;place-items:center;border-radius:12px;
+  background:linear-gradient(135deg,var(--accent2),var(--accent));
+  color:#fff;font-size:19px;font-weight:800;
+  box-shadow:0 10px 24px color-mix(in srgb,var(--accent) 26%,transparent);
+}
+.friend-hero strong{display:block;font-size:12px;color:#f1f4f8}
+.friend-hero span{display:block;margin-top:3px;font-size:9px;line-height:1.5;color:#7f8a9c}
+.friend-search-box{
+  height:48px;display:flex;align-items:center;gap:9px;padding:0 11px;
+  border:1px solid #2c3745;border-radius:12px;background:#0c1219;
+  box-shadow:inset 0 1px rgba(255,255,255,.02);
+}
+.friend-search-box:focus-within{
+  border-color:color-mix(in srgb,var(--accent) 62%,#2c3745);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 11%,transparent);
+}
+.friend-search-box>span{color:#8591a3;font-size:15px}
+.friend-search-box input{
+  flex:1!important;width:auto!important;margin:0!important;min-height:0!important;
+  padding:0!important;border:0!important;background:transparent!important;outline:0!important;
+  font-size:11px!important;color:#eef2f7!important;
+}
+.friend-search-box kbd{
+  padding:4px 6px;border:1px solid #293440;border-radius:6px;
+  color:#7e8a9d;background:#121923;font-size:7px;
+}
+.friend-results{
+  min-height:96px;max-height:220px;overflow:auto;
+  border:1px solid #27313e;border-radius:13px;background:#0d131a;
+}
+.friend-results .friend-empty{
+  min-height:96px;display:grid;place-items:center;padding:18px;
+  text-align:center;color:#6f7b8e;font-size:9px;
+}
+.friend-results .friend-pick{
+  width:100%;border:0;border-bottom:1px solid #202a35;cursor:pointer;
+  background:transparent!important;padding:10px 12px!important;
+}
+.friend-results .friend-pick:last-child{border-bottom:0}
+.friend-results .friend-pick:hover,
+.friend-results .friend-pick.selected{background:#151e29!important}
+.friend-results .friend-pick>span:last-child{
+  margin-left:auto;padding:5px 8px;border-radius:7px;
+  border:1px solid #2b3745;background:#141c26;color:#9ca8b9;font-size:8px;
+}
+.friend-send-btn{
+  height:44px!important;margin-top:1px!important;border-radius:11px!important;
+  font-size:10px!important;font-weight:700;
+}
+.friend-send-btn:disabled{opacity:.42;cursor:not-allowed;filter:saturate(.5)}
