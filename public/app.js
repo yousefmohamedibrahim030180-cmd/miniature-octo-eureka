@@ -391,8 +391,9 @@ async function selectChannel(channel) {
 function appendMessage(m) {
   const el = document.createElement("article");
   el.className = "message";
+  rememberAvatarUser(knownAvatarUsers.get(String(m.user_id))||{id:m.user_id,username:m.username});
   el.innerHTML =
-    '<div class="avatar">' + escapeHtml(avatar(m.username)) + '</div>' +
+    avatarHtml(knownAvatarUsers.get(String(m.user_id))||{id:m.user_id,username:m.username}) +
     '<div><div class="msg-head"><strong>' + escapeHtml(m.username) + '</strong><time>' +
     fmt(m.created_at) + '</time></div><div class="msg-body">' + escapeHtml(m.content) + "</div></div>";
   $("#messages").appendChild(el);
@@ -1388,7 +1389,7 @@ function saveDMDraft(){
 function dmMessageMarkup(m){
   const own=String(m.user_id)===String(me?.id);
   return '<article class="dm-message '+(own?"own":"")+'" data-dm-message-id="'+escapeHtml(m.id)+'">'+
-    (!own?'<div class="dm-message-avatar">'+escapeHtml(avatar(m.username))+'</div>':"")+
+    (!own?'<div class="dm-message-avatar">'+avatarHtml(knownAvatarUsers.get(String(m.user_id))||{id:m.user_id,username:m.username})+'</div>':"")+
     '<div class="dm-message-stack"><div class="dm-message-bubble">'+escapeHtml(m.content)+'</div>'+
     '<div class="dm-message-meta">'+escapeHtml(formatDMTime(m.created_at))+(own&&m.seen_at?' · Seen':"")+(m.edited_at?' · edited':"")+'</div></div></article>';
 }
@@ -2079,12 +2080,13 @@ async function openThread(el){
     $("#thread-panel").classList.remove("hidden");$("#thread-panel").dataset.messageId=idValue;
     $("#thread-root").innerHTML='<div class="content-card"><strong>'+escapeHtml(el.querySelector(".msg-head strong")?.textContent||"Message")+'</strong><p>'+escapeHtml(el.querySelector(".msg-body")?.textContent||"")+'</p></div>';
     $("#thread-meta").textContent=(d.thread.replies?.length||0)+" replies";
-    $("#thread-messages").innerHTML=(d.thread.replies||[]).map(r=>'<div class="message">'+avatarHtml(knownAvatarUsers.get(String(r.user_id))||{id:r.user_id,username:r.username})+<div><div class="msg-head"><strong>'+escapeHtml(r.username)+'</strong><time>now</time></div><div class="msg-body">'+escapeHtml(r.content)+'</div></div></div>').join("");
+    rememberAvatarUsers(d.thread.replies||[]);
+    $("#thread-messages").innerHTML=(d.thread.replies||[]).map(r=>'<div class="message">'+avatarHtml(knownAvatarUsers.get(String(r.user_id))||{id:r.user_id,username:r.username})+'<div><div class="msg-head"><strong>'+escapeHtml(r.username)+'</strong><time>now</time></div><div class="msg-body">'+escapeHtml(r.content)+'</div></div></div>').join("");
   }catch(e){orbitToast("Thread failed",e.message,"error")}
 }
 $("#thread-composer")?.addEventListener("submit",async e=>{
   e.preventDefault();const idValue=$("#thread-panel").dataset.messageId,content=$("#thread-input").value.trim();if(!idValue||!content)return;
-  try{const d=await api("/api/messages/"+encodeURIComponent(idValue)+"/thread",{method:"POST",body:JSON.stringify({content})});const r=d.reply;$("#thread-messages").insertAdjacentHTML("beforeend",'<div class="message">'+avatarHtml(knownAvatarUsers.get(String(r.user_id))||{id:r.user_id,username:r.username})+<div><div class="msg-head"><strong>'+escapeHtml(r.username)+'</strong><time>now</time></div><div class="msg-body">'+escapeHtml(r.content)+'</div></div></div>');$("#thread-input").value="";$("#thread-meta").textContent=(d.thread.replies?.length||0)+" replies"}catch(err){orbitToast("Reply failed",err.message,"error")}
+  try{const d=await api("/api/messages/"+encodeURIComponent(idValue)+"/thread",{method:"POST",body:JSON.stringify({content})});const r=d.reply;$("#thread-messages").insertAdjacentHTML("beforeend",'<div class="message">'+avatarHtml(knownAvatarUsers.get(String(r.user_id))||{id:r.user_id,username:r.username})+'<div><div class="msg-head"><strong>'+escapeHtml(r.username)+'</strong><time>now</time></div><div class="msg-body">'+escapeHtml(r.content)+'</div></div></div>');$("#thread-input").value="";$("#thread-meta").textContent=(d.thread.replies?.length||0)+" replies"}catch(err){orbitToast("Reply failed",err.message,"error")}
 });
 function openMessageMore(el){
   openModal("Message actions",'<div class="list-card"><button class="list-row" id="msg-edit-action"><span>✎ Edit message</span></button><button class="list-row" id="msg-delete-action"><span>× Delete message</span></button></div>');
