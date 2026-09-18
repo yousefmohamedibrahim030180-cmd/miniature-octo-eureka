@@ -41,6 +41,23 @@ function cleanName(value, fallback = "Guest") {
   const name = String(value || "").trim().replace(/\s+/g, " ").slice(0, 24);
   return name || fallback;
 }
+function cleanUsername(value, fallback = "") {
+  let name = String(value || "").trim().toLowerCase().replace(/^@+/, "").replace(/\s+/g, "-").replace(/[^a-z0-9._-]/g, "").replace(/[-_.]{2,}/g, "-").slice(0, 20);
+  if (name.length < 4) name = fallback;
+  return name;
+}
+function uniqueUsername(requested, ignoreUserId = null) {
+  const base = cleanUsername(requested, "orbit");
+  const used = new Set([...memory.users.values()]
+    .filter(u => !ignoreUserId || String(u.id) !== String(ignoreUserId))
+    .map(u => String(u.username || "").toLowerCase()));
+  if (!used.has(base.toLowerCase())) return base;
+  for (let i = 2; i < 10000; i++) {
+    const candidate = (base.slice(0, Math.max(1, 20 - String(i).length - 1)) + "-" + i).replace(/-+$/,"");
+    if (!used.has(candidate.toLowerCase())) return candidate;
+  }
+  return base + "-" + Math.random().toString(36).slice(2, 6);
+}
 function tokenFor(user) {
   return jwt.sign(
     { id: user.id, username: user.username, guest: true },
@@ -114,6 +131,8 @@ function publicUser(user) {
   return {
     id: user.id,
     username: user.username,
+    handle: "@" + user.username,
+    display_name: user.displayName || user.username,
     avatar_url: null,
     status: user.status || "online",
     guest: true
@@ -121,13 +140,21 @@ function publicUser(user) {
 }
 function createGuest(username, existingId) {
   const userId = existingId && memory.users.has(existingId) ? existingId : id("guest");
-  const user = memory.users.get(userId) || {
+  const existing = memory.users.get(userId);
+  const requested = cleanUsername(username, existing?.username || ("orbit-" + Math.random().toString(36).slice(2, 7)));
+  const user = existing || {
     id: userId,
-    username: cleanName(username, "Guest-" + Math.random().toString(36).slice(2, 6).toUpperCase()),
+    username: uniqueUsername(requested),
+    displayName: cleanName(username, requested),
     status: "online",
     createdAt: now()
   };
-  user.username = cleanName(username, user.username);
+  if (!existing) {
+    user.username = uniqueUsername(requested, user.id);
+  } else if (!user.username) {
+    user.username = uniqueUsername(requested, user.id);
+  }
+  user.displayName = user.displayName || cleanName(username, user.username);
   user.status = "online";
   memory.users.set(user.id, user);
   ensureDefaultServer(user);
@@ -189,7 +216,7 @@ app.get("/api/search", auth, (req, res) => {
   if (!q) return res.json({ users: [], servers: [], channels: [], messages: [] });
 
   const users = [...memory.users.values()]
-    .filter(u => u.username.toLowerCase().includes(q))
+    .filter(u => u.username.toLowerCase().includes(q) || String(u.displayName || "").toLowerCase().includes(q))
     .slice(0, 20)
     .map(publicUser);
 
@@ -264,7 +291,7 @@ app.get("/api/friends", auth, (req, res) => {
 });
 
 app.post("/api/friends/request", auth, (req, res) => {
-  const targetName = String(req.body?.username || "").trim().toLowerCase();
+  const targetName = cleanUsername(req.body?.username || "", "").toLowerCase();
   const target = [...memory.users.values()].find(u => u.username.toLowerCase() === targetName);
   if (!target) return res.status(404).json({ error: "User not found" });
   if (target.id === req.user.id) return res.status(400).json({ error: "You cannot add yourself" });
@@ -504,7 +531,19 @@ app.get("/api/realtime-config", auth, (req, res) => {
 });
 
 app.patch("/api/me", auth, (req, res) => {
-  req.user.username = cleanName(req.body?.username, req.user.username);
+  if (req.body?.username !== undefined) {
+    const desired = cleanUsername(req.body.username, req.user.username);
+    if (desired !== req.user.username) {
+      const available = uniqueUsername(desired, req.user.id);
+      if (available !== desired) {
+        return res.status(409).json({ error: "Username is already taken", suggested: available });
+      }
+      req.user.username = desired;
+    }
+  }
+  if (req.body?.displayName !== undefined) {
+    req.user.displayName = cleanName(req.body.displayName, req.user.username);
+  }
   res.json({ user: publicUser(req.user) });
 });
 
