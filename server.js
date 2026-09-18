@@ -297,7 +297,7 @@ function ensureDefaultServer(user) {
   } else {
     for (const s of memory.servers.values()) {
       serverSettings(s);
-      if (!s.members.has(user.id) && s.name === "Orbit Lobby") {
+      if (!s.members.has(user.id) && s.name === "Orbit Lobby" && !isServerBanned(s, user.id)) {
         s.members.set(user.id, "member");
       }
     }
