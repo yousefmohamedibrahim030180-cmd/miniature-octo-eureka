@@ -601,6 +601,7 @@ async function startCall(mode = "video") {
     startCallTelemetry();
     updateVoiceDock();
     updateCallMeta();
+    playUiTone("join");
   } catch (err) {
     leaveCall();
     showError(err.name === "NotAllowedError" ? "Permission denied. Allow your camera/microphone in the browser." : err.message);
@@ -772,6 +773,7 @@ function leaveCall() {
   updateVoiceDock();
   setCallIndicator("IDLE");
   updateCallMeta();
+  playUiTone("leave");
 }
 
 function startCallTelemetry() {
@@ -932,6 +934,7 @@ async function toggleScreenShare() {
       });
     }
     orbitToast("Screen sharing started", "Your screen is now being shared with the call.", "success");
+    playUiTone("share");
   } catch (err) {
     if (err.name !== "AbortError") showError("Screen sharing failed: " + (err.message || "permission denied"));
   }
@@ -951,6 +954,7 @@ async function stopScreenShare() {
   $("#dock-screen")?.classList.remove("active");
   if (socket && callState.roomId) socket.emit("call:media-state", { channelId: callState.roomId, muted: callState.micTrack ? !callState.micTrack.enabled : true, cameraOff: callState.cameraTrack ? !callState.cameraTrack.enabled : true, screenShare: false });
   orbitToast("Screen sharing stopped", "Your screen is no longer shared.", "");
+  playUiTone("click");
 }
 async function applyQuality(name, fps) {
   if (name) callState.settings.quality = name;
