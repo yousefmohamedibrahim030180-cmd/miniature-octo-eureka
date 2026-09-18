@@ -14,6 +14,12 @@ let unreadChannels = JSON.parse(localStorage.getItem("orbit_unread_channels") ||
 let callStartedAt = 0;
 let callDurationTimer = null;
 let callStatsTimer = null;
+const pulseState = {
+  users: [],
+  calls: [],
+  activity: [],
+  maxActivity: 14
+};
 
 const callState = {
   active: false,
@@ -131,8 +137,17 @@ function connectRealtime() {
     $("#typing").textContent = x.isTyping ? x.username + " is typing…" : "";
   });
   socket.on("presence:update", x => {
-    document.querySelectorAll("[data-user='" + x.userId + "'] .presence").forEach(n => n.textContent = x.status);
+    document.querySelectorAll("[data-user='" + x.userId + "'] .presence").forEach(n => n.textContent = x.status + (x.activity ? " · " + x.activity : ""));
+    const user=pulseState.users.find(u=>String(u.id)===String(x.userId))||{id:x.userId,username:x.username||"Guest"};
+    upsertPulseUser({...user,status:x.status,activity:x.activity||x.status},x.activity||x.status);
+    if(orbitUI.view==="home")renderPulse();
   });
+  socket.on("pulse:snapshot", data => {
+    pulseState.users=data?.users||[];
+    pulseState.calls=data?.calls||[];
+    if(orbitUI.view==="home")renderPulse();
+  });
+  socket.on("pulse:update", event => handlePulseEvent(event));
   socket.on("friend:request", payload => {
     orbitToast("New friend request", (payload?.request?.fromUser?.username || "Someone") + " wants to connect.", "success");
     if (orbitUI.view === "friends") renderFriendsPage();
@@ -1095,33 +1110,170 @@ function goChat(){
   $("#sidebar")?.classList.remove("open");
 }
 
+function upsertPulseUser(user, activity){
+  if(!user?.id)return;
+  const normalized={...user,activity:activity||user.activity||user.status||"Online"};
+  const i=pulseState.users.findIndex(x=>String(x.id)===String(normalized.id));
+  if(i===-1)pulseState.users.unshift(normalized);
+  else pulseState.users[i]={...pulseState.users[i],...normalized};
+}
+function addPulseActivity(item){
+  if(!item)return;
+  pulseState.activity.unshift(item);
+  pulseState.activity=pulseState.activity.slice(0,pulseState.maxActivity);
+}
+function handlePulseEvent(event){
+  if(!event)return;
+  const now=event.createdAt||new Date().toISOString();
+  if(event.user) upsertPulseUser(event.user,event.activity||event.user.activity);
+  if(event.type==="presence"){
+    if(event.user) upsertPulseUser(event.user,event.activity);
+  }else if(event.type==="call-start"){
+    const existing=pulseState.calls.find(c=>String(c.channelId)===String(event.channelId));
+    if(existing){
+      if(event.user && !existing.participants.some(p=>String(p.id)===String(event.user.id))) existing.participants.push(event.user);
+    }else{
+      pulseState.calls.unshift({
+        roomId:event.channelId,
+        channelId:event.channelId,
+        serverId:event.serverId,
+        channelName:event.channelName||"Voice room",
+        mode:event.mode||"video",
+        participants:event.user?[event.user]:[]
+      });
+    }
+    addPulseActivity({type:event.type,createdAt:now,user:event.user,channelName:event.channelName,mode:event.mode});
+  }else if(event.type==="call-end"){
+    const call=pulseState.calls.find(c=>String(c.channelId)===String(event.channelId));
+    if(call&&event.user){
+      call.participants=call.participants.filter(p=>String(p.id)!==String(event.user.id));
+      if(!call.participants.length)pulseState.calls=pulseState.calls.filter(c=>String(c.channelId)!==String(event.channelId));
+    }
+    addPulseActivity({type:event.type,createdAt:now,user:event.user,channelName:event.channelName});
+  }else if(event.type==="screen-share"){
+    addPulseActivity({type:event.type,createdAt:now,user:event.user,channelName:event.channelName});
+  }else if(event.type==="message"){
+    addPulseActivity({type:event.type,createdAt:now,user:event.user,channelName:event.channelName,preview:event.preview});
+  }
+  if(orbitUI.view==="home") renderPulse();
+}
+async function loadPulse(){
+  try{
+    const data=await api("/api/pulse");
+    pulseState.users=data.users||[];
+    pulseState.calls=data.calls||[];
+    if(!pulseState.activity.length){
+      pulseState.activity=[];
+      (pulseState.calls||[]).slice(0,6).forEach(c=>{
+        (c.participants||[]).forEach(u=>addPulseActivity({type:"call-start",createdAt:new Date().toISOString(),user:u,channelName:c.channelName,mode:c.mode}));
+      });
+    }
+  }catch{}
+  renderPulse();
+}
+function formatPulseTime(ts){
+  const d=ts?new Date(ts):new Date();
+  return d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
+}
+function pulseUserCard(user){
+  const activity=user.activity||user.status||"Online";
+  const activityClass=activity==="Offline"?"offline":activity.toLowerCase().includes("screen")?"screen":activity.toLowerCase().includes("call")||activity.toLowerCase().includes("voice")||activity.toLowerCase().includes("video")?"live":"online";
+  return '<button class="pulse-person" data-pulse-user="'+escapeHtml(user.id)+'">'+
+    '<div class="pulse-avatar-wrap"><div class="avatar">'+escapeHtml(avatar(user.username))+'</div><i class="'+activityClass+'"></i></div>'+
+    '<div class="pulse-person-copy"><strong>'+escapeHtml(user.display_name||user.username)+'</strong><span>'+escapeHtml(user.handle||("@"+user.username))+'</span></div>'+
+    '<em>'+escapeHtml(activity)+'</em>'+
+  '</button>';
+}
+function renderPulse(){
+  const panel=$("#pulse-panel");
+  if(!panel)return;
+  const liveUsers=pulseState.users.filter(u=>(u.status||"online")!=="offline");
+  const calls=pulseState.calls||[];
+  const activities=pulseState.activity||[];
+  const userMap=new Map(pulseState.users.map(u=>[String(u.id),u]));
+  panel.innerHTML=
+    '<div class="pulse-hero"><div><span class="eyebrow">ORBIT PULSE</span><h3>Everything alive, right now.</h3><p>Presence, calls, screen sharing and community activity update live.</p></div><div class="pulse-live-badge"><span></span>LIVE</div></div>'+
+    '<div class="pulse-grid">'+
+      '<section class="pulse-card pulse-people"><div class="pulse-card-head"><div><strong>Live now</strong><span>'+liveUsers.length+' online</span></div><button class="pulse-refresh" id="pulse-refresh">Refresh</button></div><div class="pulse-people-grid">'+
+        (liveUsers.length?liveUsers.slice(0,12).map(pulseUserCard).join(""):'<div class="pulse-empty">Nobody else is online yet.</div>')+
+      '</div></section>'+
+      '<section class="pulse-card pulse-calls"><div class="pulse-card-head"><div><strong>Live rooms</strong><span>'+calls.length+' active</span></div><span class="pulse-signal">● Realtime</span></div><div class="pulse-call-list">'+
+        (calls.length?calls.slice(0,6).map(c=>{
+          const names=(c.participants||[]).slice(0,3).map(p=>escapeHtml(p.username)).join(", ");
+          return '<button class="pulse-call-row" data-pulse-server="'+escapeHtml(c.serverId||"")+'" data-pulse-channel="'+escapeHtml(c.channelId||"")+'"><div class="pulse-call-icon">◉</div><div><strong>#'+escapeHtml(c.channelName||"room")+'</strong><span>'+escapeHtml(c.mode==="voice"?"Voice":"Video")+' · '+(c.participants?.length||0)+' people · '+names+'</span></div><b>Join →</b></button>';
+        }).join(""):'<div class="pulse-empty">No active calls. Start the room and invite someone.</div>')+
+      '</div></section>'+
+      '<section class="pulse-card pulse-activity"><div class="pulse-card-head"><div><strong>Activity</strong><span>Latest events</span></div><span class="pulse-signal">LIVE FEED</span></div><div class="pulse-activity-list">'+
+        (activities.length?activities.slice(0,8).map(item=>{
+          const u=item.user||{};
+          let text="Activity";
+          if(item.type==="message")text='sent a message in #'+(item.channelName||"channel");
+          if(item.type==="call-start")text='joined '+(item.mode==="voice"?"voice":"video")+' in #'+(item.channelName||"room");
+          if(item.type==="call-end")text='left #'+(item.channelName||"room");
+          if(item.type==="screen-share")text='started screen sharing in #'+(item.channelName||"room");
+          if(item.type==="presence")text='is '+(item.activity||u.status||"online").toLowerCase();
+          return '<button class="pulse-activity-row" data-pulse-user="'+escapeHtml(u.id||"")+'"><div class="avatar">'+escapeHtml(avatar(u.username||"G"))+'</div><div><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>'+escapeHtml(text)+(item.preview?' · '+escapeHtml(item.preview):"")+'</span></div><time>'+formatPulseTime(item.createdAt)+'</time></button>';
+        }).join(""):'<div class="pulse-empty">The feed will fill as people interact.</div>')+
+      '</div></section>'+
+    '</div>';
+  $("#pulse-refresh")?.addEventListener("click",loadPulse);
+  document.querySelectorAll("[data-pulse-user]").forEach(btn=>btn.addEventListener("click",()=>openPulseProfile(btn.dataset.pulseUser)));
+  document.querySelectorAll("[data-pulse-server][data-pulse-channel]").forEach(btn=>btn.addEventListener("click",async()=>{
+    const s=servers.find(x=>String(x.id)===String(btn.dataset.pulseServer));
+    if(s)await selectServer(s);
+    const ch=channels.find(x=>String(x.id)===String(btn.dataset.pulseChannel));
+    if(ch)await selectChannel(ch);
+    goChat();
+  }));
+}
+async function openPulseProfile(userId){
+  const user=pulseState.users.find(u=>String(u.id)===String(userId));
+  if(!user)return;
+  const activity=user.activity||user.status||"Online";
+  openModal("Profile",
+    '<div class="pulse-profile-modal">'+
+      '<div class="pulse-profile-top"><div class="pulse-big-avatar">'+escapeHtml(avatar(user.username))+'</div><div><strong>'+escapeHtml(user.display_name||user.username)+'</strong><span>'+escapeHtml(user.handle||("@"+user.username))+'</span><em>'+escapeHtml(activity)+'</em></div></div>'+
+      '<div class="pulse-profile-actions"><button class="primary" id="pulse-message-user">Message</button><button id="pulse-add-user">Add friend</button></div>'+
+    '</div>');
+  $("#pulse-message-user").onclick=async()=>{
+    try{await api("/api/dms",{method:"POST",body:JSON.stringify({username:user.username})});closeModal();setView("dms");renderDMPage();orbitToast("Conversation ready","DM with @"+user.username+" is ready.","success")}catch(e){orbitToast("DM failed",e.message,"error")}
+  };
+  $("#pulse-add-user").onclick=async()=>{
+    try{await api("/api/friends/request",{method:"POST",body:JSON.stringify({username:user.username})});closeModal();orbitToast("Friend request sent","Request sent to @"+user.username+".","success")}catch(e){orbitToast("Friend request failed",e.message,"error")}
+  };
+}
 function renderHomePage(){
   $("#page-actions").innerHTML='<button id="home-create">+ Create server</button><button id="home-search">Search</button>';
   $("#page-body").innerHTML=
+  '<div class="pulse-command"><div><span class="eyebrow">REALTIME SOCIAL OS</span><h2>Orbit Pulse</h2><p>Your community, alive in one view.</p></div><div class="pulse-command-actions"><button id="pulse-open-chat">Open chat</button><button id="pulse-open-settings">Personalize</button></div></div>'+
+  '<div id="pulse-panel" class="pulse-live-surface"></div>'+
   '<div class="hero-grid">'+
-    '<div class="hero-card"><span class="eyebrow">WORKSPACE</span><h2>Everything in one place.</h2><p>Chat, communities, voice rooms, calls, screen sharing, search, threads and moderation controls.</p><button class="hero-action" id="home-open-chat">Open #'+escapeHtml(currentChannel?.name||"general")+'</button></div>'+
-    '<div class="hero-card"><span class="eyebrow">LIVE</span><h2>Voice & Video</h2><p>Start a high-quality room with screen sharing, layouts, quality presets and device controls.</p><button class="hero-action" id="home-call">Start video</button></div>'+
-    '<div class="hero-card"><span class="eyebrow">PROFILE</span><h2>'+escapeHtml(orbitUI.profile.displayName||me?.username||"Guest")+'</h2><p>'+escapeHtml(orbitUI.profile.bio)+'</p><button class="hero-action" id="home-profile">Customize</button></div>'+
+    '<div class="hero-card"><span class="eyebrow">WORKSPACE</span><h2>Everything in one place.</h2><p>Chat, communities, voice rooms, screen sharing, search, threads and moderation controls.</p><button class="hero-action" id="home-open-chat">Open #'+escapeHtml(currentChannel?.name||"general")+'</button></div>'+
+    '<div class="hero-card"><span class="eyebrow">LIVE</span><h2>Voice & Video</h2><p>Jump into a room with high-quality media, screen sharing and live controls.</p><button class="hero-action" id="home-call">Start video</button></div>'+
+    '<div class="hero-card"><span class="eyebrow">PROFILE</span><h2>'+escapeHtml(orbitUI.profile.displayName||me?.displayName||me?.username||"Guest")+'</h2><p>'+escapeHtml(orbitUI.profile.bio)+'</p><button class="hero-action" id="home-profile">Customize</button></div>'+
   '</div>'+
   '<div class="metric-grid">'+
     '<div class="metric"><span>Communities</span><strong>'+servers.length+'</strong><span>Connected workspaces</span></div>'+
-    '<div class="metric"><span>Status</span><strong>'+escapeHtml(orbitUI.profile.status)+'</strong><span>Guest session</span></div>'+
-    '<div class="metric"><span>Channel</span><strong>#'+escapeHtml(currentChannel?.name||"general")+'</strong><span>Current room</span></div>'+
-    '<div class="metric"><span>Calls</span><strong>HD</strong><span>Ready for realtime</span></div>'+
+    '<div class="metric"><span>Live now</span><strong id="home-live-count">—</strong><span>People online</span></div>'+
+    '<div class="metric"><span>Active rooms</span><strong id="home-call-count">—</strong><span>Live calls</span></div>'+
+    '<div class="metric"><span>Identity</span><strong>@'+escapeHtml(me?.username||"guest")+'</strong><span>Unique Orbit username</span></div>'+
   '</div>'+
-  '<div class="section-block"><div class="section-heading"><h3>Quick actions</h3><span>Everything below is wired to the live app</span></div><div class="card-grid">'+
-    '<button class="content-card" id="qa-search"><div class="chip">⌕</div><h4>Search</h4><p>Search users, channels, servers and messages.</p></button>'+
-    '<button class="content-card" id="qa-poll"><div class="chip">◫</div><h4>Create poll</h4><p>Publish a poll directly into the current channel.</p></button>'+
-    '<button class="content-card" id="qa-friends"><div class="chip">◎</div><h4>Friends</h4><p>Send and accept friend requests.</p></button>'+
+  '<div class="section-block"><div class="section-heading"><h3>Quick actions</h3><span>Built into Orbit Pulse</span></div><div class="card-grid">'+
+    '<button class="content-card" id="qa-search"><div class="chip">⌕</div><h4>Search Orbit</h4><p>Find people, communities, channels and messages.</p></button>'+
+    '<button class="content-card" id="qa-poll"><div class="chip">◫</div><h4>Create poll</h4><p>Publish a realtime poll in the current channel.</p></button>'+
+    '<button class="content-card" id="qa-friends"><div class="chip">◎</div><h4>Friends</h4><p>Meet people who are online right now.</p></button>'+
   '</div></div>';
   $("#home-open-chat").onclick=goChat;
   $("#home-call").onclick=()=>{goChat();startCall("video")};
   $("#home-profile").onclick=()=>{setView("settings");renderSettingsPage("profile")};
   $("#home-create").onclick=()=>$("#new-server").click();
-  $("#home-search").onclick=openCommandPalette;
-  $("#qa-search").onclick=openCommandPalette;
+  $("#home-search").onclick=()=>openSearchModal("");
+  $("#pulse-open-chat").onclick=goChat;
+  $("#pulse-open-settings").onclick=()=>{setView("settings");renderSettingsPage("appearance")};
+  $("#qa-search").onclick=()=>openSearchModal("");
   $("#qa-poll").onclick=openPoll;
   $("#qa-friends").onclick=()=>setView("friends");
+  loadPulse();
 }
 
 function renderDiscoverPage(){
@@ -1650,6 +1802,7 @@ document.addEventListener("click",async e=>{
 });
 
 // Boot premium nav after DOM is parsed, then launch guest session.
+applySavedOrbitBackground();
 bindPremiumNavigation();
 wireEnhancedControls();
 updateVoiceDock();
