@@ -1447,3 +1447,55 @@ body::after{
 .dm-list-pane,.dm-chat-pane,.dm-messages,.dm-list{scrollbar-width:thin;scrollbar-color:#303b4a transparent}
 @media(max-width:850px){.dm-shell{grid-template-columns:1fr;height:calc(100vh - 160px);min-height:500px}.dm-list-pane{display:none}}
 @media(max-width:560px){.dm-shell{height:calc(100vh - 145px);border-radius:14px;min-height:460px}.dm-chat-header{padding:0 10px;min-height:62px}.dm-messages{padding:16px 10px 12px}.dm-message{max-width:88%}.dm-message-bubble{font-size:11px}.dm-composer{padding:8px}.dm-hint{display:none}}
+
+/* ===== Animated avatar system ===== */
+.avatar,.dm-active-avatar,.pulse-big-avatar{
+  position:relative;
+  overflow:hidden;
+  isolation:isolate;
+  background-size:260% 260%;
+  will-change:background-position,box-shadow,filter;
+}
+body[data-avatar-motion="aurora"] .avatar,
+body[data-avatar-motion="aurora"] .dm-active-avatar,
+body[data-avatar-motion="aurora"] .pulse-big-avatar{
+  background:linear-gradient(130deg,#5d43d6,#267ed8,#20d4b4,#8a57ff,#5d43d6);
+  animation:orbitAvatarAurora 5s ease-in-out infinite;
+}
+body[data-avatar-motion="neon"] .avatar,
+body[data-avatar-motion="neon"] .dm-active-avatar,
+body[data-avatar-motion="neon"] .pulse-big-avatar{
+  background:linear-gradient(125deg,#ff3cac,#784ba0,#2b86c5,#00e5ff,#ff3cac);
+  animation:orbitAvatarNeon 2.8s linear infinite;
+}
+body[data-avatar-motion="energy"] .avatar,
+body[data-avatar-motion="energy"] .dm-active-avatar,
+body[data-avatar-motion="energy"] .pulse-big-avatar{
+  background:radial-gradient(circle at 30% 20%,#ffffff55 0 6%,transparent 7%),linear-gradient(135deg,#5e35d8,#1c8fff,#7c4dff,#00d4a8);
+  animation:orbitAvatarEnergy 3.2s ease-in-out infinite;
+}
+body[data-avatar-motion="off"] .avatar,
+body[data-avatar-motion="off"] .dm-active-avatar,
+body[data-avatar-motion="off"] .pulse-big-avatar{
+  animation:none!important;
+}
+.avatar-motion-setting{margin-top:12px}
+.avatar-motion-setting select{min-width:130px}
+@keyframes orbitAvatarAurora{
+  0%,100%{background-position:0% 50%;box-shadow:0 0 0 1px #8f7cff33,0 10px 24px #5139b633}
+  50%{background-position:100% 50%;box-shadow:0 0 0 2px #35e7d044,0 0 26px #4cc9ff55}
+}
+@keyframes orbitAvatarNeon{
+  0%{background-position:0% 50%;box-shadow:0 0 0 1px #ff4cc855,0 0 10px #ff35ad33}
+  50%{background-position:100% 50%;box-shadow:0 0 0 2px #42e5ff66,0 0 28px #00d9ff66}
+  100%{background-position:0% 50%;box-shadow:0 0 0 1px #ff4cc855,0 0 10px #ff35ad33}
+}
+@keyframes orbitAvatarEnergy{
+  0%,100%{background-position:20% 30%;box-shadow:0 0 0 1px #9c7bff44,0 0 8px #7a5cff33}
+  50%{background-position:80% 70%;box-shadow:0 0 0 3px #4de5d044,0 0 28px #36e4d05c}
+}
+@media (prefers-reduced-motion:reduce){
+  body[data-avatar-motion] .avatar,
+  body[data-avatar-motion] .dm-active-avatar,
+  body[data-avatar-motion] .pulse-big-avatar{animation:none!important}
+}
