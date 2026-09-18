@@ -763,6 +763,14 @@ io.on("connection", socket => {
 
     socket.join(room);
 
+    socket.to("channel:" + channel.id).emit("call:incoming", {
+      ...callParticipant(socket),
+      channelId: channel.id,
+      mode,
+      roomId: room,
+      createdAt: now()
+    });
+
     socket.emit("call:participants", existingIds.map(idValue => {
       const peer = io.sockets.sockets.get(idValue);
       return peer ? callParticipant(peer) : null;
