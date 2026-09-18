@@ -2179,3 +2179,315 @@ body::before{
 
 /* Keep reduced motion accessible */
 body.reduced-motion .rail-nav,body.reduced-motion .server-item,body.reduced-motion .channel,body.reduced-motion .content-card,body.reduced-motion .hero-card{transition:none!important}
+
+
+/* ===== ORBIT APEX / CINEMATIC UI v3 ===== */
+:root{
+  --apex-a:color-mix(in srgb,var(--server-accent,#7c5cff) 100%,transparent);
+  --apex-b:color-mix(in srgb,var(--server-secondary,#14b8a6) 100%,transparent);
+  --apex-glass:rgba(8,12,19,.68);
+  --apex-border:rgba(255,255,255,.085);
+}
+
+/* Cinematic ambient field */
+body{
+  overflow:hidden;
+  background:
+    radial-gradient(900px 520px at -5% -10%,color-mix(in srgb,var(--apex-a) 18%,transparent),transparent 65%),
+    radial-gradient(760px 480px at 105% 110%,color-mix(in srgb,var(--apex-b) 12%,transparent),transparent 68%),
+    radial-gradient(500px 300px at 52% 42%,rgba(76,58,160,.05),transparent 70%),
+    #06090e;
+}
+body::before{
+  background-image:
+    linear-gradient(rgba(255,255,255,.016) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.016) 1px,transparent 1px),
+    radial-gradient(circle at 50% 50%,rgba(255,255,255,.03) 0 1px,transparent 1.5px);
+  background-size:48px 48px,48px 48px,96px 96px;
+  animation:apexGridDrift 26s linear infinite;
+}
+body::after{
+  content:"";position:fixed;inset:-18%;
+  pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse at 25% 25%,color-mix(in srgb,var(--apex-a) 10%,transparent),transparent 38%),
+    radial-gradient(ellipse at 75% 70%,color-mix(in srgb,var(--apex-b) 8%,transparent),transparent 34%);
+  filter:blur(34px);
+  animation:apexAurora 14s ease-in-out infinite alternate;
+}
+@keyframes apexGridDrift{from{background-position:0 0,0 0,0 0}to{background-position:48px 48px,-48px 0,96px -96px}}
+@keyframes apexAurora{0%{transform:translate3d(-2%,0,0) scale(1)}100%{transform:translate3d(3%,-2%,0) scale(1.06)}}
+
+/* Main shell becomes one floating instrument */
+.app{
+  position:relative;
+  z-index:1;
+  padding:12px;
+  gap:12px;
+}
+.app::before{
+  content:"";position:absolute;inset:0;border-radius:28px;pointer-events:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035),inset 0 0 80px rgba(124,92,255,.025);
+}
+
+/* Rails */
+.server-rail{
+  position:relative;
+  overflow:visible;
+  background:
+    linear-gradient(180deg,rgba(15,20,30,.92),rgba(6,10,16,.84)),
+    linear-gradient(180deg,rgba(255,255,255,.02),transparent);
+  border-color:rgba(255,255,255,.095);
+}
+.server-rail::after{
+  content:"";position:absolute;left:50%;top:18px;bottom:18px;width:1px;
+  background:linear-gradient(180deg,transparent,rgba(255,255,255,.06),transparent);
+  transform:translateX(-50%);pointer-events:none;opacity:.65
+}
+.brand-shell,.global-nav,.server-list,.rail-btn,.bottom-nav{position:relative;z-index:1}
+.rail-logo{
+  position:relative;
+  overflow:hidden;
+}
+.rail-logo::after{
+  content:"";position:absolute;inset:-45%;
+  background:linear-gradient(110deg,transparent 34%,rgba(255,255,255,.45) 49%,transparent 62%);
+  transform:translateX(-55%) rotate(18deg);
+  animation:apexShine 4.8s ease-in-out infinite;
+}
+@keyframes apexShine{0%,42%{transform:translateX(-65%) rotate(18deg)}55%,100%{transform:translateX(70%) rotate(18deg)}}
+
+.server-item{
+  isolation:isolate;
+  overflow:visible;
+}
+.server-item.active::after{
+  content:"";position:absolute;inset:-9px;border-radius:50%;
+  border:1px solid color-mix(in srgb,var(--apex-a) 42%,transparent);
+  box-shadow:0 0 22px color-mix(in srgb,var(--apex-a) 18%,transparent);
+  animation:apexPulseRing 2.6s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes apexPulseRing{0%,100%{transform:scale(.94);opacity:.4}50%{transform:scale(1.02);opacity:.9}}
+
+/* Workspace header as control deck */
+.sidebar .workspace-head{
+  position:relative;
+  overflow:hidden;
+}
+.sidebar .workspace-head::before{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(110deg,color-mix(in srgb,var(--apex-a) 10%,transparent),transparent 55%,color-mix(in srgb,var(--apex-b) 6%,transparent));
+  pointer-events:none;
+}
+.sidebar .workspace-head::after{
+  content:"LIVE SPACE";position:absolute;right:13px;top:9px;
+  font-size:6px;letter-spacing:.18em;color:#78859a;
+  border:1px solid rgba(255,255,255,.07);padding:3px 5px;border-radius:999px;
+  background:rgba(255,255,255,.02)
+}
+.workspace-brand{position:relative;z-index:1}
+.workspace-avatar{
+  position:relative;
+}
+.workspace-avatar::after{
+  content:"";position:absolute;inset:-4px;border-radius:15px;
+  border:1px solid color-mix(in srgb,var(--apex-a) 38%,transparent);
+  animation:apexAvatarHalo 3.2s ease-in-out infinite;
+}
+@keyframes apexAvatarHalo{0%,100%{opacity:.35;transform:scale(.98)}50%{opacity:.85;transform:scale(1.04)}}
+
+/* Glass surfaces with a top-edge light */
+.global-page,.chat,.server-home-card,.hero-card,.content-card,.metric{
+  position:relative;
+}
+.global-page::before,.chat::before{
+  content:"";position:absolute;left:12%;right:12%;top:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--apex-a),var(--apex-b),transparent);
+  opacity:.45;pointer-events:none;
+}
+.server-home-card::before,.hero-card::before,.content-card::before{
+  content:"";position:absolute;left:14%;right:14%;top:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);
+  opacity:.55;pointer-events:none;
+}
+.page-head{
+  position:relative;
+  overflow:hidden;
+}
+.page-head::after{
+  content:"";position:absolute;right:-20px;top:-50px;width:190px;height:190px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.04);
+  box-shadow:0 0 0 20px rgba(255,255,255,.01),0 0 0 42px rgba(255,255,255,.008);
+  pointer-events:none;
+}
+
+/* Page title hierarchy */
+.page-head h1{
+  font-size:28px!important;
+  text-shadow:0 0 34px color-mix(in srgb,var(--apex-a) 16%,transparent);
+}
+.eyebrow{
+  letter-spacing:.22em!important;
+  color:color-mix(in srgb,var(--apex-a) 72%,#9aa6b8)!important;
+}
+
+/* Server Home hero = cinematic cover */
+.server-home-hero{
+  overflow:hidden;
+  isolation:isolate;
+}
+.server-home-hero::before{
+  content:"";position:absolute;inset:0;
+  background:
+    linear-gradient(120deg,transparent 0 42%,rgba(255,255,255,.025) 50%,transparent 58%),
+    repeating-linear-gradient(90deg,transparent 0 74px,rgba(255,255,255,.018) 74px 75px);
+  opacity:.5;pointer-events:none;
+}
+.server-home-hero::after{
+  content:"";position:absolute;right:-15%;top:-55%;width:70%;height:180%;
+  border-radius:50%;border:1px solid rgba(255,255,255,.035);
+  box-shadow:0 0 0 22px rgba(255,255,255,.012),0 0 0 46px rgba(255,255,255,.008);
+  transform:rotate(-17deg);pointer-events:none;
+}
+.server-home-hero-copy,.server-orbit-badge{position:relative;z-index:2}
+.server-home-hero-copy h2{
+  font-size:48px!important;
+  text-shadow:0 18px 44px rgba(0,0,0,.38);
+}
+.server-orbit-badge{
+  overflow:visible;
+}
+.server-orbit-badge::before{
+  border-color:color-mix(in srgb,var(--apex-a) 62%,transparent)!important;
+}
+.server-orbit-badge::after{
+  border-color:color-mix(in srgb,var(--apex-b) 28%,transparent)!important;
+}
+.server-orbit-badge span{
+  text-shadow:0 5px 18px rgba(0,0,0,.35)
+}
+
+/* Navigation / buttons get tactile light */
+button,.rail-btn,.rail-nav,.server-item,.channel{
+  -webkit-tap-highlight-color:transparent;
+}
+.page-actions button,.hero-action,.head-action,.composer button,.role-manager-controls button{
+  position:relative;overflow:hidden;
+}
+.page-actions button::after,.hero-action::after,.head-action::after,.composer button::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(105deg,transparent 0 38%,rgba(255,255,255,.12) 50%,transparent 62%);
+  transform:translateX(-120%);
+  transition:transform .5s ease;
+  pointer-events:none;
+}
+.page-actions button:hover::after,.hero-action:hover::after,.head-action:hover::after,.composer button:hover::after{transform:translateX(120%)}
+
+/* Chat gets a cleaner stage */
+.chat{
+  background:
+    radial-gradient(circle at 50% 120%,color-mix(in srgb,var(--apex-a) 5%,transparent),transparent 42%),
+    linear-gradient(180deg,rgba(10,15,23,.82),rgba(6,10,15,.93));
+}
+.chat-head{
+  position:relative;
+}
+.chat-head::after{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--apex-a),var(--apex-b),transparent);
+  opacity:.55
+}
+.messages{
+  scrollbar-color:rgba(255,255,255,.12) transparent;
+}
+.message .avatar{
+  position:relative;
+}
+.message:hover .avatar{
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--apex-a) 38%,transparent),0 8px 24px rgba(0,0,0,.28)
+}
+.msg-head strong{
+  transition:color .16s ease
+}
+.message:hover .msg-head strong{color:#fff}
+.composer{
+  position:relative;
+}
+.composer::before{
+  content:"";position:absolute;left:16px;right:16px;top:-5px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--apex-a),transparent);opacity:.45
+}
+
+/* Profile Card = premium identity panel */
+.profile-card-pro{
+  position:relative;
+  isolation:isolate;
+}
+.profile-card-pro::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset 0 -60px 90px rgba(0,0,0,.16);
+  pointer-events:none
+}
+.profile-card-cover{
+  position:relative;
+  overflow:hidden;
+}
+.profile-card-cover::after{
+  content:"";position:absolute;inset:-50%;
+  background:linear-gradient(110deg,transparent 40%,rgba(255,255,255,.18) 50%,transparent 60%);
+  transform:translateX(-40%) rotate(12deg);
+  animation:apexProfileSweep 6.5s ease-in-out infinite;
+}
+@keyframes apexProfileSweep{0%,35%{transform:translateX(-55%) rotate(12deg)}55%,100%{transform:translateX(55%) rotate(12deg)}}
+
+/* Scrollbars */
+*{
+  scrollbar-width:thin;
+  scrollbar-color:rgba(132,115,220,.28) transparent;
+}
+*::-webkit-scrollbar{width:7px;height:7px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--apex-a) 45%,#222),color-mix(in srgb,var(--apex-b) 32%,#222));
+  border-radius:999px;
+  border:2px solid transparent;background-clip:padding-box
+}
+
+/* Calls feel like a broadcast console */
+.call-panel::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:
+    linear-gradient(rgba(255,255,255,.012) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px);
+  background-size:38px 38px;
+  mask-image:linear-gradient(to bottom,black,transparent 90%);
+}
+.call-topbar,.call-stage,.call-controls{position:relative;z-index:1}
+
+/* Subtle hover depth */
+.server-home-card,.hero-card,.content-card,.metric,.server-channel-home,.server-member-card{
+  transition:transform .22s cubic-bezier(.2,.7,.2,1),border-color .22s ease,box-shadow .22s ease,background .22s ease;
+}
+.server-home-card:hover,.hero-card:hover,.content-card:hover{
+  box-shadow:0 18px 44px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.03)
+}
+.server-channel-home:hover,.server-member-card:hover{
+  box-shadow:0 12px 30px rgba(0,0,0,.16)
+}
+
+@media(max-width:900px){
+  .app{padding:8px;gap:8px}
+  .server-home-hero-copy h2{font-size:38px!important}
+}
+@media(max-width:650px){
+  body{overflow:auto}
+  .app{padding:0}
+  .server-home-hero-copy h2{font-size:30px!important}
+  .page-head h1{font-size:22px!important}
+}
+body.reduced-motion::before,body.reduced-motion::after{animation:none!important}
+body.reduced-motion .server-item.active::after,
+body.reduced-motion .workspace-avatar::after,
+body.reduced-motion .rail-logo::after,
+body.reduced-motion .profile-card-cover::after{animation:none!important}
