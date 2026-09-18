@@ -17,7 +17,7 @@ const PORT = Number(process.env.PORT || 8080);
 const JWT_SECRET = process.env.JWT_SECRET || "orbit-guest-dev-secret";
 const ADMIN_CONTROL_KEY = String(process.env.ADMIN_CONTROL_KEY || "").trim();
 const adminKeyAttempts = new Map();
-const AVATAR_DECORATIONS = new Set(["none","halo","crown","orbit","spark","fire","ice","cyber","royal"]);
+const AVATAR_DECORATIONS = new Set(["none","halo","crown","orbit","spark","fire","ice","cyber","royal","dragon"]);
 
 const memory = {
   users: new Map(),
