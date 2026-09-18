@@ -197,6 +197,35 @@ function connectRealtime() {
     if (orbitUI.view === "friends") renderFriendsPage();
   });
 
+  const refreshSharedSurface = (view) => {
+    if (orbitUI.view !== view) return;
+    if (view === "events") renderEventsPage();
+    if (view === "projects") renderProjectsPage();
+    if (view === "live") renderLivePage();
+  };
+  socket.on("event:created", payload => {
+    if (payload?.event) orbitToast("New event", payload.event.title + " was added.", "success");
+    refreshSharedSurface("events");
+  });
+  socket.on("event:updated", () => refreshSharedSurface("events"));
+  socket.on("event:rsvp", () => refreshSharedSurface("events"));
+  socket.on("event:deleted", () => refreshSharedSurface("events"));
+  socket.on("project:created", payload => {
+    if (payload?.project) orbitToast("New project", payload.project.name + " is ready.", "success");
+    refreshSharedSurface("projects");
+  });
+  socket.on("project:updated", () => refreshSharedSurface("projects"));
+  socket.on("project:task-created", () => refreshSharedSurface("projects"));
+  socket.on("project:task-updated", () => refreshSharedSurface("projects"));
+  socket.on("project:task-deleted", () => refreshSharedSurface("projects"));
+  socket.on("project:deleted", () => refreshSharedSurface("projects"));
+  socket.on("live:started", payload => {
+    if (payload?.session && orbitUI.view === "live") renderLivePage();
+    if (payload?.session?.hostUserId && String(payload.session.hostUserId)!==String(me?.id)) {
+      orbitToast("Live now", payload.session.title + " just went live.");
+    }
+  });
+  socket.on("live:ended", () => refreshSharedSurface("live"));
 
   socket.on("call:incoming", call => {
     if (callState.active || String(call.userId) === String(me?.id)) return;
@@ -1567,7 +1596,7 @@ async function renderLivePage(){
     $("#page-body").innerHTML='<div class="os-empty"><strong>Select a community first</strong><span>Live sessions belong to community Voice Spaces.</span></div>';
     return;
   }
-  $("#page-actions").innerHTML='<button id="live-start">Go live</button><button id="live-refresh">Refresh</button>';
+  $("#page-actions").innerHTML='<button id="live-refresh">Refresh</button>';
   $("#page-body").innerHTML='<div class="os-empty"><strong>Loading live rooms…</strong><span>Finding active sessions in this community.</span></div>';
   try{
     const data=await api("/api/servers/"+encodeURIComponent(currentServer.id)+"/live");
