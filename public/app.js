@@ -1169,7 +1169,14 @@ async function openDM(idValue){
 async function renderFriendsPage(){
   $("#page-actions").innerHTML='<button id="add-friend-page">+ Add friend</button><button id="refresh-friends-page">Refresh</button>';
   $("#page-body").innerHTML='<div class="content-card"><h4>Loading friends…</h4></div>';
-  $("#add-friend-page").onclick=()=>openModal("Add friend",'<p class="hint">Search the live guest directory, then send a real request.</p><input id="friend-target" list="friend-user-options" placeholder="Search username" autocomplete="off"><datalist id="friend-user-options"></datalist><div id="friend-search-results" class="list-card compact-picker"></div><button class="primary" id="friend-create">Send request</button>');
+  $("#add-friend-page").onclick=()=>openModal("Add friend",
+  '<div class="friend-modal">'+
+    '<div class="friend-hero"><div class="friend-icon">◎</div><div><strong>Add a new friend</strong><span>Search for a live Orbit guest by username.</span></div></div>'+
+    '<label class="friend-search-box"><span>⌕</span><input id="friend-target" list="friend-user-options" placeholder="Search username..." autocomplete="off"><datalist id="friend-user-options"></datalist><kbd>Enter</kbd></label>'+
+    '<div id="friend-search-results" class="friend-results"><div class="friend-empty">Start typing to search live guests.</div></div>'+
+    '<button class="primary friend-send-btn" id="friend-create" disabled>Send friend request</button>'+
+  '</div>'
+);
   $("#refresh-friends-page").onclick=renderFriendsPage;
   try{
     const d=await api("/api/friends");
@@ -1187,16 +1194,28 @@ async function renderFriendsPage(){
     document.querySelectorAll("[data-reject]").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request/"+encodeURIComponent(b.dataset.reject)+"/reject",{method:"POST",body:"{}"});orbitToast("Request declined","The request was rejected.","");renderFriendsPage()}catch(err){orbitToast("Request failed",err.message,"error")}});
     const friendSearch=$("#friend-target");
     if(friendSearch){
+      const sendBtn=$("#friend-create");
       const loadFriendSuggestions=async()=>{
         const q=friendSearch.value.trim();
-        if(q.length<1)return;
+        if(sendBtn) sendBtn.disabled=true;
+        if(q.length<1){
+          const results=$("#friend-search-results");
+          if(results) results.innerHTML='<div class="friend-empty">Start typing to search live guests.</div>';
+          return;
+        }
         try{
           const found=await api("/api/search?q="+encodeURIComponent(q));
           const users=(found.users||[]).filter(u=>String(u.id)!==String(me?.id)).slice(0,8);
           const options=$("#friend-user-options"), results=$("#friend-search-results");
           if(options)options.innerHTML=users.map(u=>'<option value="'+escapeHtml(u.username)+'">').join("");
-          if(results)results.innerHTML=users.length?users.map(u=>'<button type="button" class="list-row friend-pick" data-friend-name="'+escapeHtml(u.username)+'"><div class="avatar">'+avatar(u.username)+'</div><div><strong>'+escapeHtml(u.username)+'</strong><span>'+escapeHtml(u.status)+' · guest</span></div><span>Use</span></button>').join(""):'<div class="content-card"><p>No matching live guest.</p></div>';
-          document.querySelectorAll("[data-friend-name]").forEach(btn=>btn.onclick=()=>{friendSearch.value=btn.dataset.friendName;});
+          if(results)results.innerHTML=users.length?users.map(u=>'<button type="button" class="list-row friend-pick" data-friend-name="'+escapeHtml(u.username)+'"><div class="avatar">'+avatar(u.username)+'</div><div><strong>'+escapeHtml(u.username)+'</strong><span>'+escapeHtml(u.status)+' · guest</span></div><span>Use</span></button>').join(""):'<div class="friend-empty">No matching live guest.</div>';
+          if(sendBtn) sendBtn.disabled=users.length===0;
+          document.querySelectorAll("[data-friend-name]").forEach(btn=>btn.onclick=()=>{
+            friendSearch.value=btn.dataset.friendName;
+            if(sendBtn) sendBtn.disabled=false;
+            document.querySelectorAll("[data-friend-name]").forEach(x=>x.classList.remove("selected"));
+            btn.classList.add("selected");
+          });
         }catch(err){orbitToast("Search failed",err.message,"error")}
       };
       friendSearch.oninput=loadFriendSuggestions;
@@ -1406,7 +1425,15 @@ function bindPremiumNavigation(){
       try{await api("/api/invites/"+encodeURIComponent(code)+"/accept",{method:"POST",body:"{}"});closeModal();await loadServers();orbitToast("Joined community","Server added to your workspace.","success")}catch(err){orbitToast("Invite failed",err.message,"error")}
     }
     if(e.target.id==="dm-create"){try{await api("/api/dms",{method:"POST",body:JSON.stringify({username:$("#dm-target").value.trim()})});closeModal();renderDMPage();orbitToast("DM created","Conversation is ready.","success")}catch(err){orbitToast("DM failed",err.message,"error")}}
-    if(e.target.id==="friend-create"){try{const username=$("#friend-target").value.trim();if(!username)return orbitToast("Add friend","Choose a username first.","error");await api("/api/friends/request",{method:"POST",body:JSON.stringify({username})});closeModal();orbitToast("Friend request sent",username+" will see it in their live inbox.","success")}catch(err){orbitToast("Friend request failed",err.message,"error")}}
+    if(e.target.id==="friend-create"){
+      try{
+        const username=$("#friend-target").value.trim();
+        if(!username)return orbitToast("Add friend","Choose a username first.","error");
+        await api("/api/friends/request",{method:"POST",body:JSON.stringify({username})});
+        closeModal();
+        orbitToast("Friend request sent",username+" will see it in their live inbox.","success");
+      }catch(err){orbitToast("Friend request failed",err.message,"error")}
+    }
     if(e.target.id==="publish-poll"){
       const options=["#poll-a","#poll-b","#poll-c"].map(s=>$(s)?.value.trim()).filter(Boolean);
       try{const d=await api("/api/channels/"+currentChannel.id+"/polls",{method:"POST",body:JSON.stringify({question:$("#poll-q").value.trim(),options})});closeModal();orbitToast("Poll published","Vote collection is live.","success");renderPoll(d.poll)}catch(err){orbitToast("Poll failed",err.message,"error")}
