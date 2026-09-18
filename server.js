@@ -347,7 +347,7 @@ function publicUser(user) {
     username: user.username,
     handle: "@" + user.username,
     display_name: user.displayName || user.username,
-    avatar_url: null,
+    avatar_url: user.avatarUrl || null,
     status: user.status || "online",
     guest: true
   };
@@ -375,7 +375,7 @@ function createGuest(username, existingId) {
   return user;
 }
 
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "6mb" }));
 app.use(express.static(path.join(__dirname, "public"), {
   setHeaders(res) {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -917,13 +917,22 @@ app.delete("/api/servers/:id/admin/channels/:channelId", auth, (req, res) => {
 app.post("/api/uploads", auth, (req,res)=>{
   const data=String(req.body?.data||"");
   if(!data || data.length>2_500_000) return res.status(400).json({error:"File is missing or too large"});
-  const item={id:id("file"),name:String(req.body?.name||"file").slice(0,180),type:String(req.body?.type||"application/octet-stream").slice(0,120),size:Number(req.body?.size||0),data,created_at:now(),user_id:req.user.id};
+  const type=String(req.body?.type||"application/octet-stream").slice(0,120);
+  const size=Number(req.body?.size||0);
+  if (size>2_000_000 || (!type.startsWith("image/") && req.body?.purpose==="avatar")) return res.status(400).json({error:"Avatar must be an image up to 2 MB"});
+  const item={id:id("file"),name:String(req.body?.name||"file").slice(0,180),type,size,data,created_at:now(),user_id:req.user.id};
   memory.uploads.set(item.id,item);
   res.status(201).json({file:{id:item.id,name:item.name,type:item.type,size:item.size}});
 });
 app.get("/api/uploads/:id", auth, (req,res)=>{
   const file=memory.uploads.get(req.params.id);
   if(!file) return res.status(404).end();
+  res.type(file.type).send(Buffer.from(String(file.data).replace(/^data:[^;]+;base64,/,""),"base64"));
+});
+app.get("/api/avatar/:id",(req,res)=>{
+  const file=memory.uploads.get(String(req.params.id));
+  if(!file || !String(file.type||"").startsWith("image/")) return res.status(404).end();
+  res.set("Cache-Control","public, max-age=31536000, immutable");
   res.type(file.type).send(Buffer.from(String(file.data).replace(/^data:[^;]+;base64,/,""),"base64"));
 });
 
@@ -965,6 +974,13 @@ app.patch("/api/me", auth, (req, res) => {
   }
   if (req.body?.displayName !== undefined) {
     req.user.displayName = cleanName(req.body.displayName, req.user.username);
+  }
+  if (req.body?.avatarUrl !== undefined) {
+    const avatarUrl = String(req.body.avatarUrl || "").trim();
+    if (avatarUrl && !/^\/api\/avatar\/[A-Za-z0-9_-]+$/.test(avatarUrl)) {
+      return res.status(400).json({ error: "Invalid avatar" });
+    }
+    req.user.avatarUrl = avatarUrl || null;
   }
   res.json({ user: publicUser(req.user) });
 });
