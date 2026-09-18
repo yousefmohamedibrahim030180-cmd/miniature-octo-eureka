@@ -1702,3 +1702,87 @@ body[data-avatar-motion="off"] .orbit-avatar-preview{animation:none!important}
   .orbit-avatar-preview[data-avatar-decoration="dragon"]::before,
   .orbit-avatar-preview[data-avatar-decoration="dragon"]::after{animation:none!important}
 }
+
+
+/* ===== Safe avatar frames ===== */
+#me-avatar[class*="orbit-frame-"]{position:relative;isolation:isolate;overflow:visible}
+#me-avatar[class*="orbit-frame-"] img{position:relative;z-index:1;border-radius:inherit}
+#me-avatar[class*="orbit-frame-"]::before,#me-avatar[class*="orbit-frame-"]::after{pointer-events:none}
+#me-avatar.orbit-frame-none::before,#me-avatar.orbit-frame-none::after{display:none}
+
+#me-avatar.orbit-frame-halo::before{
+  content:"";position:absolute;inset:-4px;border:2px solid #c8b7ff;border-radius:14px;
+  box-shadow:0 0 8px #8b5cf6,0 0 22px #7c3aed88;animation:orbitFrameHalo 2.4s ease-in-out infinite;z-index:3
+}
+#me-avatar.orbit-frame-crown::before{
+  content:"♛";position:absolute;left:50%;top:-15px;transform:translateX(-50%);
+  font-size:15px;color:#ffe48a;text-shadow:0 0 7px #ffb000,0 0 14px #ff8c00;z-index:4
+}
+#me-avatar.orbit-frame-orbit::before{
+  content:"";position:absolute;inset:-5px;border:2px solid #5ce7ff;border-radius:50%;
+  box-shadow:0 0 9px #00d9ff99;animation:orbitFrameSpin 2.8s linear infinite;z-index:3
+}
+#me-avatar.orbit-frame-orbit::after{
+  content:"";position:absolute;inset:-9px;border:1px solid #8f7cff55;border-radius:50%;
+  transform:rotate(-22deg) scaleY(.48);box-shadow:0 0 10px #8f7cff55;animation:orbitFrameSpinReverse 3.4s linear infinite;z-index:2
+}
+#me-avatar.orbit-frame-spark::before{
+  content:"✦";position:absolute;right:-7px;top:-8px;color:#fff;font-size:13px;
+  text-shadow:0 0 7px #fff,0 0 15px #a78bfa;animation:orbitFrameSpark 1.35s ease-in-out infinite;z-index:4
+}
+#me-avatar.orbit-frame-spark::after{
+  content:"✧";position:absolute;left:-7px;bottom:-7px;color:#bdefff;font-size:11px;
+  text-shadow:0 0 8px #6ee7f9;animation:orbitFrameSpark 1.7s .35s ease-in-out infinite;z-index:4
+}
+#me-avatar.orbit-frame-fire::before{
+  content:"";position:absolute;inset:-4px;border:3px solid #ff6a00;border-radius:14px;
+  box-shadow:0 0 8px #ff4d00,0 0 18px #ff220088;animation:orbitFrameFire 1.2s ease-in-out infinite alternate;z-index:3
+}
+#me-avatar.orbit-frame-ice::before{
+  content:"";position:absolute;inset:-4px;border:2px solid #9fe8ff;border-radius:14px;
+  box-shadow:0 0 8px #53cfff,0 0 19px #38bdf888;animation:orbitFrameIce 2.1s ease-in-out infinite;z-index:3
+}
+#me-avatar.orbit-frame-cyber::before{
+  content:"";position:absolute;inset:-4px;border:2px solid #00f0ff;border-radius:13px;
+  box-shadow:0 0 7px #00e5ff,0 0 18px #00e5ff88;animation:orbitFrameCyber 1.8s linear infinite;z-index:3
+}
+#me-avatar.orbit-frame-royal::before{
+  content:"";position:absolute;inset:-4px;border:2px solid #f4d06f;border-radius:14px;
+  box-shadow:0 0 8px #f1c75b,0 0 20px #b98b2d77;animation:orbitFrameRoyal 2.2s ease-in-out infinite;z-index:3
+}
+#me-avatar.orbit-frame-dragon::before{
+  content:"";position:absolute;inset:-9px;background:url("/assets/avatar-dragon.svg") center/contain no-repeat;
+  z-index:4;filter:drop-shadow(0 0 5px #ff5c33);animation:orbitFrameDragon 2.8s ease-in-out infinite
+}
+
+.avatar-frame-section{margin-top:16px;padding-top:15px;border-top:1px solid #202936}
+.avatar-frame-head{margin-bottom:10px}.avatar-frame-head strong{display:block;font-size:12px}.avatar-frame-head span{display:block;color:#768297;font-size:10px;margin-top:4px}
+.avatar-frame-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.avatar-frame-card{min-width:0;border:1px solid #252d3a;background:#0b1017;color:#dfe5ef;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:.18s}
+.avatar-frame-card:hover{border-color:#674ab0;transform:translateY(-1px);background:#111722}
+.avatar-frame-card.active{border-color:#9a7cff;background:linear-gradient(180deg,#1d1632,#111722);box-shadow:0 0 0 1px #8b5cf633 inset}
+.avatar-frame-card strong{display:block;font-size:9px;margin-top:6px}
+.frame-preview{position:relative;width:42px;height:42px;margin:0 auto;border-radius:12px;background:linear-gradient(135deg,#7652e8,#247ed7);display:grid;place-items:center;font-weight:900;font-size:13px;color:#fff;isolation:isolate}
+.frame-preview::before,.frame-preview::after{pointer-events:none}
+.frame-none{box-shadow:inset 0 0 0 1px #ffffff18}
+.frame-halo{box-shadow:0 0 9px #8b5cf6,0 0 20px #7c3aed66}.frame-halo::before{content:"";position:absolute;inset:-3px;border:2px solid #c8b7ff;border-radius:14px}
+.frame-crown::before{content:"♛";position:absolute;left:50%;top:-10px;transform:translateX(-50%);color:#ffe48a;font-size:11px;text-shadow:0 0 6px #ffae00}
+.frame-orbit{box-shadow:0 0 10px #00d9ff66}.frame-orbit::before{content:"";position:absolute;inset:-3px;border:2px solid #5ce7ff;border-radius:50%;animation:orbitFrameSpin 2.8s linear infinite}
+.frame-spark::before{content:"✦";position:absolute;right:-5px;top:-7px;font-size:11px;color:#fff;text-shadow:0 0 8px #fff}.frame-spark::after{content:"✧";position:absolute;left:-5px;bottom:-6px;font-size:9px;color:#bdefff;text-shadow:0 0 7px #6ee7f9}
+.frame-fire{box-shadow:0 0 10px #ff4d0066}.frame-fire::before{content:"";position:absolute;inset:-3px;border:2px solid #ff6a00;border-radius:14px}
+.frame-ice{box-shadow:0 0 10px #38bdf866}.frame-ice::before{content:"";position:absolute;inset:-3px;border:2px solid #9fe8ff;border-radius:14px}
+.frame-cyber{box-shadow:0 0 10px #00e5ff66}.frame-cyber::before{content:"";position:absolute;inset:-3px;border:2px solid #00f0ff;border-radius:13px}
+.frame-royal{box-shadow:0 0 10px #f1c75b55}.frame-royal::before{content:"";position:absolute;inset:-3px;border:2px solid #f4d06f;border-radius:14px}
+.frame-dragon::before{content:"";position:absolute;inset:-7px;background:url("/assets/avatar-dragon.svg") center/contain no-repeat;z-index:3}
+
+@keyframes orbitFrameHalo{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.06);opacity:1}}
+@keyframes orbitFrameSpin{to{transform:rotate(360deg)}}
+@keyframes orbitFrameSpinReverse{to{transform:rotate(-360deg)}}
+@keyframes orbitFrameSpark{0%,100%{transform:scale(.8) rotate(0deg);opacity:.6}50%{transform:scale(1.15) rotate(18deg);opacity:1}}
+@keyframes orbitFrameFire{0%{transform:scale(1);filter:brightness(1)}100%{transform:scale(1.04);filter:brightness(1.35)}}
+@keyframes orbitFrameIce{0%,100%{filter:brightness(1)}50%{filter:brightness(1.25)}}
+@keyframes orbitFrameCyber{0%,100%{opacity:.75}50%{opacity:1}}
+@keyframes orbitFrameRoyal{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
+@keyframes orbitFrameDragon{0%,100%{transform:scale(1) rotate(0deg)}50%{transform:scale(1.04) rotate(.8deg)}}
+
+@media(max-width:700px){.avatar-frame-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
