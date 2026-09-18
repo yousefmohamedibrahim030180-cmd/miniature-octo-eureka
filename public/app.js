@@ -10,6 +10,10 @@ let channels = [];
 let currentChannel = null;
 let socket = null;
 let typingTimer = null;
+let unreadChannels = JSON.parse(localStorage.getItem("orbit_unread_channels") || "{}");
+let callStartedAt = 0;
+let callDurationTimer = null;
+let callStatsTimer = null;
 
 const callState = {
   active: false,
@@ -103,7 +107,14 @@ function connectRealtime() {
   socket = io({ auth: { token }, transports: ["websocket", "polling"] });
 
   socket.on("message:new", m => {
-    if (currentChannel && String(m.channel_id) === String(currentChannel.id)) appendMessage(m);
+    const active = currentChannel && String(m.channel_id) === String(currentChannel.id);
+    if (active) {
+      appendMessage(m);
+    } else if (m.channel_id) {
+      unreadChannels[m.channel_id] = Number(unreadChannels[m.channel_id] || 0) + 1;
+      localStorage.setItem("orbit_unread_channels", JSON.stringify(unreadChannels));
+      renderChannels();
+    }
   });
   socket.on("typing", x => {
     if (!currentChannel) return;
@@ -229,17 +240,43 @@ async function selectServer(serverItem) {
   await loadMembers();
 }
 function renderChannels() {
-  $("#channel-list").innerHTML = channels.map(c =>
-    '<button class="channel ' + (String(currentChannel?.id) === String(c.id) ? "active" : "") +
-    '" data-id="' + c.id + '"><span class="hash">#</span><span>' + escapeHtml(c.name) + "</span></button>"
+  $("#channel-list").innerHTML = channels.filter(c => c.type !== "voice").map(c => {
+    const unread = Number(unreadChannels[c.id] || 0);
+    const icon = c.type === "announcement" ? "!" : "#";
+    return '<button class="channel ' + (String(currentChannel?.id) === String(c.id) ? "active" : "") +
+      '" data-id="' + c.id + '"><span class="hash">' + icon + '</span><span class="channel-name-text">' + escapeHtml(c.name) + '</span>' +
+      (unread ? '<b class="channel-unread">' + (unread > 99 ? "99+" : unread) + '</b>' : '') +
+      '</button>';
+  }).join("");
+  $("#voice-channel-list").innerHTML = channels.filter(c => c.type === "voice").map(c =>
+    '<button class="channel voice-channel" data-id="' + c.id + '"><span class="voice-icon">◉</span><span class="channel-name-text">' +
+    escapeHtml(c.name) + '</span></button>'
   ).join("");
   document.querySelectorAll(".channel").forEach(btn => {
-    btn.onclick = () => selectChannel(channels.find(c => String(c.id) === btn.dataset.id));
+    btn.onclick = () => {
+      selectChannel(channels.find(c => String(c.id) === btn.dataset.id));
+      $("#sidebar")?.classList.remove("open");
+      document.body.classList.remove("mobile-sidebar-open");
+    };
   });
 }
 async function selectChannel(channel) {
+  if (!channel) return;
+  if (channel.type === "voice") {
+    if (callState.active && String(callState.roomId) === String(channel.id)) return;
+    if (callState.active) leaveCall();
+    currentChannel = channel;
+    renderChannels();
+    $("#channel-name").textContent = channel.name;
+    $("#channel-meta").textContent = "Voice room";
+    $("#message").placeholder = "Voice room";
+    await startCall("voice");
+    return;
+  }
   if (callState.active && String(callState.roomId) !== String(channel.id)) leaveCall();
   currentChannel = channel;
+  unreadChannels[channel.id] = 0;
+  localStorage.setItem("orbit_unread_channels", JSON.stringify(unreadChannels));
   renderChannels();
   $("#channel-name").textContent = channel.name;
   $("#channel-meta").textContent = channel.type === "announcement" ? "Announcement channel" : "Realtime conversation";
@@ -248,6 +285,7 @@ async function selectChannel(channel) {
   const data = await api("/api/channels/" + channel.id + "/messages");
   data.messages.forEach(appendMessage);
   if (socket) socket.emit("channel:join", channel.id);
+  $("#messages").scrollTop = $("#messages").scrollHeight;
 }
 function appendMessage(m) {
   const el = document.createElement("article");
@@ -359,6 +397,8 @@ async function startCall(mode = "video") {
 
   callState.mode = mode;
   callState.roomId = currentChannel.id;
+  callStartedAt = Date.now();
+
   callState.active = true;
   $("#call-panel").classList.remove("hidden");
   $("#call-title").textContent = currentChannel.name;
@@ -372,6 +412,8 @@ async function startCall(mode = "video") {
     socket.emit("call:join", { channelId: callState.roomId, mode });
     socket.emit("call:media-state", { channelId: callState.roomId, muted: false, cameraOff: mode === "voice", screenShare: false });
     setCallIndicator("LIVE");
+    startCallTelemetry();
+    updateVoiceDock();
     updateCallMeta();
   } catch (err) {
     leaveCall();
@@ -457,7 +499,10 @@ async function ensurePeer(socketId, initiator, info = {}) {
 
   pc.onconnectionstatechange = () => {
     const state = pc.connectionState;
-    if (state === "connected") setCallIndicator("LIVE");
+    if (state === "connected") {
+      setCallIndicator("LIVE");
+      updateCallNetwork();
+    }
     if (["failed", "closed", "disconnected"].includes(state)) {
       if (state !== "disconnected") removePeer(socketId);
     }
@@ -537,8 +582,70 @@ function leaveCall() {
   document.querySelectorAll(".call-tile").forEach(t => t.remove());
   $("#call-panel").classList.add("hidden");
   document.body.classList.remove("call-open");
+  stopCallTelemetry();
+  updateVoiceDock();
   setCallIndicator("IDLE");
   updateCallMeta();
+}
+
+function startCallTelemetry() {
+  stopCallTelemetry();
+  callStartedAt = callStartedAt || Date.now();
+  callDurationTimer = setInterval(() => {
+    const elapsed = Math.max(0, Math.floor((Date.now() - callStartedAt) / 1000));
+    const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
+    const ss = String(elapsed % 60).padStart(2, "0");
+    $("#call-duration").textContent = mm + ":" + ss;
+  }, 500);
+  callStatsTimer = setInterval(updateCallNetwork, 4000);
+}
+function stopCallTelemetry() {
+  if (callDurationTimer) clearInterval(callDurationTimer);
+  if (callStatsTimer) clearInterval(callStatsTimer);
+  callDurationTimer = null;
+  callStatsTimer = null;
+  callStartedAt = 0;
+  $("#call-duration").textContent = "00:00";
+  $("#call-network-indicator").textContent = "NETWORK —";
+}
+async function updateCallNetwork() {
+  if (!callState.active || !callState.peers.size) {
+    $("#call-network-indicator").textContent = callState.active ? "NETWORK · READY" : "NETWORK —";
+    return;
+  }
+  let maxRtt = 0;
+  let packetsLost = 0;
+  let packetsTotal = 0;
+  for (const [, item] of callState.peers) {
+    try {
+      const stats = await item.pc.getStats();
+      stats.forEach(report => {
+        if (report.type === "candidate-pair" && report.state === "succeeded" && typeof report.currentRoundTripTime === "number") {
+          maxRtt = Math.max(maxRtt, report.currentRoundTripTime * 1000);
+        }
+        if (report.type === "inbound-rtp" && typeof report.packetsLost === "number") {
+          packetsLost += report.packetsLost;
+          packetsTotal += report.packetsReceived || 0;
+        }
+      });
+    } catch {}
+  }
+  const loss = packetsTotal ? packetsLost / (packetsLost + packetsTotal) : 0;
+  let label = "NETWORK · GOOD";
+  if (maxRtt > 280 || loss > 0.08) label = "NETWORK · POOR";
+  else if (maxRtt > 160 || loss > 0.03) label = "NETWORK · FAIR";
+  $("#call-network-indicator").textContent = label + (maxRtt ? " · " + Math.round(maxRtt) + "ms" : "");
+}
+function updateVoiceDock() {
+  const dock = $("#voice-dock");
+  if (!dock) return;
+  const active = Boolean(callState.active && currentChannel);
+  dock.classList.toggle("hidden", !active);
+  if (active) {
+    $("#voice-dock-name").textContent = currentChannel.name;
+    $("#dock-mic")?.classList.toggle("active", Boolean(callState.micTrack?.enabled));
+    $("#dock-leave")?.setAttribute("aria-label", "Leave " + currentChannel.name);
+  }
 }
 
 function setCallIndicator(text) {
@@ -1108,6 +1215,34 @@ async function runGlobalSearch(q){
   }catch(e){orbitToast("Search failed",e.message,"error")}
 }
 
+function wireEnhancedControls() {
+  $("#quick-share-btn")?.addEventListener("click", async () => {
+    if (!currentChannel) return;
+    const link = location.origin + "/?server=" + encodeURIComponent(currentServer?.id || "") + "&channel=" + encodeURIComponent(currentChannel.id);
+    try {
+      await navigator.clipboard.writeText(link);
+      orbitToast("Channel link copied", "Share it with anyone using Orbit.", "success");
+    } catch {
+      openModal("Share channel", '<input value="' + escapeHtml(link) + '" readonly><p class="hint">Copy this link to share the current channel.</p>');
+    }
+  });
+  $("#workspace-menu")?.addEventListener("click", () => {
+    if (!currentServer) return;
+    openModal("Community controls",
+      '<div class="control-grid">' +
+      '<div class="control-row"><strong>' + escapeHtml(currentServer.name) + '</strong><span>Workspace</span></div>' +
+      '<div class="control-row"><strong>Members</strong><span>Open the Members panel from chat.</span></div>' +
+      '<div class="control-row"><strong>Invite</strong><span>Create a 7-day invite link.</span></div>' +
+      '<button class="primary" id="workspace-open-settings">Open settings</button>' +
+      '</div>');
+    $("#workspace-open-settings").onclick = () => { closeModal(); setView("settings"); };
+  });
+  $("#more-call-btn")?.addEventListener("click", e => togglePopover("participants", e.currentTarget));
+  $("#dock-mic")?.addEventListener("click", toggleMic);
+  $("#dock-screen")?.addEventListener("click", toggleScreenShare);
+  $("#dock-leave")?.addEventListener("click", leaveCall);
+  $("#poll-btn")?.addEventListener("click", openPoll);
+}
 function bindPremiumNavigation(){
   document.querySelectorAll(".rail-nav[data-view]").forEach(b=>b.onclick=()=>{
     setView(b.dataset.view);
@@ -1241,8 +1376,10 @@ $("#attach")?.addEventListener("click",()=>{
 const __selectChannelBase=selectChannel;
 selectChannel=async function(channel){
   await __selectChannelBase(channel);
+  if(!channel) return;
   if(channel?.type==="voice") $("#composer")?.classList.add("hidden");
   else {$("#composer")?.classList.remove("hidden");await loadPolls();}
+  updateVoiceDock();
 };
 
 // Join/create voice support uses the server's "voice" channel type.
@@ -1259,13 +1396,26 @@ document.addEventListener("click",async e=>{
 
 // Boot premium nav after DOM is parsed, then launch guest session.
 bindPremiumNavigation();
+wireEnhancedControls();
+updateVoiceDock();
 
 (async()=>{
   try{
     await enterAsGuest();
     const invite=new URLSearchParams(location.search).get("invite");
     if(invite){await api("/api/invites/"+encodeURIComponent(invite)+"/accept",{method:"POST",body:"{}"}).catch(()=>{});await loadServers();}
-    setView("home");
+    const channelParam = new URLSearchParams(location.search).get("channel");
+    if (channelParam && currentServer) {
+      const target = channels.find(c => String(c.id) === String(channelParam));
+      if (target) {
+        await selectChannel(target);
+        goChat();
+      } else {
+        setView("home");
+      }
+    } else {
+      setView("home");
+    }
   }catch(err){
     console.error("Orbit boot failed",err);
     showError(err.message||"Unable to start Orbit");
