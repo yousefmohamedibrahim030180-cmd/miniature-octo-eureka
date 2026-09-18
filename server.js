@@ -20,7 +20,16 @@ const memory = {
   servers: new Map(),
   channels: new Map(),
   messages: new Map(),
-  invites: new Map()
+  invites: new Map(),
+  friendRequests: new Map(),
+  friendships: new Set(),
+  dms: new Map(),
+  dmMessages: new Map(),
+  notifications: new Map(),
+  threads: new Map(),
+  polls: new Map(),
+  uploads: new Map(),
+  audit: []
 };
 
 const CALL_EVENT_PREFIX = "call:";
@@ -197,6 +206,262 @@ app.get("/api/search", auth, (req, res) => {
     if (messages.length >= 50) break;
   }
   res.json({ users, servers, channels, messages });
+});
+
+function pairKey(a, b) {
+  return [String(a), String(b)].sort().join(":");
+}
+function findMessage(messageId) {
+  for (const [channelId, list] of memory.messages.entries()) {
+    const index = list.findIndex(m => String(m.id) === String(messageId));
+    if (index !== -1) return { channelId, list, index, message: list[index] };
+  }
+  return null;
+}
+function notify(userId, item) {
+  const list = memory.notifications.get(String(userId)) || [];
+  list.unshift({
+    id: id("notif"),
+    read: false,
+    created_at: now(),
+    ...item
+  });
+  memory.notifications.set(String(userId), list.slice(0, 200));
+}
+function audit(userId, action, target, details = {}) {
+  memory.audit.unshift({ id: id("audit"), user_id: userId, action, target, details, created_at: now() });
+  memory.audit = memory.audit.slice(0, 500);
+}
+function socketRoom(kind, idValue) { return kind + ":" + String(idValue); }
+
+app.get("/api/friends", auth, (req, res) => {
+  const userId = String(req.user.id);
+  const friends = [];
+  for (const key of memory.friendships) {
+    const [a, b] = key.split(":");
+    if (a !== userId && b !== userId) continue;
+    const other = memory.users.get(a === userId ? b : a);
+    if (other) friends.push(publicUser(other));
+  }
+  const incoming = [...memory.friendRequests.values()]
+    .filter(r => r.to === userId && r.status === "pending")
+    .map(r => ({ ...r, fromUser: publicUser(memory.users.get(r.from)) }));
+  const outgoing = [...memory.friendRequests.values()]
+    .filter(r => r.from === userId && r.status === "pending")
+    .map(r => ({ ...r, toUser: publicUser(memory.users.get(r.to)) }));
+  res.json({ friends, incoming, outgoing });
+});
+
+app.post("/api/friends/request", auth, (req, res) => {
+  const targetName = String(req.body?.username || "").trim().toLowerCase();
+  const target = [...memory.users.values()].find(u => u.username.toLowerCase() === targetName);
+  if (!target) return res.status(404).json({ error: "User not found" });
+  if (target.id === req.user.id) return res.status(400).json({ error: "You cannot add yourself" });
+  if (memory.friendships.has(pairKey(req.user.id, target.id))) return res.status(409).json({ error: "Already friends" });
+  const existing = [...memory.friendRequests.values()].find(r =>
+    r.status === "pending" &&
+    ((r.from === req.user.id && r.to === target.id) || (r.from === target.id && r.to === req.user.id))
+  );
+  if (existing) return res.status(409).json({ error: "Friend request already exists" });
+  const request = { id: id("friendreq"), from: req.user.id, to: target.id, status: "pending", created_at: now() };
+  memory.friendRequests.set(request.id, request);
+  notify(target.id, { type: "friend_request", title: "Friend request", body: req.user.username + " sent you a friend request", actorId: req.user.id, requestId: request.id });
+  audit(req.user.id, "FRIEND_REQUEST_CREATE", target.id);
+  res.status(201).json({ request });
+});
+
+app.post("/api/friends/request/:id/accept", auth, (req, res) => {
+  const request = memory.friendRequests.get(req.params.id);
+  if (!request || request.to !== String(req.user.id) || request.status !== "pending") return res.status(404).json({ error: "Request not found" });
+  request.status = "accepted";
+  memory.friendships.add(pairKey(request.from, request.to));
+  const from = memory.users.get(request.from);
+  notify(request.from, { type: "friend_request", title: "Friend request accepted", body: req.user.username + " accepted your request", actorId: req.user.id });
+  audit(req.user.id, "FRIEND_REQUEST_ACCEPT", request.from);
+  res.json({ ok: true, friend: from ? publicUser(from) : null });
+});
+
+app.post("/api/friends/request/:id/reject", auth, (req, res) => {
+  const request = memory.friendRequests.get(req.params.id);
+  if (!request || request.to !== String(req.user.id) || request.status !== "pending") return res.status(404).json({ error: "Request not found" });
+  request.status = "rejected";
+  audit(req.user.id, "FRIEND_REQUEST_REJECT", request.from);
+  res.json({ ok: true });
+});
+
+app.get("/api/dms", auth, (req, res) => {
+  const rows = [...memory.dms.values()]
+    .filter(dm => dm.members.includes(String(req.user.id)))
+    .map(dm => {
+      const otherId = dm.members.find(idValue => idValue !== String(req.user.id));
+      const other = otherId ? memory.users.get(otherId) : null;
+      const list = memory.dmMessages.get(dm.id) || [];
+      return { ...dm, otherUser: other ? publicUser(other) : null, lastMessage: list[list.length - 1] || null };
+    })
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  res.json({ dms: rows });
+});
+
+app.post("/api/dms", auth, (req, res) => {
+  const targetId = String(req.body?.userId || "");
+  const targetName = String(req.body?.username || "").trim().toLowerCase();
+  const target = targetId ? memory.users.get(targetId) : [...memory.users.values()].find(u => u.username.toLowerCase() === targetName);
+  if (!target) return res.status(404).json({ error: "User not found" });
+  if (target.id === req.user.id) return res.status(400).json({ error: "You cannot message yourself" });
+
+  const existing = [...memory.dms.values()].find(dm => dm.type === "dm" && dm.members.length === 2 && dm.members.includes(String(req.user.id)) && dm.members.includes(String(target.id)));
+  if (existing) return res.json({ dm: existing });
+
+  const dm = { id: id("dm"), type: "dm", name: null, members: [String(req.user.id), String(target.id)], created_at: now() };
+  memory.dms.set(dm.id, dm);
+  memory.dmMessages.set(dm.id, []);
+  res.status(201).json({ dm });
+});
+
+app.get("/api/dms/:id/messages", auth, (req, res) => {
+  const dm = memory.dms.get(req.params.id);
+  if (!dm || !dm.members.includes(String(req.user.id))) return res.status(403).json({ error: "Not a participant" });
+  res.json({ messages: memory.dmMessages.get(dm.id) || [] });
+});
+
+app.post("/api/dms/:id/messages", auth, (req, res) => {
+  const dm = memory.dms.get(req.params.id);
+  if (!dm || !dm.members.includes(String(req.user.id))) return res.status(403).json({ error: "Not a participant" });
+  const content = String(req.body?.content || "").trim().slice(0, 4000);
+  if (!content) return res.status(400).json({ error: "Message is empty" });
+  const message = { id: id("dmmsg"), dm_id: dm.id, content, user_id: req.user.id, username: req.user.username, created_at: now() };
+  const list = memory.dmMessages.get(dm.id) || [];
+  list.push(message);
+  memory.dmMessages.set(dm.id, list.slice(-500));
+  for (const memberId of dm.members.filter(idValue => idValue !== String(req.user.id))) {
+    notify(memberId, { type: "message", title: "New direct message", body: req.user.username + ": " + content.slice(0, 120), actorId: req.user.id, dmId: dm.id });
+  }
+  io.to(socketRoom("dm", dm.id)).emit("dm:message", message);
+  res.status(201).json({ message });
+});
+
+app.get("/api/notifications", auth, (req, res) => {
+  res.json({ notifications: memory.notifications.get(String(req.user.id)) || [] });
+});
+app.post("/api/notifications/read", auth, (req, res) => {
+  const list = memory.notifications.get(String(req.user.id)) || [];
+  list.forEach(n => n.read = true);
+  res.json({ ok: true });
+});
+
+app.get("/api/messages/:id/thread", auth, (req, res) => {
+  const found = findMessage(req.params.id);
+  if (!found) return res.status(404).json({ error: "Message not found" });
+  const channel = memory.channels.get(found.channelId);
+  if (!channel || !member(channel.serverId, req.user.id)) return res.status(403).json({ error: "Not a member" });
+  const thread = memory.threads.get(String(req.params.id)) || { id: id("thread"), message_id: found.message.id, replies: [] };
+  memory.threads.set(String(req.params.id), thread);
+  res.json({ thread });
+});
+app.post("/api/messages/:id/thread", auth, (req, res) => {
+  const found = findMessage(req.params.id);
+  if (!found) return res.status(404).json({ error: "Message not found" });
+  const channel = memory.channels.get(found.channelId);
+  if (!channel || !member(channel.serverId, req.user.id)) return res.status(403).json({ error: "Not a member" });
+  const content = String(req.body?.content || "").trim().slice(0, 2000);
+  if (!content) return res.status(400).json({ error: "Reply is empty" });
+  let thread = memory.threads.get(String(req.params.id));
+  if (!thread) { thread = { id: id("thread"), message_id: found.message.id, replies: [] }; memory.threads.set(String(req.params.id), thread); }
+  const reply = { id: id("reply"), user_id: req.user.id, username: req.user.username, content, created_at: now() };
+  thread.replies.push(reply);
+  notify(found.message.user_id, { type: "reply", title: "New thread reply", body: req.user.username + " replied to your message", actorId: req.user.id, messageId: found.message.id });
+  res.status(201).json({ reply, thread });
+});
+
+app.post("/api/messages/:id/reaction", auth, (req, res) => {
+  const found = findMessage(req.params.id);
+  if (!found) return res.status(404).json({ error: "Message not found" });
+  const channel = memory.channels.get(found.channelId);
+  if (!channel || !member(channel.serverId, req.user.id)) return res.status(403).json({ error: "Not a member" });
+  const emoji = String(req.body?.emoji || "👍").slice(0, 8);
+  found.message.reactions = found.message.reactions || {};
+  found.message.reactions[emoji] = found.message.reactions[emoji] || [];
+  const users = found.message.reactions[emoji];
+  const idx = users.indexOf(String(req.user.id));
+  if (idx === -1) users.push(String(req.user.id)); else users.splice(idx, 1);
+  io.to("channel:" + channel.id).emit("message:reaction", { messageId: found.message.id, reactions: found.message.reactions });
+  res.json({ reactions: found.message.reactions });
+});
+
+function canEditMessage(found, user) {
+  const channel = memory.channels.get(found.channelId);
+  const access = channel ? member(channel.serverId, user.id) : null;
+  return found.message.user_id === user.id || canManage(access?.role);
+}
+app.patch("/api/messages/:id", auth, (req, res) => {
+  const found = findMessage(req.params.id);
+  if (!found) return res.status(404).json({ error: "Message not found" });
+  if (!canEditMessage(found, req.user)) return res.status(403).json({ error: "Permission denied" });
+  const content = String(req.body?.content || "").trim().slice(0, 4000);
+  if (!content) return res.status(400).json({ error: "Message is empty" });
+  found.message.content = content;
+  found.message.edited_at = now();
+  io.to("channel:" + found.channelId).emit("message:update", found.message);
+  audit(req.user.id, "MESSAGE_EDIT", found.message.id);
+  res.json({ message: found.message });
+});
+app.delete("/api/messages/:id", auth, (req, res) => {
+  const found = findMessage(req.params.id);
+  if (!found) return res.status(404).json({ error: "Message not found" });
+  if (!canEditMessage(found, req.user)) return res.status(403).json({ error: "Permission denied" });
+  const [deleted] = found.list.splice(found.index, 1);
+  io.to("channel:" + found.channelId).emit("message:delete", { messageId: deleted.id });
+  audit(req.user.id, "MESSAGE_DELETE", deleted.id);
+  res.json({ ok: true });
+});
+
+app.get("/api/channels/:id/polls", auth, (req, res) => {
+  const channel = memory.channels.get(req.params.id);
+  if (!channel || !member(channel.serverId, req.user.id)) return res.status(403).json({ error: "Not a member" });
+  res.json({ polls: [...memory.polls.values()].filter(p => p.channelId === channel.id).map(p => ({
+    ...p,
+    options: p.options.map(o => ({ id:o.id, text:o.text, votes:o.votes.size }))
+  })) });
+});
+app.post("/api/channels/:id/polls", auth, (req, res) => {
+  const channel = memory.channels.get(req.params.id);
+  if (!channel || !member(channel.serverId, req.user.id)) return res.status(403).json({ error: "Not a member" });
+  const question = String(req.body?.question || "").trim().slice(0, 200);
+  const options = Array.isArray(req.body?.options) ? req.body.options.map(v => String(v).trim().slice(0, 120)).filter(Boolean).slice(0, 8) : [];
+  if (!question || options.length < 2) return res.status(400).json({ error: "Question and at least two options are required" });
+  const poll = { id: id("poll"), channelId: channel.id, question, multiple: Boolean(req.body?.multiple), createdBy:req.user.id, created_at:now(), options:options.map(text=>({id:id("opt"),text,votes:new Set()})) };
+  memory.polls.set(poll.id,poll);
+  notify(req.user.id, { type:"poll", title:"Poll published", body:question, channelId:channel.id });
+  io.to("channel:" + channel.id).emit("poll:new", { ...poll, options: poll.options.map(o=>({id:o.id,text:o.text,votes:o.votes.size})) });
+  res.status(201).json({ poll: { ...poll, options: poll.options.map(o=>({id:o.id,text:o.text,votes:o.votes.size})) } });
+});
+app.post("/api/polls/:id/vote", auth, (req, res) => {
+  const poll=memory.polls.get(req.params.id);
+  if(!poll) return res.status(404).json({error:"Poll not found"});
+  const optionIds=Array.isArray(req.body?.optionIds)?req.body.optionIds.map(String):[String(req.body?.optionId||"")];
+  if(!poll.multiple && optionIds.length>1) return res.status(400).json({error:"Only one option allowed"});
+  poll.options.forEach(o=>o.votes.delete(String(req.user.id)));
+  for(const idValue of optionIds){const option=poll.options.find(o=>String(o.id)===idValue);if(option)option.votes.add(String(req.user.id));}
+  res.json({poll:{...poll,options:poll.options.map(o=>({id:o.id,text:o.text,votes:o.votes.size}))}});
+});
+
+app.get("/api/servers/:id/audit", auth, (req, res) => {
+  const access=member(req.params.id,req.user.id);
+  if(!access || !canManage(access.role)) return res.status(403).json({error:"Permission denied"});
+  res.json({audit:memory.audit.slice(0,100)});
+});
+
+app.post("/api/uploads", auth, (req,res)=>{
+  const data=String(req.body?.data||"");
+  if(!data || data.length>2_500_000) return res.status(400).json({error:"File is missing or too large"});
+  const item={id:id("file"),name:String(req.body?.name||"file").slice(0,180),type:String(req.body?.type||"application/octet-stream").slice(0,120),size:Number(req.body?.size||0),data,created_at:now(),user_id:req.user.id};
+  memory.uploads.set(item.id,item);
+  res.status(201).json({file:{id:item.id,name:item.name,type:item.type,size:item.size}});
+});
+app.get("/api/uploads/:id", auth, (req,res)=>{
+  const file=memory.uploads.get(req.params.id);
+  if(!file) return res.status(404).end();
+  res.type(file.type).send(Buffer.from(String(file.data).replace(/^data:[^;]+;base64,/,""),"base64"));
 });
 
 app.get("/api/realtime-config", auth, (req, res) => {
@@ -541,11 +806,19 @@ io.on("connection", socket => {
     });
   });
 
-  socket.on("call:mute", ({ channelId, muted }) => {
+  socket.on("call:media-state", ({ channelId, muted, cameraOff, screenShare }) => {
     socket.to(callRoomFor(channelId)).emit("call:media-state", {
       socketId: socket.id,
-      muted: Boolean(muted)
+      muted: Boolean(muted),
+      cameraOff: Boolean(cameraOff),
+      screenShare: Boolean(screenShare)
     });
+  });
+
+  socket.on("dm:join", dmId => {
+    const dm = memory.dms.get(String(dmId));
+    if (!dm || !dm.members.includes(String(socket.user.id))) return;
+    socket.join(socketRoom("dm", dmId));
   });
 
   socket.on("disconnect", () => {

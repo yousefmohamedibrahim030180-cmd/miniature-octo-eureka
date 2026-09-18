@@ -413,3 +413,107 @@ window.addEventListener("load",()=>{
   document.documentElement.style.setProperty("--accent",accent||"#7652e8");
   setView("home");
 });
+
+/* ===========================
+   ORBIT FUNCTIONAL CORE
+   =========================== */
+async function refreshFriends() {
+  try { const d=await api("/api/friends"); return d; } catch { return {friends:[],incoming:[],outgoing:[]}; }
+}
+async function refreshDMs() {
+  try { const d=await api("/api/dms"); return d.dms||[]; } catch { return []; }
+}
+async function refreshNotifications() {
+  try { const d=await api("/api/notifications"); return d.notifications||[]; } catch { return []; }
+}
+function setPageButton(text,id,onClick){ const b=document.createElement("button"); b.id=id;b.textContent=text;b.onclick=onClick;return b; }
+function renderFriendsFunctional() {
+  $("#page-actions").innerHTML="";
+  $("#page-actions").append(
+    setPageButton("+ Add friend","add-friend-fn",()=>openModal("Add friend",'<input id="friend-name-fn" placeholder="Exact username"><button class="primary" id="send-friend-request-fn">Send request</button>')),
+    setPageButton("Refresh","friends-refresh-fn",()=>{renderFriends();orbitToast("Friends refreshed");})
+  );
+  refreshFriends().then(d=>{
+    const incoming=d.incoming||[], friends=d.friends||[], outgoing=d.outgoing||[];
+    $("#page-body").innerHTML=
+      '<div class="section-block"><div class="section-heading"><h3>Friends</h3><span>'+friends.length+' accepted</span></div><div class="list-card">'+
+      (friends.length?friends.map(u=>'<div class="list-row"><div class="avatar">'+avatar(u.username)+'</div><div><strong>'+escapeHtml(u.username)+'</strong><span>'+u.status+' · friend</span></div><button class="friend-dm-fn" data-user="'+escapeHtml(u.username)+'">Message</button></div>').join(""):'<div class="content-card"><h4>No friends yet</h4><p>Add someone by exact guest username.</p></div>')+
+      '</div></div>'+
+      '<div class="section-block"><div class="section-heading"><h3>Requests</h3><span>'+incoming.length+' incoming · '+outgoing.length+' outgoing</span></div><div class="list-card">'+
+      incoming.map(r=>'<div class="list-row"><div class="avatar">'+avatar(r.fromUser?.username)+'</div><div><strong>'+escapeHtml(r.fromUser?.username||"Guest")+'</strong><span>Incoming request</span></div><button class="accept-fn" data-id="'+r.id+'">Accept</button></div>').join("")+
+      outgoing.map(r=>'<div class="list-row"><div class="avatar">'+avatar(r.toUser?.username)+'</div><div><strong>'+escapeHtml(r.toUser?.username||"Guest")+'</strong><span>Request pending</span></div><button disabled>Pending</button></div>').join("")+
+      '</div></div>';
+    document.querySelectorAll(".accept-fn").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request/"+b.dataset.id+"/accept",{method:"POST",body:"{}"});orbitToast("Friend request accepted","You are now connected.","success");renderFriends()}catch(e){orbitToast("Request failed",e.message,"error")}});
+    document.querySelectorAll(".friend-dm-fn").forEach(b=>b.onclick=async()=>{try{const d=await api("/api/dms",{method:"POST",body:JSON.stringify({username:b.dataset.user})});setView("dms");orbitToast("Conversation ready","DM with "+b.dataset.user+" is ready.","success")}catch(e){orbitToast("DM failed",e.message,"error")}});
+  });
+}
+function renderDMsFunctional() {
+  $("#page-actions").innerHTML="";
+  $("#page-actions").append(
+    setPageButton("New message","new-dm-fn",()=>openModal("New direct message",'<input id="dm-user-fn" placeholder="Exact username"><button class="primary" id="create-dm-fn">Start conversation</button>')),
+    setPageButton("Refresh","dm-refresh-fn",()=>renderDMs())
+  );
+  refreshDMs().then(dms=>{
+    $("#page-body").innerHTML='<div class="list-card">'+(dms.length?dms.map(dm=>{
+      const u=dm.otherUser;
+      return '<div class="list-row"><div class="avatar">'+avatar(u?.username||"G")+'</div><div><strong>'+escapeHtml(u?.username||dm.name||"Group")+'</strong><span>'+(dm.lastMessage?escapeHtml(dm.lastMessage.content.slice(0,80)):"No messages yet")+'</span></div><button class="open-dm-fn" data-id="'+dm.id+'" data-name="'+escapeHtml(u?.username||"Group")+'">Open</button></div>'
+    }).join(""):'<div class="content-card"><h4>No direct messages yet</h4><p>Create a DM to start a private conversation.</p></div>')+'</div>';
+    document.querySelectorAll(".open-dm-fn").forEach(b=>b.onclick=()=>openDMConversation(b.dataset.id,b.dataset.name));
+  });
+}
+async function openDMConversation(dmId,name){
+  const d=await api("/api/dms/"+encodeURIComponent(dmId)+"/messages");
+  openModal("Direct message · "+name,'<div id="dm-modal-feed" class="list-card" style="max-height:360px;overflow:auto">'+(d.messages||[]).map(m=>'<div class="list-row"><div class="avatar">'+avatar(m.username)+'</div><div><strong>'+escapeHtml(m.username)+'</strong><span>'+escapeHtml(m.content)+'</span></div><span>'+new Date(m.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})+'</span></div>').join("")+'</div><form id="dm-send-form" class="thread-composer"><input id="dm-send-input" placeholder="Write a message"><button>Send</button></form>');
+  socket?.emit("dm:join",dmId);
+  $("#dm-send-form").onsubmit=async e=>{e.preventDefault();const v=$("#dm-send-input").value.trim();if(!v)return;const x=await api("/api/dms/"+encodeURIComponent(dmId)+"/messages",{method:"POST",body:JSON.stringify({content:v})});const feed=$("#dm-modal-feed");feed.insertAdjacentHTML("beforeend",'<div class="list-row"><div class="avatar">'+avatar(x.message.username)+'</div><div><strong>'+escapeHtml(x.message.username)+'</strong><span>'+escapeHtml(x.message.content)+'</span></div><span>now</span></div>');$("#dm-send-input").value="";feed.scrollTop=feed.scrollHeight;};
+}
+function renderNotificationsFunctional(){
+  $("#page-actions").innerHTML="";
+  $("#page-actions").append(setPageButton("Mark all read","mark-read-fn",async()=>{await api("/api/notifications/read",{method:"POST",body:"{}"});$("#notification-badge").textContent="0";orbitToast("Inbox cleared","All notifications are marked as read.","success");renderNotifications();}));
+  refreshNotifications().then(items=>{
+    $("#notification-badge").textContent=String(items.filter(n=>!n.read).length||0);
+    $("#page-body").innerHTML='<div class="list-card">'+(items.length?items.map(n=>'<div class="list-row"><div class="chip">'+(n.type==="friend_request"?"◎":n.type==="reply"?"↩":"◇")+'</div><div><strong>'+escapeHtml(n.title)+'</strong><span>'+escapeHtml(n.body||"")+' · '+new Date(n.created_at).toLocaleString()+'</span></div><button class="notification-action">Open</button></div>').join(""):'<div class="content-card"><h4>All clear</h4><p>You have no new notifications.</p></div>')+'</div>';
+  });
+}
+async function sendFriendRequestFromModal(){
+  const username=$("#friend-name-fn")?.value.trim();if(!username)return;
+  try{await api("/api/friends/request",{method:"POST",body:JSON.stringify({username})});closeOrbitModal();orbitToast("Friend request sent","Waiting for acceptance.","success");}catch(e){orbitToast("Request failed",e.message,"error")}
+}
+document.addEventListener("click",async e=>{
+  if(e.target.id==="send-friend-request-fn")await sendFriendRequestFromModal();
+  if(e.target.id==="create-dm-fn"){const username=$("#dm-user-fn")?.value.trim();if(!username)return;try{await api("/api/dms",{method:"POST",body:JSON.stringify({username})});closeOrbitModal();orbitToast("DM created","Opening Messages.");renderDMs();}catch(err){orbitToast("DM failed",err.message,"error")}}
+});
+
+function openPollComposerFunctional(){
+  openModal("Create poll",'<input id="poll-question-fn" placeholder="Question"><input id="poll-a-fn" placeholder="Option A"><input id="poll-b-fn" placeholder="Option B"><input id="poll-c-fn" placeholder="Option C (optional)"><button class="primary" id="publish-poll-fn">Publish poll</button>');
+}
+document.addEventListener("click",async e=>{
+  if(e.target.id==="publish-poll-fn"){
+    const options=["#poll-a-fn","#poll-b-fn","#poll-c-fn"].map(s=>$(s)?.value.trim()).filter(Boolean);
+    try{const d=await api("/api/channels/"+currentChannel.id+"/polls",{method:"POST",body:JSON.stringify({question:$("#poll-question-fn").value.trim(),options})});closeOrbitModal();orbitToast("Poll published","The poll is now live in #"+currentChannel.name,"success");await renderChannelPolls(d.poll)}catch(err){orbitToast("Poll failed",err.message,"error")}
+  }
+});
+async function renderChannelPolls(newPoll=null){
+  if(!currentChannel||currentChannel.type==="voice")return;
+  const d=await api("/api/channels/"+currentChannel.id+"/polls");
+  const polls=d.polls||[];
+  for(const p of polls) insertPollCard(p);
+  if(newPoll) insertPollCard(newPoll);
+}
+function insertPollCard(p){
+  if(document.querySelector('[data-poll="'+p.id+'"]'))return;
+  const el=document.createElement("div");el.className="content-card poll-card";el.dataset.poll=p.id;
+  el.innerHTML='<div class="eyebrow">LIVE POLL</div><h4>'+escapeHtml(p.question)+'</h4>'+p.options.map(o=>'<button class="poll-option" data-poll="'+p.id+'" data-option="'+o.id+'"><span>'+escapeHtml(o.text)+'</span><b>'+o.votes+'</b></button>').join("");
+  $("#messages").appendChild(el);
+  el.querySelectorAll(".poll-option").forEach(b=>b.onclick=async()=>{try{const x=await api("/api/polls/"+p.id+"/vote",{method:"POST",body:JSON.stringify({optionId:b.dataset.option})});el.querySelectorAll(".poll-option").forEach((n,i)=>n.querySelector("b").textContent=x.poll.options[i]?.votes||0);orbitToast("Vote saved","Your choice has been recorded.","success")}catch(err){orbitToast("Vote failed",err.message,"error")}});
+}
+function patchFunctionalNavigation(){
+  // Replace page renderers with functional versions.
+  const rf=renderFriends, rd=renderDMs, rn=renderNotifications;
+  renderFriends=renderFriendsFunctional;
+  renderDMs=renderDMsFunctional;
+  renderNotifications=renderNotificationsFunctional;
+  if(typeof openPollComposerFunctional==="function")window.openPollComposer=openPollComposerFunctional;
+  return {rf,rd,rn};
+}
+window.__orbitFunctionalReady = true;
