@@ -104,7 +104,7 @@ function applyAvatarNode(node,user,nameOverride=""){
 function avatarHtml(userOrName,className=""){
   const u=typeof userOrName==="object"&&userOrName?rememberAvatarUser(userOrName):(knownAvatarUsers.get(String(userOrName))||{username:userOrName||"G"});
   const image=avatarImageUrl(u),deco=avatarDecoration(u),decoUrl=avatarDecorationUrl(u);
-  return '<div class="avatar '+escapeHtml(className)+' '+(image?"has-image ":"")+(decoUrl?"has-decoration-image":"")+'" data-avatar-decoration="'+escapeHtml(deco)+'" data-avatar-decoration-url="'+escapeHtml(decoUrl)+'"'+(decoUrl?' style="--avatar-decoration-image:url(\\"'+escapeHtml(decoUrl)+'\\")"':'')+'>'+(image?'<img src="'+escapeHtml(image)+'" alt="">':'<span>'+escapeHtml(avatar(u.username||"G"))+'</span>')+'</div>';
+  return '<div class="avatar '+escapeHtml(className)+' '+(image?"has-image ":"")+(decoUrl?"has-decoration-image":"")+'" data-avatar-decoration="'+escapeHtml(deco)+'" data-avatar-decoration-url="'+escapeHtml(decoUrl)+'"'+(decoUrl?' style="--avatar-decoration-image:url(\\''+escapeHtml(decoUrl)+'\\')"':'')+'>'+(image?'<img src="'+escapeHtml(image)+'" alt="">':'<span>'+escapeHtml(avatar(u.username||"G"))+'</span>')+'</div>';
 }
 function renderOwnAvatar(){
   const node=$("#me-avatar");
@@ -1873,7 +1873,7 @@ async function runGlobalSearch(q){
     const empty='<div class="search-empty"><div class="search-empty-icon">⌕</div><strong>No results</strong><span>Try another word, username or channel.</span></div>';
     const section=(title,count,body,cls="")=>'<section class="search-section '+cls+'"><div class="search-section-head"><strong>'+title+'</strong><span>'+count+'</span></div>'+(body||empty)+'</section>';
     rememberAvatarUsers(users);
-    const bodyUsers=users.map(u=>'<button class="search-result user-result" data-search-user="'+escapeHtml(u.username)+'">'+avatarHtml(u)+<div><strong>'+escapeHtml(u.display_name||u.username)+'</strong><span>'+escapeHtml(u.handle||("@"+u.username))+' · '+escapeHtml(u.status)+'</span></div><b>Profile</b></button>').join("");
+    const bodyUsers=users.map(u=>'<button class="search-result user-result" data-search-user="'+escapeHtml(u.username)+'">'+avatarHtml(u)+'<div><strong>'+escapeHtml(u.display_name||u.username)+'</strong><span>'+escapeHtml(u.handle||("@"+u.username))+' · '+escapeHtml(u.status)+'</span></div><b>Profile</b></button>').join("");
     const bodyServers=serversFound.map(x=>'<div class="search-result"><div class="search-type-icon">◈</div><div><strong>'+escapeHtml(x.name)+'</strong><span>'+x.memberCount+' members</span></div></div>').join("");
     const bodyChannels=channelsFound.map(x=>'<div class="search-result"><div class="search-type-icon">'+(x.type==="voice"?"◉":"#")+'</div><div><strong>'+escapeHtml(x.name)+'</strong><span>'+escapeHtml(x.type)+' channel</span></div></div>').join("");
     const bodyMessages=messages.map(m=>'<div class="search-result"><div class="search-type-icon">◫</div><div><strong>'+escapeHtml(m.username)+'</strong><span>'+escapeHtml(m.content)+'</span></div></div>').join("");
