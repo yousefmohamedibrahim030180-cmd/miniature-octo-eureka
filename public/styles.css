@@ -1896,3 +1896,38 @@ body[data-avatar-motion="off"] .orbit-avatar-preview{animation:none!important}
 @keyframes profileCoverFlow{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 @media(max-width:900px){.server-home-columns{grid-template-columns:1fr}.server-metrics{grid-template-columns:repeat(2,1fr)}.onboarding-steps{grid-template-columns:1fr}.server-orbit-badge{width:100px;height:100px}.server-orbit-badge span{font-size:22px}}
 @media(max-width:600px){.server-home-hero{padding:20px}.server-orbit-badge{display:none}.server-member-grid{grid-template-columns:1fr}.role-manager{align-items:stretch;flex-direction:column}.role-manager-controls>*{width:100%}}
+
+
+/* ===== Community Identity / Activity ===== */
+:root{--server-accent:#7c5cff;--server-secondary:#14b8a6}
+.server-home-hero{background:
+  radial-gradient(circle at 82% 18%,color-mix(in srgb,var(--server-accent) 22%,transparent) 0 10%,transparent 34%),
+  radial-gradient(circle at 22% 115%,color-mix(in srgb,var(--server-secondary) 14%,transparent) 0 12%,transparent 34%),
+  linear-gradient(135deg,#121925,#0c1119 58%,#171228)}
+.server-orbit-badge{background:linear-gradient(135deg,var(--server-accent),var(--server-secondary))}
+.server-member-card em{display:block;color:#8f9db2;font-size:7px;font-style:normal;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profile-badge-row{display:flex;gap:6px;flex-wrap:wrap;padding:10px 18px 0}
+.profile-badge{display:inline-flex;align-items:center;gap:4px;padding:5px 7px;border-radius:999px;border:1px solid #323b4b;background:#131b26;color:#cbd4e1;font-size:7px}
+.profile-badge:first-child{border-color:#6c58b5;background:#1b1530;color:#ddd2ff}
+.activity-editor{margin:14px 0;padding:14px;border:1px solid #252d3a;border-radius:14px;background:#0b1017}
+.activity-editor>div:first-child strong{display:block;font-size:11px}.activity-editor>div:first-child span{display:block;color:#748197;font-size:9px;margin-top:3px}
+.activity-presets{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0 8px}
+.activity-presets button{border:1px solid #293341;background:#111823;color:#cfd7e4;border-radius:9px;padding:7px 9px;font-size:8px;cursor:pointer}
+.activity-presets button:hover{border-color:#6d59bb;background:#1a1530}
+#profile-activity{width:100%;box-sizing:border-box}
+
+.server-customizer{display:grid;gap:12px}
+.customizer-cover{height:90px;border-radius:14px;border:1px solid #2a3341;background:linear-gradient(135deg,var(--server-accent),var(--server-secondary));background-size:cover;background-position:center}
+.customizer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.customizer-grid label,.customizer-field{display:grid;gap:6px}.customizer-grid span,.customizer-field span{font-size:9px;color:#8793a6}
+.customizer-grid input[type=color]{width:100%;height:38px;border:1px solid #293342;border-radius:9px;background:#0b1017;padding:3px}
+.customizer-field textarea{width:100%;min-height:72px;box-sizing:border-box}
+.customizer-upload-row{display:flex;align-items:center;gap:8px;padding:11px;border:1px solid #252d3a;border-radius:12px;background:#0b1017}
+.customizer-upload-row>div{flex:1}.customizer-upload-row strong{display:block;font-size:10px}.customizer-upload-row small{display:block;color:#758196;font-size:8px;margin-top:2px}
+.customizer-upload-row button{border:1px solid #303a49;background:#151c27;color:#e3e9f2;border-radius:8px;padding:7px 9px;cursor:pointer;font-size:8px}
+.customizer-preview{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid #242d3b;border-radius:12px;background:#0a0f16}
+.customizer-preview-icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,var(--server-accent),var(--server-secondary));font-weight:900;overflow:hidden}
+.customizer-preview-icon img{width:100%;height:100%;object-fit:cover}.customizer-preview strong{display:block;font-size:10px}.customizer-preview span{display:block;color:#738095;font-size:8px;margin-top:3px}
+.server-orbit-badge[style*="background-image"]{background-position:center;background-size:cover}
+
+@media(max-width:600px){.customizer-grid{grid-template-columns:1fr}.activity-presets button{flex:1}.customizer-upload-row{flex-wrap:wrap}}
