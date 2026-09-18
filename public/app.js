@@ -1115,6 +1115,12 @@ async function loadPolls(){
   try{const d=await api("/api/channels/"+currentChannel.id+"/polls");(d.polls||[]).forEach(renderPoll)}catch{}
 }
 
+
+$("#new-server").onclick=()=>openModal("Create server",'<input id="server-name-input" placeholder="Community name"><button class="primary" id="create-server-now">Create server</button>');
+$("#new-channel").onclick=()=>openChannelModal("text");
+$("#new-voice-channel").onclick=()=>openChannelModal("voice");
+$("#modal-close").onclick=closeModal;
+
 // Add realtime message management to the original socket.
 const __connectRealtimeBase=connectRealtime;
 connectRealtime=function(){
