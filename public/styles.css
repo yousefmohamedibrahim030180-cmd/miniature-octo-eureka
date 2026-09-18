@@ -479,3 +479,47 @@ body{
   .composer .send{padding:0 14px}
   .call-panel{inset:5px;border-radius:15px}
 }
+
+/* professional rail tooltips */
+@media(min-width:851px){
+  .rail-nav[title]::after{
+    content:attr(title);
+    position:absolute;
+    left:calc(100% + 10px);
+    top:50%;
+    transform:translateY(-50%) translateX(-4px);
+    opacity:0;
+    pointer-events:none;
+    z-index:300;
+    padding:7px 9px;
+    border-radius:8px;
+    background:#171f29;
+    color:#eef2f8;
+    border:1px solid #34404e;
+    box-shadow:0 12px 30px rgba(0,0,0,.35);
+    font-size:9px;
+    white-space:nowrap;
+    transition:.14s;
+  }
+  .rail-nav[title]:hover::after{opacity:1;transform:translateY(-50%) translateX(0)}
+  .server-item[title]{position:relative}
+  .server-item[title]::after{
+    content:attr(title);
+    position:absolute;
+    left:calc(100% + 10px);
+    top:50%;
+    transform:translateY(-50%);
+    opacity:0;
+    pointer-events:none;
+    z-index:300;
+    padding:7px 9px;
+    border-radius:8px;
+    background:#171f29;
+    color:#eef2f8;
+    border:1px solid #34404e;
+    box-shadow:0 12px 30px rgba(0,0,0,.35);
+    font-size:9px;
+    white-space:nowrap;
+  }
+  .server-item[title]:hover::after{opacity:1}
+}
