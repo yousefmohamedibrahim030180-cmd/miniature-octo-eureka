@@ -1670,8 +1670,7 @@ function renderSettingsPage(section="appearance"){
       '<button type="button" class="avatar-frame-card" data-avatar-frame="ice"><span class="frame-preview frame-ice">A</span><strong>Ice</strong></button>'+
       '<button type="button" class="avatar-frame-card" data-avatar-frame="cyber"><span class="frame-preview frame-cyber">A</span><strong>Cyber</strong></button>'+
       '<button type="button" class="avatar-frame-card" data-avatar-frame="royal"><span class="frame-preview frame-royal">A</span><strong>Royal</strong></button>'+
-      '<button type="button" class="avatar-frame-card" data-avatar-frame="dragon"><span class="frame-preview frame-dragon">A</span><strong>Dragon</strong></button>'+\
-      '</div></div></div>'+
+      '<button type="button" class="avatar-frame-card" data-avatar-frame="dragon"><span class="frame-preview frame-dragon">A</span><strong>Dragon</strong></button>'+      '</div></div></div>'+
       '<input id="profile-name" value="'+escapeHtml(orbitUI.profile.displayName||me?.display_name||me?.username||"Guest")+'" placeholder="Display name">'+
       '<textarea id="profile-bio" placeholder="Bio">'+escapeHtml(orbitUI.profile.bio||"")+'</textarea>'+
       '<select id="profile-status"><option>Online</option><option>Idle</option><option>Do Not Disturb</option><option>Invisible</option></select>'+
