@@ -36,6 +36,7 @@ const memory = {
 
 const CALL_EVENT_PREFIX = "call:";
 const callRoomFor = channelId => CALL_EVENT_PREFIX + String(channelId);
+const serverMessageRate = new Map();
 
 const DATABASE_URL = String(process.env.DATABASE_URL || "").trim();
 const PERSIST_URL = String(process.env.ORBIT_PERSIST_URL || "").trim().replace(/\/$/, "");
@@ -245,6 +246,20 @@ function auth(req, res, next) {
     return res.status(401).json({ error: "Guest session expired" });
   }
 }
+function serverSettings(server) {
+  if (!server.settings || typeof server.settings !== "object") server.settings = {};
+  if (typeof server.settings.locked !== "boolean") server.settings.locked = false;
+  if (!Number.isFinite(Number(server.settings.slowmode))) server.settings.slowmode = 0;
+  server.settings.slowmode = Math.max(0, Math.min(120, Number(server.settings.slowmode)));
+  if (!["open","verified","high"].includes(server.settings.verification)) server.settings.verification = "open";
+  if (!Array.isArray(server.bannedUserIds)) server.bannedUserIds = [];
+  return server.settings;
+}
+function isServerBanned(server, userId) {
+  serverSettings(server);
+  return server.bannedUserIds.includes(String(userId));
+}
+
 function ensureDefaultServer(user) {
   if (!memory.servers.size) {
     const serverId = id("server");
@@ -256,7 +271,9 @@ function ensureDefaultServer(user) {
       ownerId: user.id,
       createdAt: now(),
       members: new Map([[user.id, "owner"]]),
-      channels: [channelId, voiceId]
+      channels: [channelId, voiceId],
+      settings: { locked: false, slowmode: 0, verification: "open" },
+      bannedUserIds: []
     };
     memory.servers.set(serverId, lobby);
     memory.channels.set(channelId, {
@@ -277,6 +294,7 @@ function ensureDefaultServer(user) {
     memory.messages.set(voiceId, []);
   } else {
     for (const s of memory.servers.values()) {
+      serverSettings(s);
       if (!s.members.has(user.id) && s.name === "Orbit Lobby") {
         s.members.set(user.id, "member");
       }
@@ -635,7 +653,7 @@ app.patch("/api/messages/:id", auth, (req, res) => {
   found.message.content = content;
   found.message.edited_at = now();
   io.to("channel:" + found.channelId).emit("message:update", found.message);
-  audit(req.user.id, "MESSAGE_EDIT", found.message.id);
+  audit(req.user.id, "MESSAGE_EDIT", found.message.id, { serverId: channel.serverId });
   res.json({ message: found.message });
 });
 app.delete("/api/messages/:id", auth, (req, res) => {
@@ -644,7 +662,7 @@ app.delete("/api/messages/:id", auth, (req, res) => {
   if (!canEditMessage(found, req.user)) return res.status(403).json({ error: "Permission denied" });
   const [deleted] = found.list.splice(found.index, 1);
   io.to("channel:" + found.channelId).emit("message:delete", { messageId: deleted.id });
-  audit(req.user.id, "MESSAGE_DELETE", deleted.id);
+  audit(req.user.id, "MESSAGE_DELETE", deleted.id, { serverId: channel.serverId });
   res.json({ ok: true });
 });
 
@@ -681,7 +699,143 @@ app.post("/api/polls/:id/vote", auth, (req, res) => {
 app.get("/api/servers/:id/audit", auth, (req, res) => {
   const access=member(req.params.id,req.user.id);
   if(!access || !canManage(access.role)) return res.status(403).json({error:"Permission denied"});
-  res.json({audit:memory.audit.slice(0,100)});
+  const rows=memory.audit.filter(item=>String(item?.details?.serverId||"")===String(access.server.id)).slice(0,150);
+  res.json({audit:rows});
+});
+
+app.get("/api/servers/:id/admin/dashboard", auth, (req, res) => {
+  const access=member(req.params.id,req.user.id);
+  if(!access || !canManage(access.role)) return res.status(403).json({error:"Permission denied"});
+  const server=access.server;
+  const settings=serverSettings(server);
+  const members=[...server.members.entries()].map(([userId,role])=>{
+    const user=memory.users.get(userId);
+    return user?{...publicUser(user),role,joinedAt:user.createdAt,banned:isServerBanned(server,user.id)}:null;
+  }).filter(Boolean).sort((a,b)=>({owner:0,admin:1,moderator:2,member:3}[a.role]??9)-({owner:0,admin:1,moderator:2,member:3}[b.role]??9)||a.username.localeCompare(b.username));
+  const channels=server.channels.map(channelId=>memory.channels.get(channelId)).filter(Boolean).map(channel=>({
+    ...channel,
+    messageCount:(memory.messages.get(channel.id)||[]).length,
+    activeParticipants:[...(io.sockets.adapter.rooms.get(callRoomFor(channel.id))||[])].map(socketId=>io.sockets.sockets.get(socketId)).filter(Boolean).map(callParticipant)
+  }));
+  const messages=[];
+  for(const channel of channels) for(const message of (memory.messages.get(channel.id)||[])) messages.push({...message,channel_name:channel.name,channel_type:channel.type});
+  messages.sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));
+  const calls=livePulseSnapshot().calls.filter(call=>String(call.serverId)===String(server.id));
+  const auditRows=memory.audit.filter(item=>String(item?.details?.serverId||"")===String(server.id)).slice(0,150);
+  res.json({
+    ok:true,
+    server:{id:server.id,name:server.name,ownerId:server.ownerId,createdAt:server.createdAt,role:access.role,memberCount:server.members.size,channelCount:server.channels.length,settings},
+    permissions:{
+      manageMembers:["owner","admin"].includes(access.role),
+      manageRoles:["owner","admin"].includes(access.role),
+      manageSecurity:["owner","admin"].includes(access.role),
+      deleteMessages:canManage(access.role),
+      deleteChannels:["owner","admin"].includes(access.role)
+    },
+    stats:{
+      members:server.members.size,
+      online:members.filter(m=>m.status==="online").length,
+      channels:channels.length,
+      textChannels:channels.filter(c=>c.type!=="voice").length,
+      voiceChannels:channels.filter(c=>c.type==="voice").length,
+      messages:messages.length,
+      activeCalls:calls.length,
+      activeCallParticipants:calls.reduce((sum,c)=>sum+c.participants.length,0),
+      banned:server.bannedUserIds.length,
+      auditEvents:auditRows.length
+    },
+    members,
+    channels,
+    messages:messages.slice(0,250),
+    calls,
+    audit:auditRows,
+    bans:server.bannedUserIds.map(idValue=>memory.users.get(idValue)).filter(Boolean).map(publicUser)
+  });
+});
+
+app.patch("/api/servers/:id/admin/settings", auth, (req, res) => {
+  const access=member(req.params.id,req.user.id);
+  if(!access || !["owner","admin"].includes(access.role)) return res.status(403).json({error:"Permission denied"});
+  const settings=serverSettings(access.server);
+  if(req.body?.locked!==undefined) settings.locked=Boolean(req.body.locked);
+  if(req.body?.slowmode!==undefined){
+    const value=Number(req.body.slowmode);
+    if(!Number.isFinite(value)||value<0||value>120) return res.status(400).json({error:"Slowmode must be between 0 and 120 seconds"});
+    settings.slowmode=Math.round(value);
+  }
+  if(req.body?.verification!==undefined){
+    const v=String(req.body.verification);
+    if(!["open","verified","high"].includes(v)) return res.status(400).json({error:"Unsupported verification level"});
+    settings.verification=v;
+  }
+  audit(req.user.id,"SERVER_SETTINGS_UPDATE",access.server.id,{serverId:access.server.id,settings:{...settings}});
+  res.json({ok:true,settings});
+});
+
+app.patch("/api/servers/:id/admin/members/:userId/role", auth, (req, res) => {
+  const access=member(req.params.id,req.user.id);
+  if(!access || !["owner","admin"].includes(access.role)) return res.status(403).json({error:"Permission denied"});
+  const target=member(req.params.id,req.params.userId);
+  if(!target || target.role==="owner") return res.status(400).json({error:"Member cannot be changed"});
+  if(access.role==="admin" && target.role==="admin") return res.status(403).json({error:"Only the owner can change another admin"});
+  const nextRole=["member","moderator","admin"].includes(String(req.body?.role))?String(req.body.role):null;
+  if(!nextRole) return res.status(400).json({error:"Unsupported role"});
+  if(access.role==="admin" && nextRole==="admin") return res.status(403).json({error:"Only the owner can grant admin"});
+  target.server.members.set(req.params.userId,nextRole);
+  audit(req.user.id,"SERVER_ROLE_UPDATE",req.params.userId,{serverId:target.server.id,role:nextRole});
+  emitToUser(req.params.userId,"server:role-updated",{serverId:target.server.id,role:nextRole});
+  res.json({ok:true,role:nextRole});
+});
+
+app.post("/api/servers/:id/admin/members/:userId/kick", auth, (req, res) => {
+  const access=member(req.params.id,req.user.id);
+  if(!access || !["owner","admin"].includes(access.role)) return res.status(403).json({error:"Permission denied"});
+  const target=member(req.params.id,req.params.userId);
+  if(!target || target.role==="owner") return res.status(400).json({error:"Member cannot be kicked"});
+  if(access.role==="admin" && target.role==="admin") return res.status(403).json({error:"Only the owner can kick another admin"});
+  target.server.members.delete(req.params.userId);
+  audit(req.user.id,"SERVER_MEMBER_KICK",req.params.userId,{serverId:target.server.id});
+  emitToUser(req.params.userId,"server:removed",{serverId:target.server.id,action:"kick"});
+  res.json({ok:true});
+});
+
+app.post("/api/servers/:id/admin/members/:userId/ban", auth, (req, res) => {
+  const access=member(req.params.id,req.user.id);
+  if(!access || !["owner","admin"].includes(access.role)) return res.status(403).json({error:"Permission denied"});
+  const target=member(req.params.id,req.params.userId);
+  if(!target || target.role==="owner") return res.status(400).json({error:"Member cannot be banned"});
+  if(access.role==="admin" && target.role==="admin") return res.status(403).json({error:"Only the owner can ban another admin"});
+  serverSettings(target.server);
+  if(!target.server.bannedUserIds.includes(String(req.params.userId))) target.server.bannedUserIds.push(String(req.params.userId));
+  target.server.members.delete(req.params.userId);
+  audit(req.user.id,"SERVER_MEMBER_BAN",req.params.userId,{serverId:target.server.id});
+  emitToUser(req.params.userId,"server:removed",{serverId:target.server.id,action:"ban"});
+  res.json({ok:true});
+});
+
+app.post("/api/servers/:id/admin/members/:userId/unban", auth, (req, res) => {
+  const access=member(req.params.id,req.user.id);
+  if(!access || !["owner","admin"].includes(access.role)) return res.status(403).json({error:"Permission denied"});
+  const server=access.server;serverSettings(server);
+  server.bannedUserIds=server.bannedUserIds.filter(idValue=>String(idValue)!==String(req.params.userId));
+  audit(req.user.id,"SERVER_MEMBER_UNBAN",req.params.userId,{serverId:server.id});
+  res.json({ok:true});
+});
+
+app.delete("/api/servers/:id/admin/channels/:channelId", auth, (req, res) => {
+  const access=member(req.params.id,req.user.id);
+  if(!access || !["owner","admin"].includes(access.role)) return res.status(403).json({error:"Permission denied"});
+  const server=access.server;
+  if(!server.channels.includes(req.params.channelId)) return res.status(404).json({error:"Channel not found"});
+  if(server.channels.length<=1) return res.status(400).json({error:"A server must keep at least one channel"});
+  server.channels=server.channels.filter(idValue=>String(idValue)!==String(req.params.channelId));
+  const channel=memory.channels.get(req.params.channelId);
+  memory.channels.delete(req.params.channelId);
+  memory.messages.delete(req.params.channelId);
+  if(channel) for(const key of [...memory.polls.keys()]){const poll=memory.polls.get(key);if(poll?.channelId===channel.id)memory.polls.delete(key);}
+  io.to("channel:"+req.params.channelId).emit("channel:deleted",{channelId:req.params.channelId});
+  audit(req.user.id,"CHANNEL_DELETE",req.params.channelId,{serverId:server.id});
+  res.json({ok:true});
 });
 
 app.post("/api/uploads", auth, (req,res)=>{
@@ -838,6 +992,7 @@ app.post("/api/servers/:id/channels", auth, (req, res) => {
   access.server.channels.push(channelId);
   memory.channels.set(channelId, channel);
   memory.messages.set(channelId, []);
+  audit(req.user.id, "CHANNEL_CREATE", channel.id, { serverId: access.server.id, name: channel.name, type: channel.type });
   res.status(201).json({ channel });
 });
 
@@ -863,6 +1018,7 @@ app.post("/api/servers/:id/invites", auth, (req, res) => {
     expiresAt: expires,
     uses: 0
   });
+  audit(req.user.id, "INVITE_CREATE", access.server.id, { serverId: access.server.id, code });
   res.status(201).json({
     invite: { code, expires_at: new Date(expires).toISOString() }
   });
@@ -875,6 +1031,7 @@ app.post("/api/invites/:code/accept", auth, (req, res) => {
   }
   const server = memory.servers.get(invite.serverId);
   if (!server) return res.status(404).json({ error: "Server not found" });
+  if (isServerBanned(server, req.user.id)) return res.status(403).json({ error: "You are banned from this server" });
   if (!server.members.has(req.user.id)) server.members.set(req.user.id, "member");
   invite.uses += 1;
   res.json({ server_id: server.id });
@@ -1008,6 +1165,24 @@ io.on("connection", socket => {
     if (!channel || !member(channel.serverId, socket.user.id)) return;
     const text = String(content || "").trim().slice(0, 4000);
     if (!text) return;
+
+    const server = memory.servers.get(channel.serverId);
+    const role = server?.members.get(socket.user.id);
+    const settings = server ? serverSettings(server) : { locked:false, slowmode:0 };
+    if (settings.locked && !canManage(role)) {
+      socket.emit("error:toast", { message: "This server is currently locked by an administrator." });
+      return;
+    }
+    const rateKey = channel.serverId + ":" + socket.user.id;
+    const lastMessageAt = serverMessageRate.get(rateKey) || 0;
+    if (settings.slowmode > 0 && !canManage(role)) {
+      const wait = (settings.slowmode * 1000) - (Date.now() - lastMessageAt);
+      if (wait > 0) {
+        socket.emit("error:toast", { message: "Slowmode is enabled. Try again in " + Math.ceil(wait / 1000) + "s." });
+        return;
+      }
+    }
+    serverMessageRate.set(rateKey, Date.now());
 
     const message = {
       id: id("msg"),
