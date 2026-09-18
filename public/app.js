@@ -13,6 +13,10 @@ let typingTimer = null;
 
 const callState = {
   active: false,
+  startedAt: 0,
+  durationTimer: null,
+  statsTimer: null,
+  iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }],
   mode: "video",
   roomId: null,
   peers: new Map(),
@@ -25,6 +29,8 @@ const callState = {
     fps: 30,
     layout: "grid",
     frame: "soft",
+    autoQuality: true,
+    background: "none",
     mirror: true,
     noiseSuppression: true,
     echoCancellation: true,
@@ -102,6 +108,12 @@ function connectRealtime() {
   if (socket) socket.disconnect();
   socket = io({ auth: { token }, transports: ["websocket", "polling"] });
 
+  api("/api/realtime-config").then(cfg => {
+    if (Array.isArray(cfg.iceServers) && cfg.iceServers.length) {
+      callState.iceServers = cfg.iceServers;
+    }
+  }).catch(() => {});
+
   socket.on("message:new", m => {
     if (currentChannel && String(m.channel_id) === String(currentChannel.id)) appendMessage(m);
   });
@@ -128,9 +140,14 @@ function connectRealtime() {
     updateCallMeta();
   });
 
-  socket.on("call:media-state", ({ socketId, muted }) => {
+  socket.on("call:media-state", ({ socketId, muted, cameraOff, screenShare }) => {
     const tile = document.querySelector('.call-tile[data-peer="' + socketId + '"]');
-    if (tile) tile.classList.toggle("remote-muted", muted);
+    if (!tile) return;
+    tile.classList.toggle("remote-muted", muted);
+    tile.classList.toggle("remote-camera-off", cameraOff);
+    tile.classList.toggle("remote-screen", screenShare);
+    const badge = tile.querySelector(".tile-badge");
+    if (badge) badge.textContent = screenShare ? "SCREEN" : cameraOff ? "CAM OFF" : "LIVE";
   });
 
   socket.on("rtc:offer", async ({ from, fromUser, offer }) => {
@@ -192,12 +209,29 @@ async function selectServer(serverItem) {
   await loadMembers();
 }
 function renderChannels() {
-  $("#channel-list").innerHTML = channels.map(c =>
+  const textChannels = channels.filter(c => c.type !== "voice");
+  const voiceChannels = channels.filter(c => c.type === "voice");
+
+  $("#channel-list").innerHTML = textChannels.map(c =>
     '<button class="channel ' + (String(currentChannel?.id) === String(c.id) ? "active" : "") +
     '" data-id="' + c.id + '"><span class="hash">#</span><span>' + escapeHtml(c.name) + "</span></button>"
   ).join("");
-  document.querySelectorAll(".channel").forEach(btn => {
+
+  $("#voice-channel-list").innerHTML = voiceChannels.map(c =>
+    '<button class="channel voice-channel ' + (String(currentChannel?.id) === String(c.id) ? "active" : "") +
+    '" data-id="' + c.id + '"><span class="voice-icon">◉</span><span>' + escapeHtml(c.name) + '</span><span class="voice-live-count" data-voice="' + c.id + '"></span></button>'
+  ).join("");
+
+  document.querySelectorAll("#channel-list .channel").forEach(btn => {
     btn.onclick = () => selectChannel(channels.find(c => String(c.id) === btn.dataset.id));
+  });
+
+  document.querySelectorAll("#voice-channel-list .channel").forEach(btn => {
+    btn.onclick = async () => {
+      const channel = channels.find(c => String(c.id) === btn.dataset.id);
+      await selectChannel(channel);
+      if (channel) startCall("voice");
+    };
   });
 }
 async function selectChannel(channel) {
@@ -205,12 +239,19 @@ async function selectChannel(channel) {
   currentChannel = channel;
   renderChannels();
   $("#channel-name").textContent = channel.name;
-  $("#channel-meta").textContent = channel.type === "announcement" ? "Announcement channel" : "Realtime conversation";
+  $("#channel-meta").textContent =
+    channel.type === "announcement" ? "Announcement channel" :
+    channel.type === "voice" ? "Voice room" :
+    "Realtime conversation";
   $("#message").placeholder = "Message #" + channel.name;
   $("#messages").innerHTML = "";
-  const data = await api("/api/channels/" + channel.id + "/messages");
+  const data = channel.type === "voice"
+    ? { messages: [] }
+    : await api("/api/channels/" + channel.id + "/messages");
   data.messages.forEach(appendMessage);
   if (socket) socket.emit("channel:join", channel.id);
+  if (channel.type === "voice") $("#composer").classList.add("hidden");
+  else $("#composer").classList.remove("hidden");
 }
 function appendMessage(m) {
   const el = document.createElement("article");
@@ -244,11 +285,23 @@ $("#new-server").onclick = () => openModal(
 );
 $("#new-channel").onclick = () => {
   if (!currentServer) return;
+  openChannelCreator("text");
+};
+$("#new-voice-channel").onclick = () => {
+  if (!currentServer) return;
+  openChannelCreator("voice");
+};
+function openChannelCreator(defaultType) {
   openModal(
     "Create channel",
-    '<input id="channel-name-input" placeholder="general"><select id="channel-type"><option value="text">Text</option><option value="announcement">Announcement</option></select><button class="primary" id="create-channel">Create channel</button>'
+    '<input id="channel-name-input" placeholder="general">' +
+    '<select id="channel-type">' +
+    '<option value="text"' + (defaultType === "text" ? " selected" : "") + '>Text</option>' +
+    '<option value="announcement">Announcement</option>' +
+    '<option value="voice"' + (defaultType === "voice" ? " selected" : "") + '>Voice</option>' +
+    '</select><button class="primary" id="create-channel">Create channel</button>'
   );
-};
+}
 $("#rename-guest").onclick = () => openModal(
   "Change guest name",
   '<input id="guest-name-input" value="' + escapeHtml(me?.username || "") + '" maxlength="24"><button class="primary" id="save-guest-name">Save name</button>'
@@ -346,6 +399,7 @@ async function startCall(mode = "video") {
   callState.mode = mode;
   callState.roomId = currentChannel.id;
   callState.active = true;
+  callState.startedAt = Date.now();
   $("#call-panel").classList.remove("hidden");
   $("#call-title").textContent = currentChannel.name;
   $("#call-subtitle").textContent = mode === "voice" ? "Voice room" : "Video room";
@@ -356,6 +410,10 @@ async function startCall(mode = "video") {
     ensureSelfTile();
     socket.emit("call:join", callState.roomId);
     setCallIndicator("LIVE");
+    startCallClock();
+    startStatsMonitor();
+    $("#voice-dock").classList.toggle("hidden", mode !== "voice");
+    $("#voice-dock-name").textContent = currentChannel.name;
     updateCallMeta();
   } catch (err) {
     leaveCall();
@@ -393,6 +451,7 @@ async function setupLocalMedia(mode) {
   if (callState.micTrack) callState.micTrack.enabled = true;
   $("#mic-btn").classList.add("active");
   $("#camera-btn").classList.toggle("active", Boolean(callState.cameraTrack));
+  $("#camera-btn").classList.toggle("off", !callState.cameraTrack);
 }
 
 function ensureSelfTile() {
@@ -504,6 +563,10 @@ function leaveCall() {
   try { if (socket && callState.roomId) socket.emit("call:leave", callState.roomId); } catch {}
   for (const [, item] of callState.peers) item.pc.close();
   callState.peers.clear();
+  if (callState.statsTimer) clearInterval(callState.statsTimer);
+  if (callState.durationTimer) clearInterval(callState.durationTimer);
+  callState.statsTimer = null;
+  callState.durationTimer = null;
   if (callState.screenTrack) {
     callState.screenTrack.stop();
     callState.screenTrack = null;
@@ -516,16 +579,55 @@ function leaveCall() {
   callState.micTrack = null;
   callState.active = false;
   callState.roomId = null;
+  callState.startedAt = 0;
+  $("#voice-dock").classList.add("hidden");
   document.querySelectorAll(".call-tile").forEach(t => t.remove());
   $("#call-panel").classList.add("hidden");
   document.body.classList.remove("call-open");
   setCallIndicator("IDLE");
+  $("#call-network-indicator").textContent = "NETWORK —";
+  $("#call-duration").textContent = "00:00";
   updateCallMeta();
 }
 
 function setCallIndicator(text) {
   $("#call-quality-indicator").textContent = text;
   $("#call-quality-indicator").classList.toggle("good", text === "LIVE");
+}
+function startCallClock() {
+  if (callState.durationTimer) clearInterval(callState.durationTimer);
+  const tick = () => {
+    const total = Math.max(0, Math.floor((Date.now() - callState.startedAt) / 1000));
+    const m = String(Math.floor(total / 60)).padStart(2, "0");
+    const s = String(total % 60).padStart(2, "0");
+    $("#call-duration").textContent = m + ":" + s;
+  };
+  tick();
+  callState.durationTimer = setInterval(tick, 1000);
+}
+function startStatsMonitor() {
+  if (callState.statsTimer) clearInterval(callState.statsTimer);
+  callState.statsTimer = setInterval(async () => {
+    if (!callState.active) return;
+    let good = 0, total = 0;
+    for (const [, item] of callState.peers) {
+      try {
+        const stats = await item.pc.getStats();
+        for (const report of stats.values()) {
+          if (report.type === "candidate-pair" && report.state === "succeeded") {
+            good++;
+          }
+          if (report.type === "inbound-rtp" && report.kind === "video" && report.framesPerSecond) {
+            item.fps = Math.round(report.framesPerSecond);
+          }
+        }
+      } catch {}
+      total++;
+    }
+    const network = total === 0 ? "NETWORK · LOCAL" : good === total ? "NETWORK · EXCELLENT" : good > 0 ? "NETWORK · GOOD" : "NETWORK · CHECK";
+    $("#call-network-indicator").textContent = network;
+    $("#call-network-indicator").classList.toggle("good", good === total || total === 0);
+  }, 2200);
 }
 function updateCallMeta() {
   const count = 1 + callState.peers.size;
@@ -550,7 +652,12 @@ function toggleMic() {
   callState.micTrack.enabled = !callState.micTrack.enabled;
   $("#mic-btn").classList.toggle("active", callState.micTrack.enabled);
   $("#mic-btn").classList.toggle("off", !callState.micTrack.enabled);
-  if (socket && callState.roomId) socket.emit("call:mute", { channelId: callState.roomId, muted: !callState.micTrack.enabled });
+  if (socket && callState.roomId) socket.emit("call:media-state", {
+    channelId: callState.roomId,
+    muted: !callState.micTrack.enabled,
+    cameraOff: callState.cameraTrack ? !callState.cameraTrack.enabled : true,
+    screenShare: Boolean(callState.screenTrack)
+  });
 }
 function toggleCamera() {
   if (!callState.cameraTrack) return;
@@ -559,6 +666,12 @@ function toggleCamera() {
   $("#camera-btn").classList.toggle("off", !callState.cameraTrack.enabled);
   const selfTile = document.querySelector('.call-tile[data-peer="self"]');
   selfTile?.classList.toggle("voice-only", !callState.cameraTrack.enabled);
+  if (socket && callState.roomId) socket.emit("call:media-state", {
+    channelId: callState.roomId,
+    muted: callState.micTrack ? !callState.micTrack.enabled : true,
+    cameraOff: !callState.cameraTrack.enabled,
+    screenShare: Boolean(callState.screenTrack)
+  });
 }
 async function toggleScreenShare() {
   if (!callState.active) return;
@@ -594,6 +707,12 @@ async function toggleScreenShare() {
 
     callState.screenTrack.onended = stopScreenShare;
     $("#share-btn").classList.add("active");
+    if (socket && callState.roomId) socket.emit("call:media-state", {
+      channelId: callState.roomId,
+      muted: callState.micTrack ? !callState.micTrack.enabled : true,
+      cameraOff: false,
+      screenShare: true
+    });
   } catch (err) {
     if (err.name !== "AbortError") showError("Screen sharing failed: " + err.message);
   }
@@ -610,6 +729,12 @@ async function stopScreenShare() {
   }
   ensureSelfTile();
   $("#share-btn").classList.remove("active");
+  if (socket && callState.roomId) socket.emit("call:media-state", {
+    channelId: callState.roomId,
+    muted: callState.micTrack ? !callState.micTrack.enabled : true,
+    cameraOff: callState.cameraTrack ? !callState.cameraTrack.enabled : true,
+    screenShare: false
+  });
 }
 async function applyQuality(name, fps) {
   if (name) callState.settings.quality = name;
@@ -642,6 +767,7 @@ function togglePopover(kind, anchor) {
   if (kind === "frame") renderFrameMenu(pop);
   if (kind === "settings") renderSettingsMenu(pop);
   if (kind === "participants") renderParticipantsMenu(pop);
+  if (kind === "more") renderMoreMenu(pop);
   pop.classList.remove("hidden");
   positionCallPopover(anchor);
 }
@@ -670,7 +796,8 @@ function renderFrameMenu(pop) {
   pop.innerHTML = '<div class="popover-title">Video frame</div>' +
     '<button data-frame="soft">Rounded <small>Soft corners</small></button>' +
     '<button data-frame="square">Square <small>Compact professional</small></button>' +
-    '<button data-frame="cinema">Cinema <small>Wide cinematic tiles</small></button>';
+    '<button data-frame="cinema">Cinema <small>Wide cinematic tiles</small></button>' +
+    '<button data-frame="glow">Glow <small>Premium live frame</small></button>';
   pop.querySelectorAll("[data-frame]").forEach(b => b.onclick = () => {
     callState.settings.frame = b.dataset.frame;
     applyAllFrames();
@@ -681,9 +808,44 @@ function renderQualityMenu(pop) {
   const options = Object.keys(QUALITY_PRESETS).map(q =>
     '<button data-quality="' + q + '">' + q + '<small>' + QUALITY_PRESETS[q].width + "×" + QUALITY_PRESETS[q].height + " · " + QUALITY_PRESETS[q].frameRate + "fps</small></button>"
   ).join("");
-  pop.innerHTML = '<div class="popover-title">Video quality</div>' + options +
-    '<div class="quality-note">Higher quality uses more bandwidth.</div>';
-  pop.querySelectorAll("[data-quality]").forEach(b => b.onclick = () => applyQuality(b.dataset.quality, QUALITY_PRESETS[b.dataset.quality].frameRate));
+  pop.innerHTML = '<div class="popover-title">Video quality</div>' +
+    '<button data-quality="auto">Auto <small>Adaptive to network</small></button>' + options +
+    '<div class="quality-note">Higher quality uses more bandwidth. Auto adapts the capture target.</div>';
+  pop.querySelectorAll("[data-quality]").forEach(b => b.onclick = () => {
+    if (b.dataset.quality === "auto") {
+      callState.settings.autoQuality = true;
+      hideCallPopover();
+      showCallToast("Adaptive quality enabled");
+      return;
+    }
+    callState.settings.autoQuality = false;
+    applyQuality(b.dataset.quality, QUALITY_PRESETS[b.dataset.quality].frameRate);
+  });
+}
+function renderMoreMenu(pop) {
+  pop.innerHTML = '<div class="popover-title">Call tools</div>' +
+    '<button data-more="record">● <span>Recording</span><small>UI-ready recording slot</small></button>' +
+    '<button data-more="share">↗ <span>Share room</span><small>Copy the current page link</small></button>' +
+    '<button data-more="refresh">↻ <span>Refresh devices</span><small>Re-enumerate cameras and microphones</small></button>';
+  pop.querySelector('[data-more="share"]').onclick = async () => {
+    await navigator.clipboard?.writeText(location.href);
+    showCallToast("Room link copied");
+  };
+  pop.querySelector('[data-more="refresh"]').onclick = async () => {
+    await navigator.mediaDevices?.enumerateDevices();
+    showCallToast("Devices refreshed");
+    hideCallPopover();
+  };
+  pop.querySelector('[data-more="record"]').onclick = () => {
+    showCallToast("Recording controls can be connected to server storage later");
+  };
+}
+function showCallToast(text) {
+  const t = $("#call-toast");
+  t.textContent = text;
+  t.classList.remove("hidden");
+  clearTimeout(showCallToast.timer);
+  showCallToast.timer = setTimeout(() => t.classList.add("hidden"), 2400);
 }
 function renderParticipantsMenu(pop) {
   const tiles = [...document.querySelectorAll(".call-tile")];
@@ -786,6 +948,14 @@ $("#quality-btn").onclick = e => openCallPopoverFrom(e.currentTarget, "quality")
 $("#frames-btn").onclick = e => openCallPopoverFrom(e.currentTarget, "frame");
 $("#settings-btn").onclick = e => openCallPopoverFrom(e.currentTarget, "settings");
 $("#participants-btn").onclick = e => openCallPopoverFrom(e.currentTarget, "participants");
+$("#more-call-btn").onclick = e => openCallPopoverFrom(e.currentTarget, "more");
+$("#quick-share-btn").onclick = () => {
+  if (!callState.active) return startCall("video");
+  toggleScreenShare();
+};
+$("#dock-mic").onclick = toggleMic;
+$("#dock-screen").onclick = toggleScreenShare;
+$("#dock-leave").onclick = leaveCall;
 document.addEventListener("click", e => {
   if (!e.target.closest("#call-popover") && !e.target.closest(".call-btn")) hideCallPopover();
 });

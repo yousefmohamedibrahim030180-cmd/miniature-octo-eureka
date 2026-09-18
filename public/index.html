@@ -22,7 +22,13 @@
       <button id="workspace-menu" class="icon-btn">⋯</button>
     </div>
     <div class="section-title">CHANNELS <button id="new-channel" title="Create channel">+</button></div>
-    <div id="channel-list" class="channel-list"></div>
+    <div class="channel-list" id="channel-list"></div>
+    <div class="section-title voice-section-title">VOICE CHANNELS <button id="new-voice-channel" title="Create voice channel">+</button></div>
+    <div class="channel-list voice-list" id="voice-channel-list"></div>
+    <div id="voice-dock" class="voice-dock hidden">
+      <div class="voice-dock-status"><span class="dock-dot"></span><div><strong>Voice connected</strong><span id="voice-dock-name">general</span></div></div>
+      <div class="voice-dock-actions"><button id="dock-mic">🎙</button><button id="dock-screen">▣</button><button id="dock-leave" class="dock-danger">×</button></div>
+    </div>
     <div class="sidebar-bottom">
       <div class="profile">
         <div class="avatar" id="me-avatar">G</div>
@@ -41,6 +47,7 @@
       <div class="head-actions">
         <button id="voice-call-btn" class="head-action"><span>☎</span> Voice</button>
         <button id="video-call-btn" class="head-action primary-soft"><span>▣</span> Video</button>
+        <button id="quick-share-btn" class="head-action"><span>↗</span> Share
         <button id="invite-btn" class="head-action">Invite</button>
         <button id="members-btn" class="head-action">Members</button>
         <button id="admin-btn" class="head-action">Control</button>
@@ -74,15 +81,18 @@
     <div class="call-room">
       <div class="call-live-dot"></div>
       <div><strong id="call-title">general</strong><span id="call-subtitle">Voice & video room</span></div>
+      <div class="call-duration" id="call-duration">00:00</div>
     </div>
     <div class="call-top-actions">
       <div class="live-stat" id="call-quality-indicator">CONNECTING</div>
+      <div class="live-stat muted-stat" id="call-network-indicator">NETWORK —</div>
       <button id="minimize-call" class="glass-btn" title="Minimize">—</button>
       <button id="close-call" class="glass-btn danger" title="Leave call">×</button>
     </div>
   </div>
 
   <div id="call-stage" class="call-stage layout-grid frame-soft"></div>
+  <div id="call-toast" class="call-toast hidden"></div>
   <div class="call-empty hidden" id="call-empty">
     <div class="call-empty-icon">◉</div>
     <strong>You're the first one here</strong>
@@ -100,6 +110,7 @@
       <button id="quality-btn" class="call-btn wide" title="Quality settings">Quality</button>
       <button id="frames-btn" class="call-btn wide" title="Video frame">Frame</button>
       <button id="settings-btn" class="call-btn wide" title="Call settings">Settings</button>
+      <button id="more-call-btn" class="call-btn wide" title="More">More</button>
     </div>
     <div class="toolbar-right">
       <button id="participants-btn" class="call-btn wide" title="Participants">People <span id="participant-count">1</span></button>

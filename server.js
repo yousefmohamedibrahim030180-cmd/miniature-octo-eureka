@@ -141,6 +141,31 @@ app.get("/api/me", auth, (req, res) => {
   res.json({ user: publicUser(req.user) });
 });
 
+app.get("/api/realtime-config", auth, (req, res) => {
+  const turnUrls = String(process.env.TURN_URLS || "")
+    .split(",")
+    .map(v => v.trim())
+    .filter(Boolean);
+
+  const iceServers = [
+    {
+      urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]
+    }
+  ];
+
+  if (turnUrls.length) {
+    const turn = { urls: turnUrls };
+    if (process.env.TURN_USERNAME) turn.username = process.env.TURN_USERNAME;
+    if (process.env.TURN_CREDENTIAL) turn.credential = process.env.TURN_CREDENTIAL;
+    iceServers.push(turn);
+  }
+
+  res.json({
+    iceServers,
+    hasTurn: turnUrls.length > 0
+  });
+});
+
 app.patch("/api/me", auth, (req, res) => {
   req.user.username = cleanName(req.body?.username, req.user.username);
   res.json({ user: publicUser(req.user) });
@@ -219,7 +244,7 @@ app.post("/api/servers/:id/channels", auth, (req, res) => {
     .toLowerCase()
     .replace(/[^a-z0-9-_]/g, "-")
     .slice(0, 50);
-  const type = ["text", "announcement"].includes(req.body?.type)
+  const type = ["text", "announcement", "voice"].includes(req.body?.type)
     ? req.body.type
     : "text";
   if (!name) return res.status(400).json({ error: "Channel name is required" });
