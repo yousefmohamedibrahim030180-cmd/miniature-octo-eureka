@@ -634,7 +634,10 @@ async function updateCallNetwork() {
   let label = "NETWORK · GOOD";
   if (maxRtt > 280 || loss > 0.08) label = "NETWORK · POOR";
   else if (maxRtt > 160 || loss > 0.03) label = "NETWORK · FAIR";
-  $("#call-network-indicator").textContent = label + (maxRtt ? " · " + Math.round(maxRtt) + "ms" : "");
+  const netEl = $("#call-network-indicator");
+  netEl.textContent = label + (maxRtt ? " · " + Math.round(maxRtt) + "ms" : "");
+  netEl.classList.remove("call-network-good", "call-network-fair", "call-network-poor");
+  netEl.classList.add(label.endsWith("GOOD") ? "call-network-good" : label.endsWith("FAIR") ? "call-network-fair" : "call-network-poor");
 }
 function updateVoiceDock() {
   const dock = $("#voice-dock");
@@ -644,6 +647,7 @@ function updateVoiceDock() {
   if (active) {
     $("#voice-dock-name").textContent = currentChannel.name;
     $("#dock-mic")?.classList.toggle("active", Boolean(callState.micTrack?.enabled));
+    $("#dock-screen")?.classList.toggle("active", Boolean(callState.screenTrack));
     $("#dock-leave")?.setAttribute("aria-label", "Leave " + currentChannel.name);
   }
 }
@@ -1404,7 +1408,13 @@ updateVoiceDock();
     await enterAsGuest();
     const invite=new URLSearchParams(location.search).get("invite");
     if(invite){await api("/api/invites/"+encodeURIComponent(invite)+"/accept",{method:"POST",body:"{}"}).catch(()=>{});await loadServers();}
-    const channelParam = new URLSearchParams(location.search).get("channel");
+    const params = new URLSearchParams(location.search);
+    const serverParam = params.get("server");
+    const channelParam = params.get("channel");
+    if (serverParam) {
+      const linkedServer = servers.find(s => String(s.id) === String(serverParam));
+      if (linkedServer && String(linkedServer.id) !== String(currentServer?.id)) await selectServer(linkedServer);
+    }
     if (channelParam && currentServer) {
       const target = channels.find(c => String(c.id) === String(channelParam));
       if (target) {
