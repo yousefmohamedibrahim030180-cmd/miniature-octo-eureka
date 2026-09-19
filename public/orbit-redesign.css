@@ -323,7 +323,7 @@ body.orbit-redesign .page-head p{color:#7c8799!important;font-size:13px!importan
 body.orbit-redesign .orbit-store-launch,
 body.orbit-redesign #aw-dock{display:none!important}
 
-body.orbit-redesign .call-panel{
+body.orbit-redesign .call-panel.hidden{display:none!important}\nbody.orbit-redesign .call-panel{
   position:fixed!important;inset:16px!important;z-index:300!important;
   display:flex!important;flex-direction:column!important;
   border:1px solid var(--or-line-strong)!important;border-radius:18px!important;
