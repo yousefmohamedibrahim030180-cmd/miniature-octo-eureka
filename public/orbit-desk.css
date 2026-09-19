@@ -1625,3 +1625,44 @@ body.orbit-discord-home .od-active-empty{
   body.orbit-discord-home .od-tab-content:after,
   body.orbit-discord-home .od-active-sidebar:before{animation:none!important}
 }
+
+
+/* ===== Clean Avatar Geometry ===== */
+body.orbit-discord-home .od-avatar,
+body.orbit-discord-home .od-user-row .od-avatar,
+body.orbit-discord-home .od-active-row .od-avatar{
+  width:38px!important;
+  height:38px!important;
+  flex:0 0 38px!important;
+  border-radius:50%!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+}
+body.orbit-discord-home .od-avatar img{
+  width:100%!important;
+  height:100%!important;
+  border-radius:50%!important;
+  border:1px solid rgba(144,157,205,.16)!important;
+  box-shadow:0 6px 16px rgba(0,0,0,.24)!important;
+  background:#090d15!important;
+}
+body.orbit-discord-home .od-active-row .od-avatar img,
+body.orbit-discord-home .od-user-row .od-avatar img{
+  border-color:rgba(132,147,198,.14)!important;
+}
+body.orbit-discord-home .od-avatar.large{
+  width:32px!important;
+  height:32px!important;
+  flex-basis:32px!important;
+}
+body.orbit-discord-home .od-presence{
+  z-index:3!important;
+  right:-1px!important;
+  bottom:-1px!important;
+  width:9px!important;
+  height:9px!important;
+  border:2px solid #0b1018!important;
+  box-shadow:0 0 8px rgba(32,190,112,.16);
+}
