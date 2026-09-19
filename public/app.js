@@ -1974,8 +1974,9 @@ function renderHomePage(){
   const userRow=(u, kind="friend")=>{
     const name=u?.display_name||u?.username||"Guest";
     const activity=u?.activity||u?.status||"Online";
+    const friendAvatar=avatarMarkup(u, "od-friend-avatar").replace('class="od-avatar od-friend-avatar"','class="od-avatar od-friend-avatar" data-od-friend-username="'+escapeHtml(u?.username||"")+'"');
     return '<div class="od-user-row" data-od-user="'+escapeHtml(u?.id||"")+'">'+
-      avatarMarkup(u, "od-friend-avatar")+
+      friendAvatar+
       '<div class="od-user-copy"><strong>'+escapeHtml(name)+'</strong><span>'+escapeHtml(activity)+(u?.username?' · @'+escapeHtml(u.username):"")+'</span></div>'+
       '<div class="od-user-actions">'+
       (kind==="friend"?'<button class="od-row-btn" data-od-message="'+escapeHtml(u?.username||"")+'">Message</button>':"")+
@@ -2156,7 +2157,11 @@ function renderHomePage(){
             orbitToast("Chat failed",err.message||"Could not open this conversation.","error");
           }
         });
-        slot.querySelectorAll("[data-od-user]").forEach(btn=>btn.onclick=e=>{if(e.target.closest("button"))return;openPulseProfile(btn.dataset.odUser)});
+        slot.querySelectorAll("[data-od-user]").forEach(btn=>btn.onclick=e=>{
+          if(e.target.closest(".od-friend-avatar"))return;
+          if(e.target.closest("button"))return;
+          openPulseProfile(btn.dataset.odUser);
+        });
         slot.querySelectorAll("[data-od-accept]").forEach(btn=>btn.onclick=async()=>{
           try{await api("/api/friends/request/"+encodeURIComponent(btn.dataset.odAccept)+"/accept",{method:"POST",body:"{}"});orbitToast("Friend added","Request accepted.","success");renderHomePage()}catch(e){orbitToast("Request failed",e.message,"error")}
         });
@@ -2436,6 +2441,34 @@ async function openHomeDirectMessage(dmId){
   }
 }
 window.openHomeDirectMessage=openHomeDirectMessage;
+/* ===== Friends avatar -> DM hard click bridge ===== */
+if(!window.__orbitFriendAvatarDMBridge){
+  window.__orbitFriendAvatarDMBridge=true;
+  document.addEventListener("click",async e=>{
+    const avatarEl=e.target?.closest?.(".od-user-row .od-friend-avatar");
+    if(!avatarEl)return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    const username=String(avatarEl.dataset.odFriendUsername||"").trim();
+    if(!username)return;
+    try{
+      let dm=(dmState.list||[]).find(x=>String(x?.otherUser?.username||"").toLowerCase()===username.toLowerCase());
+      if(!dm){
+        await api("/api/dms",{method:"POST",body:JSON.stringify({username})});
+        const fresh=await api("/api/dms");
+        dmState.list=fresh.dms||[];
+        dm=dmState.list.find(x=>String(x?.otherUser?.username||"").toLowerCase()===username.toLowerCase());
+      }
+      if(!dm)throw new Error("Conversation could not be opened.");
+      await openHomeDirectMessage(dm.id);
+    }catch(err){
+      console.error("Friend avatar DM failed",err);
+      orbitToast("Chat failed",err.message||"Could not open this conversation.","error");
+    }
+  },true);
+}
+
 window.__orbitDMClick=async function(id){
   if(!id || window.__orbitDMOpening===String(id))return false;
   window.__orbitDMOpening=String(id);
