@@ -1646,7 +1646,6 @@ function renderHomePage(){
         '<label class="od-quick-search"><span>⌕</span><input id="od-quick-search" placeholder="Find or start a conversation" autocomplete="off"></label>'+
         '<nav class="od-social-nav">'+
           '<button class="active" data-od-social="friends"><span class="od-nav-icon">♟</span><span>Friends</span></button>'+
-          '<button data-od-social="dms"><span class="od-nav-icon">◌</span><span>Messages</span></button>'+
           '<button data-od-social="calls"><span class="od-nav-icon">◉</span><span>Calls</span></button>'+
           '<button data-od-social="discover"><span class="od-nav-icon">✦</span><span>Discover</span></button>'+
         '</nav>'+
