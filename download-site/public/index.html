@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ORBIT // Windows</title>
+  <meta name="description" content="Official ORBIT Windows download portal.">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="grid"></div>
+  <main class="shell">
+    <header class="nav">
+      <div class="brand"><span class="dot"></span> ORBIT</div>
+      <div class="tag">NEXUS EXPERIENCE</div>
+    </header>
+
+    <section class="hero">
+      <div class="eyebrow">WINDOWS DESKTOP</div>
+      <h1>Enter the orbit.</h1>
+      <p>Download the latest ORBIT Windows build and launch the full desktop experience.</p>
+      <div class="actions">
+        <a class="download" id="downloadBtn" href="/download">
+          <span>Download for Windows</span>
+          <span class="arrow">↓</span>
+        </a>
+        <a class="ghost" href="/api/status" target="_blank" rel="noreferrer">Build info</a>
+      </div>
+      <div class="status" id="status">Checking latest build…</div>
+    </section>
+
+    <section class="cards">
+      <article>
+        <div class="label">VERSION</div>
+        <strong id="version">—</strong>
+      </article>
+      <article>
+        <div class="label">FILE</div>
+        <strong>ORBIT-Windows.zip</strong>
+      </article>
+      <article>
+        <div class="label">PLATFORM</div>
+        <strong>Windows x64</strong>
+      </article>
+    </section>
+
+    <section class="steps">
+      <div><b>01</b><span>Download the ZIP.</span></div>
+      <div><b>02</b><span>Extract it anywhere.</span></div>
+      <div><b>03</b><span>Open the ORBIT installer/app.</span></div>
+    </section>
+
+    <footer>ORBIT // NEXUS · Built for the next session.</footer>
+  </main>
+
+  <script>
+    fetch("/api/status").then(r => r.json()).then(data => {
+      document.getElementById("version").textContent = data.version || "1.1.0";
+      const status = document.getElementById("status");
+      if (data.available) {
+        status.textContent = (data.size / 1024 / 1024).toFixed(1) + " MB · Ready to download";
+      } else {
+        status.textContent = "Build not uploaded yet.";
+        document.getElementById("downloadBtn").classList.add("disabled");
+      }
+    }).catch(() => {
+      document.getElementById("status").textContent = "Build status unavailable.";
+    });
+  </script>
+</body>
+</html>
