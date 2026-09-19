@@ -2186,3 +2186,571 @@ body.orbit-discord-home .od-profile-section{
   body.orbit-discord-home .od-dm-row,
   body.orbit-discord-home .od-active-row{transition:none!important}
 }
+
+
+/* ==========================================================
+   ORBIT // SINGULARITY
+   A cinematic, spatial UI language for the Home surface.
+   ========================================================== */
+body.orbit-discord-home{
+  --sx-bg:#02040a;
+  --sx-surface:rgba(8,13,23,.76);
+  --sx-surface-2:rgba(12,18,31,.72);
+  --sx-line:rgba(111,142,219,.14);
+  --sx-blue:#6c7dff;
+  --sx-cyan:#4ee6ff;
+  --sx-violet:#a278ff;
+  --sx-green:#5be6b0;
+  --sx-white:#f7f9ff;
+  --sx-muted:#69758e;
+  background:
+    radial-gradient(circle at 50% 48%,rgba(81,94,255,.07),transparent 28%),
+    #02040a!important;
+}
+body.orbit-discord-home .app{
+  overflow:hidden!important;
+  background:
+    radial-gradient(circle at 30% 0%,rgba(86,98,255,.08),transparent 26%),
+    radial-gradient(circle at 92% 80%,rgba(46,215,241,.05),transparent 23%),
+    linear-gradient(130deg,#02040a 0%,#040914 48%,#02050a 100%)!important;
+}
+body.orbit-discord-home .app:before{
+  content:"";
+  position:absolute;
+  inset:-20%;
+  z-index:0;
+  pointer-events:none;
+  background:
+    repeating-linear-gradient(115deg,transparent 0 72px,rgba(107,129,255,.014) 73px 74px,transparent 75px 136px),
+    radial-gradient(circle at 50% 42%,rgba(94,116,255,.045),transparent 34%);
+  transform:perspective(900px) rotateX(58deg) translateY(18%);
+  opacity:.9;
+}
+body.orbit-discord-home .orbit-discord-home{
+  position:relative;
+  isolation:isolate;
+  grid-template-columns:252px minmax(0,1fr) 316px!important;
+  background:transparent!important;
+}
+body.orbit-discord-home .orbit-discord-home:before{
+  content:"";
+  position:absolute;
+  left:252px;
+  right:316px;
+  top:0;
+  bottom:0;
+  z-index:-1;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 50% 44%,rgba(91,104,255,.09),transparent 34%),
+    radial-gradient(circle at 50% 44%,rgba(51,222,242,.045),transparent 17%),
+    conic-gradient(from 205deg at 50% 44%,transparent 0 18%,rgba(106,126,255,.028) 20%,transparent 33%,rgba(67,218,237,.018) 45%,transparent 61%,rgba(145,93,255,.022) 78%,transparent 88%);
+  filter:blur(1px);
+}
+body.orbit-discord-home .orbit-discord-home:after{
+  content:"";
+  position:absolute;
+  left:calc(252px + 50%);
+  top:44%;
+  width:340px;
+  height:340px;
+  z-index:-1;
+  pointer-events:none;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:
+    radial-gradient(circle at center,rgba(117,137,255,.10) 0 3%,rgba(74,229,255,.045) 12%,transparent 43%),
+    repeating-radial-gradient(circle at center,rgba(111,131,255,.045) 0 1px,transparent 2px 20px);
+  mask-image:radial-gradient(circle,black 0 49%,transparent 73%);
+  box-shadow:
+    0 0 40px rgba(84,106,255,.08),
+    0 0 120px rgba(61,222,241,.035);
+  animation:singularityOrbit 18s linear infinite;
+}
+@keyframes singularityOrbit{
+  to{transform:translate(-50%,-50%) rotate(360deg)}
+}
+
+/* The center canvas becomes a stage instead of a flat page. */
+body.orbit-discord-home #od-home-main,
+body.orbit-discord-home .od-friends-main{
+  background:
+    radial-gradient(circle at 50% 45%,rgba(99,112,255,.075),transparent 27%),
+    radial-gradient(circle at 50% 45%,rgba(63,221,242,.035),transparent 13%),
+    linear-gradient(180deg,rgba(7,12,21,.84),rgba(3,8,14,.93))!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.018),
+    inset 0 0 120px rgba(42,59,136,.05);
+}
+body.orbit-discord-home #od-home-main:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 50% 46%,transparent 0 13%,rgba(116,132,255,.055) 13.2%,transparent 13.4% 26%,rgba(79,220,244,.025) 26.2%,transparent 26.4%),
+    linear-gradient(90deg,transparent 0 49.8%,rgba(119,137,255,.018) 49.9%,transparent 50.1%),
+    linear-gradient(0deg,transparent 0 49.8%,rgba(119,137,255,.015) 49.9%,transparent 50.1%);
+  background-size:auto,100% 100%,100% 100%;
+}
+body.orbit-discord-home #od-home-main:after{
+  content:"ORBIT CORE";
+  position:absolute;
+  left:50%;
+  top:45%;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  z-index:1;
+  color:rgba(141,155,209,.055);
+  font:900 72px/1 Inter,system-ui,sans-serif;
+  letter-spacing:.22em;
+  white-space:nowrap;
+  text-transform:uppercase;
+  filter:blur(.1px);
+}
+
+/* Header = command deck */
+body.orbit-discord-home .od-friends-head{
+  position:relative;
+  z-index:6;
+  min-height:82px!important;
+  padding:0 18px!important;
+  background:
+    linear-gradient(180deg,rgba(10,16,28,.94),rgba(5,10,18,.76))!important;
+  border-bottom:1px solid rgba(126,148,221,.14)!important;
+  box-shadow:
+    0 18px 42px rgba(0,0,0,.26),
+    inset 0 1px rgba(255,255,255,.028)!important;
+  backdrop-filter:blur(26px) saturate(125%);
+}
+body.orbit-discord-home .od-friends-head:before{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:-1px;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(103,122,255,.18),rgba(78,226,246,.20),transparent);
+  box-shadow:0 0 20px rgba(94,121,255,.14);
+}
+body.orbit-discord-home .od-friends-label{
+  min-width:142px!important;
+}
+body.orbit-discord-home .od-friends-label strong{
+  font-size:13px!important;
+}
+body.orbit-discord-home .od-friends-label:after{
+  content:"SOCIAL CORE";
+  color:#59657d!important;
+}
+body.orbit-discord-home .od-friends-tabs{
+  position:relative;
+  overflow:hidden;
+  max-width:650px;
+  border:1px solid rgba(118,141,205,.12)!important;
+  background:rgba(3,7,13,.54)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.02),
+    0 12px 32px rgba(0,0,0,.17)!important;
+}
+body.orbit-discord-home .od-friends-tabs:before{
+  content:"";
+  position:absolute;
+  top:0;
+  bottom:0;
+  left:-30%;
+  width:28%;
+  background:linear-gradient(90deg,transparent,rgba(125,145,255,.10),transparent);
+  transform:skewX(-17deg);
+  animation:singularitySweep 5.5s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes singularitySweep{
+  0%,45%{transform:translateX(0) skewX(-17deg);opacity:0}
+  58%{opacity:1}
+  76%,100%{transform:translateX(470%) skewX(-17deg);opacity:0}
+}
+body.orbit-discord-home .od-friends-tabs button{
+  position:relative;
+  z-index:1;
+}
+body.orbit-discord-home .od-add-friend{
+  border:1px solid rgba(103,233,187,.22)!important;
+  background:linear-gradient(135deg,#31c18d,#178c6a)!important;
+  box-shadow:
+    0 14px 34px rgba(31,176,116,.20),
+    inset 0 1px rgba(255,255,255,.13)!important;
+}
+
+/* Notice becomes a compact status strip */
+body.orbit-discord-home .od-home-notice{
+  position:relative;
+  z-index:4;
+  min-height:48px!important;
+  margin:14px 18px 10px!important;
+  border-radius:12px!important;
+  background:
+    linear-gradient(100deg,rgba(14,24,40,.78),rgba(8,15,25,.88))!important;
+  border:1px solid rgba(107,130,188,.12)!important;
+  box-shadow:
+    0 18px 36px rgba(0,0,0,.16),
+    inset 0 1px rgba(255,255,255,.024)!important;
+}
+body.orbit-discord-home .od-home-notice:after{
+  content:"LIVE";
+  margin-left:auto;
+  padding:5px 8px;
+  border-radius:999px;
+  color:#5fe8b1;
+  border:1px solid rgba(74,222,160,.16);
+  background:rgba(48,171,117,.07);
+  font:900 6px/1 ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:.14em;
+}
+
+/* Search becomes a floating lens */
+body.orbit-discord-home .od-friend-search{
+  position:relative;
+  z-index:4;
+  height:44px!important;
+  margin:0 18px 9px!important;
+  border-radius:12px!important;
+  background:rgba(3,8,14,.68)!important;
+  border:1px solid rgba(111,133,190,.10)!important;
+  box-shadow:0 12px 28px rgba(0,0,0,.14),inset 0 1px rgba(255,255,255,.018)!important;
+}
+
+/* Friend list becomes floating data cards */
+body.orbit-discord-home .od-tab-content{
+  position:relative;
+  z-index:3;
+  padding:3px 18px 36px!important;
+  background:transparent!important;
+}
+body.orbit-discord-home .od-list-heading{
+  display:flex!important;
+  align-items:flex-end!important;
+  justify-content:space-between!important;
+  padding:14px 3px 11px!important;
+}
+body.orbit-discord-home .od-list-heading:after{
+  content:"LIVE PRESENCE MATRIX";
+  color:#47546d;
+  font:800 6px/1 ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:.14em;
+}
+body.orbit-discord-home .od-user-list{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:8px!important;
+  align-content:start;
+}
+body.orbit-discord-home .od-user-row{
+  position:relative;
+  overflow:hidden;
+  min-height:88px!important;
+  padding:12px!important;
+  border-radius:15px!important;
+  background:
+    radial-gradient(circle at 0% 50%,rgba(102,116,255,.08),transparent 32%),
+    linear-gradient(135deg,rgba(9,16,28,.74),rgba(6,11,19,.62))!important;
+  border:1px solid rgba(110,131,190,.09)!important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.02),
+    0 12px 26px rgba(0,0,0,.12)!important;
+  transform:translateZ(0);
+}
+body.orbit-discord-home .od-user-row:before{
+  content:"";
+  position:absolute;
+  right:-42px;
+  top:-42px;
+  width:120px;
+  height:120px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(102,117,255,.11),transparent 68%);
+  transition:transform .35s ease,opacity .35s ease;
+  opacity:.45;
+}
+body.orbit-discord-home .od-user-row:hover:before{
+  transform:scale(1.6);
+  opacity:.85;
+}
+body.orbit-discord-home .od-user-row:hover{
+  transform:translateY(-2px)!important;
+  border-color:rgba(118,139,207,.19)!important;
+  background:
+    radial-gradient(circle at 0% 50%,rgba(101,115,255,.14),transparent 34%),
+    linear-gradient(135deg,rgba(13,22,38,.86),rgba(7,13,23,.74))!important;
+  box-shadow:
+    0 20px 42px rgba(0,0,0,.21),
+    0 0 28px rgba(75,94,189,.06),
+    inset 0 1px rgba(255,255,255,.03)!important;
+}
+body.orbit-discord-home .od-user-row .od-avatar{
+  width:46px!important;
+  height:46px!important;
+  flex-basis:46px!important;
+  border-radius:14px!important;
+  overflow:hidden!important;
+  box-shadow:0 12px 24px rgba(0,0,0,.28)!important;
+}
+body.orbit-discord-home .od-user-row .od-presence{
+  width:10px!important;height:10px!important;
+  border:2px solid #08101a!important;
+  box-shadow:0 0 12px rgba(69,227,167,.17);
+}
+body.orbit-discord-home .od-user-copy strong{
+  font-size:12px!important;
+  letter-spacing:.01em!important;
+}
+body.orbit-discord-home .od-user-copy span{
+  margin-top:5px!important;
+  color:#73819a!important;
+  font-size:8px!important;
+}
+body.orbit-discord-home .od-row-btn{
+  min-height:34px!important;
+  border-radius:10px!important;
+  padding:0 11px!important;
+}
+body.orbit-discord-home .od-row-btn.primary{
+  background:linear-gradient(135deg,#6b7bff,#46b8ef)!important;
+}
+
+/* Right rail = presence instrument */
+body.orbit-discord-home .od-active-sidebar{
+  position:relative;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 8%,rgba(100,115,255,.13),transparent 25%),
+    radial-gradient(circle at 100% 78%,rgba(52,218,241,.035),transparent 25%),
+    linear-gradient(180deg,#060c15,#03080e)!important;
+  border-left:1px solid rgba(111,131,189,.12)!important;
+}
+body.orbit-discord-home .od-active-sidebar:before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:18%;
+  width:260px;
+  height:260px;
+  transform:translateX(-50%);
+  border-radius:50%;
+  border:1px solid rgba(105,127,255,.06);
+  box-shadow:
+    0 0 0 22px rgba(107,127,255,.018),
+    0 0 0 54px rgba(107,127,255,.012);
+  pointer-events:none;
+}
+body.orbit-discord-home .od-active-title{
+  position:relative;
+  z-index:3;
+  height:82px!important;
+  padding:0 18px!important;
+  border-bottom:1px solid rgba(113,132,191,.10)!important;
+}
+body.orbit-discord-home .od-active-title strong{
+  font-size:11px!important;
+  letter-spacing:.14em!important;
+  text-transform:uppercase;
+}
+body.orbit-discord-home .od-active-title:before{
+  content:"LIVE / PRESENCE";
+  position:absolute;
+  top:18px;right:18px;
+  color:#45536b;
+  font:800 6px/1 ui-monospace,SFMono-Regular,Consolas,monospace;
+  letter-spacing:.14em;
+}
+body.orbit-discord-home .od-active-list{
+  position:relative;
+  z-index:3;
+  padding:10px!important;
+}
+body.orbit-discord-home .od-active-row{
+  position:relative;
+  min-height:66px!important;
+  padding:10px!important;
+  border-radius:13px!important;
+  border:1px solid transparent!important;
+  background:transparent!important;
+}
+body.orbit-discord-home .od-active-row:before{
+  content:"";
+  position:absolute;
+  left:10px;right:10px;bottom:2px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(101,125,255,.11),transparent);
+  opacity:0;
+}
+body.orbit-discord-home .od-active-row:hover:before{opacity:1}
+body.orbit-discord-home .od-active-row:hover{
+  transform:translateX(-3px)!important;
+  background:linear-gradient(105deg,rgba(62,78,159,.12),rgba(54,213,237,.025))!important;
+  border-color:rgba(113,135,194,.10)!important;
+}
+body.orbit-discord-home .od-active-row .od-avatar{
+  width:42px!important;height:42px!important;flex-basis:42px!important;
+  border-radius:13px!important;
+}
+
+/* Chat becomes a cinematic stage */
+body.orbit-discord-home .od-home-chat-active{
+  position:relative;
+  background:
+    radial-gradient(circle at 50% 44%,rgba(107,121,255,.085),transparent 24%),
+    radial-gradient(circle at 90% 0%,rgba(65,220,240,.045),transparent 23%),
+    linear-gradient(180deg,#070d17,#040a11)!important;
+}
+body.orbit-discord-home .od-home-chat-active:before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:52%;
+  width:520px;
+  height:520px;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:
+    radial-gradient(circle,rgba(108,126,255,.055) 0 2%,transparent 3% 15%,rgba(106,127,255,.028) 15.2%,transparent 15.6% 34%,rgba(62,213,238,.018) 34.2%,transparent 34.6%);
+  pointer-events:none;
+  animation:singularityPulse 7s ease-in-out infinite;
+}
+@keyframes singularityPulse{
+  0%,100%{transform:translate(-50%,-50%) scale(.96);opacity:.58}
+  50%{transform:translate(-50%,-50%) scale(1.04);opacity:1}
+}
+body.orbit-discord-home .od-home-dm-head{
+  position:relative;
+  z-index:5;
+  min-height:82px!important;
+  padding:0 18px!important;
+  background:linear-gradient(180deg,rgba(9,15,26,.94),rgba(6,11,18,.76))!important;
+  border-bottom:1px solid rgba(111,133,195,.13)!important;
+  box-shadow:0 16px 42px rgba(0,0,0,.21),inset 0 1px rgba(255,255,255,.024)!important;
+  backdrop-filter:blur(24px);
+}
+body.orbit-discord-home .od-home-dm-avatar{
+  width:44px!important;height:44px!important;border-radius:14px!important;
+  box-shadow:0 14px 28px rgba(0,0,0,.30)!important;
+}
+body.orbit-discord-home .od-home-dm-user-copy strong{
+  font-size:12px!important;
+}
+body.orbit-discord-home .od-home-dm-actions button{
+  width:35px!important;height:35px!important;
+  border-radius:10px!important;
+}
+body.orbit-discord-home .od-home-dm-messages{
+  position:relative;
+  z-index:2;
+  background:transparent!important;
+  padding:28px 30px 16px!important;
+}
+body.orbit-discord-home .od-home-dm-message{
+  border-radius:13px!important;
+}
+body.orbit-discord-home .od-home-dm-welcome{
+  max-width:660px!important;
+  margin:8vh auto 0!important;
+  text-align:center;
+}
+body.orbit-discord-home .od-home-dm-big-avatar{
+  width:92px!important;height:92px!important;
+  border-radius:26px!important;
+  box-shadow:
+    0 22px 48px rgba(0,0,0,.34),
+    0 0 0 1px rgba(117,136,222,.10)!important;
+}
+body.orbit-discord-home .od-home-dm-welcome-kicker{
+  color:#6576a2!important;
+  letter-spacing:.20em!important;
+}
+body.orbit-discord-home .od-home-dm-composer{
+  position:relative;
+  z-index:7;
+  margin:0 18px 18px!important;
+  padding:7px!important;
+  border-radius:16px!important;
+  border:1px solid rgba(113,135,195,.14)!important;
+  background:
+    linear-gradient(180deg,rgba(11,18,29,.92),rgba(5,10,17,.98))!important;
+  box-shadow:
+    0 22px 46px rgba(0,0,0,.30),
+    0 0 28px rgba(62,82,171,.06),
+    inset 0 1px rgba(255,255,255,.03)!important;
+  backdrop-filter:blur(22px);
+}
+body.orbit-discord-home .od-home-dm-composer textarea{
+  background:rgba(4,8,14,.40)!important;
+  border:0!important;
+}
+body.orbit-discord-home .od-home-dm-send{
+  border-radius:11px!important;
+  background:linear-gradient(135deg,#7482ff,#45c3ef)!important;
+  box-shadow:0 13px 30px rgba(74,102,227,.28)!important;
+}
+
+/* Profile drawer = floating capsule */
+body.orbit-discord-home .od-profile-active{
+  background:
+    radial-gradient(circle at 55% 0%,rgba(108,120,255,.12),transparent 29%),
+    linear-gradient(180deg,#060c15,#03080f)!important;
+  border-left:1px solid rgba(109,131,191,.12)!important;
+}
+body.orbit-discord-home .od-profile-head{
+  height:82px!important;
+  padding:0 16px!important;
+}
+body.orbit-discord-home .od-profile-cover{
+  height:124px!important;
+  background:
+    linear-gradient(125deg,#17285b,#304b9a 45%,#14768a 100%)!important;
+}
+body.orbit-discord-home .od-profile-card{
+  padding:0 16px 26px!important;
+}
+body.orbit-discord-home .od-profile-avatar-xl{
+  width:86px!important;height:86px!important;
+  margin-top:-38px!important;
+  border-radius:25px!important;
+  border:5px solid #08111c!important;
+  box-shadow:0 22px 42px rgba(0,0,0,.34)!important;
+}
+body.orbit-discord-home .od-profile-soft{
+  border-radius:10px!important;
+  background:rgba(14,23,36,.86)!important;
+  border:1px solid rgba(110,131,190,.12)!important;
+}
+
+/* Responsive safety */
+@media(max-width:1250px){
+  body.orbit-discord-home .orbit-discord-home{grid-template-columns:230px minmax(0,1fr) 290px!important}
+  body.orbit-discord-home .orbit-discord-home:before{left:230px;right:290px}
+}
+@media(max-width:1080px){
+  body.orbit-discord-home .orbit-discord-home{grid-template-columns:230px minmax(0,1fr)!important}
+  body.orbit-discord-home .orbit-discord-home:before{left:230px;right:0}
+  body.orbit-discord-home .od-active-sidebar{display:none!important}
+}
+@media(max-width:860px){
+  body.orbit-discord-home .od-user-list{grid-template-columns:1fr!important}
+}
+@media(max-width:760px){
+  body.orbit-discord-home .orbit-discord-home{grid-template-columns:minmax(0,1fr)!important}
+  body.orbit-discord-home .orbit-discord-home:before{left:0;right:0}
+  body.orbit-discord-home .od-social-sidebar{display:none!important}
+  body.orbit-discord-home #od-home-main:after{font-size:46px}
+  body.orbit-discord-home .od-friends-head{padding:0 10px!important}
+  body.orbit-discord-home .od-friends-tabs{overflow:auto!important}
+  body.orbit-discord-home .od-home-notice{margin-left:10px!important;margin-right:10px!important}
+  body.orbit-discord-home .od-friend-search{margin-left:10px!important;margin-right:10px!important}
+  body.orbit-discord-home .od-tab-content{padding-left:10px!important;padding-right:10px!important}
+  body.orbit-discord-home .od-home-dm-messages{padding-left:8px!important;padding-right:8px!important}
+  body.orbit-discord-home .od-home-dm-composer{margin-left:8px!important;margin-right:8px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  body.orbit-discord-home .orbit-discord-home:after,
+  body.orbit-discord-home .od-friends-tabs:before,
+  body.orbit-discord-home .od-home-chat-active:before{animation:none!important}
+}
