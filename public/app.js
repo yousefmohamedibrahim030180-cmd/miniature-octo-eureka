@@ -1726,7 +1726,15 @@ function renderHomePage(){
       document.querySelectorAll("[data-od-active-user]").forEach(btn=>btn.onclick=()=>openPulseProfile(btn.dataset.odActiveUser));
     };
 
+    const restoreActivePanel=()=>{
+      const panel=$("#od-active-sidebar");
+      if(!panel)return;
+      panel.innerHTML='<div class="od-active-title"><strong>Active Now</strong></div><div id="od-active-list" class="od-active-list"></div>';
+      renderActive();
+    };
+
     const renderFriendsSurface=()=>{
+      restoreActivePanel();
       const main=$("#od-home-main");
       if(!main)return;
       main.innerHTML=
@@ -1805,7 +1813,7 @@ function renderHomePage(){
     };
 
     const renderActiveHome=()=>{
-      renderActive();
+      restoreActivePanel();
       $("#od-profile-home").onclick=()=>setView("settings");
       $("#od-profile-settings").onclick=()=>setView("settings");
       $("#od-quick-search").oninput=e=>renderDMs(e.target.value);
@@ -1852,21 +1860,68 @@ async function openHomeDirectMessage(dmId){
     const avatarUrl=avatarImageUrl(u);
     const online=dmUserStatus(u)==="Online";
     const home=$("#od-home-main");
-    if(!home)return;
+    const side=$("#od-active-sidebar");
+    if(!home||!side)return;
+
+    home.classList.add("od-home-chat-active");
+    side.classList.add("od-profile-active");
+
+    const username=u.username||"guest";
+    const displayName=u.display_name||username||"Guest";
+    const bio=u.bio||"No bio added yet.";
+    const statusText=online?"Online":"Offline";
+
+    side.innerHTML=
+      '<div class="od-profile-head"><strong>Profile</strong><button id="od-profile-close" title="Close profile">×</button></div>'+
+      '<div class="od-profile-cover"></div>'+
+      '<div class="od-profile-card">'+
+        '<div class="od-profile-avatar-xl">'+(avatarUrl?'<img src="'+escapeHtml(avatarUrl)+'" alt="">':escapeHtml(avatar(username)))+'<i class="'+(online?"online":"offline")+'"></i></div>'+
+        '<strong class="od-profile-name">'+escapeHtml(displayName)+'</strong>'+
+        '<span class="od-profile-handle">@'+escapeHtml(username)+'</span>'+
+        '<div class="od-profile-status-line"><i class="'+(online?"online":"offline")+'"></i>'+statusText+'</div>'+
+        '<div class="od-profile-divider"></div>'+
+        '<div class="od-profile-section">ABOUT ME</div>'+
+        '<p class="od-profile-bio">'+escapeHtml(bio)+'</p>'+
+        '<div class="od-profile-section">USER INFO</div>'+
+        '<div class="od-profile-info"><span>Username</span><strong>'+escapeHtml(username)+'</strong></div>'+
+        '<div class="od-profile-info"><span>Status</span><strong>'+statusText+'</strong></div>'+
+        '<button id="od-profile-view" class="od-profile-view">View Full Profile</button>'+
+      '</div>';
+    $("#od-profile-close").onclick=()=>{
+      side.classList.remove("od-profile-active");
+      side.innerHTML='<div class="od-active-title"><strong>Active Now</strong></div><div id="od-active-list" class="od-active-list"></div>';
+      renderActive();
+    };
+    $("#od-profile-view").onclick=()=>openPulseProfile(u.id);
 
     home.innerHTML=
       '<header class="od-home-dm-head">'+
         '<div class="od-home-dm-user">'+
-          '<div class="od-home-dm-avatar">'+(avatarUrl?'<img src="'+escapeHtml(avatarUrl)+'" alt="">':escapeHtml(avatar(u.username||"G")))+'</div>'+
-          '<div><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span><i class="'+(online?"online":"offline")+'"></i>'+ (online?"Online":"Offline") +' · @'+escapeHtml(u.username||"guest")+'</span></div>'+
+          '<div class="od-home-dm-avatar">'+(avatarUrl?'<img src="'+escapeHtml(avatarUrl)+'" alt="">':escapeHtml(avatar(username)))+'</div>'+
+          '<div><strong>'+escapeHtml(displayName)+'</strong><span><i class="'+(online?"online":"offline")+'"></i>'+statusText+' · @'+escapeHtml(username)+'</span></div>'+
         '</div>'+
-        '<div class="od-home-dm-actions"><button id="od-home-dm-call" title="Voice call">☎</button><button id="od-home-dm-video" title="Video call">▣</button><button id="od-home-dm-search" title="Search">⌕</button><button id="od-home-dm-profile" title="Profile">◉</button></div>'+
+        '<div class="od-home-dm-actions">'+
+          '<button id="od-home-dm-call" title="Voice call">☎</button>'+
+          '<button id="od-home-dm-video" title="Video call">▣</button>'+
+          '<button id="od-home-dm-pin" title="Pinned messages">⌖</button>'+
+          '<button id="od-home-dm-search" title="Search messages">⌕</button>'+
+          '<button id="od-home-dm-profile" title="Toggle profile">◉</button>'+
+        '</div>'+
       '</header>'+
-      '<div id="od-home-dm-messages" class="od-home-dm-messages">'+
-        '<div class="od-home-dm-welcome"><div class="od-home-dm-big-avatar">'+(avatarUrl?'<img src="'+escapeHtml(avatarUrl)+'" alt="">':escapeHtml(avatar(u.username||"G")))+'</div><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>That’s the beginning of your direct message with @'+escapeHtml(u.username||"guest")+'.</span></div>'+
+      '<div class="od-home-dm-messages" id="od-home-dm-messages">'+
+        '<div class="od-home-dm-welcome">'+
+          '<div class="od-home-dm-big-avatar">'+(avatarUrl?'<img src="'+escapeHtml(avatarUrl)+'" alt="">':escapeHtml(avatar(username)))+'</div>'+
+          '<strong>'+escapeHtml(displayName)+'</strong>'+
+          '<span>That’s the beginning of your direct message with @'+escapeHtml(username)+'.</span>'+
+        '</div>'+
       '</div>'+
       '<div id="od-home-dm-typing" class="od-home-dm-typing"></div>'+
-      '<form id="od-home-dm-form" class="od-home-dm-composer"><button type="button" id="od-home-dm-add">＋</button><textarea id="od-home-dm-input" rows="1" maxlength="4000" placeholder="Message @'+escapeHtml(u.username||"guest")+'"></textarea><button type="button" id="od-home-dm-emoji">☺</button><button type="submit" class="od-home-dm-send">➤</button></form>';
+      '<form id="od-home-dm-form" class="od-home-dm-composer">'+
+        '<button type="button" id="od-home-dm-add" title="Add attachment">＋</button>'+
+        '<textarea id="od-home-dm-input" rows="1" maxlength="4000" placeholder="Message @'+escapeHtml(username)+'"></textarea>'+
+        '<button type="button" id="od-home-dm-emoji" title="Emoji">☺</button>'+
+        '<button type="submit" class="od-home-dm-send" title="Send">➤</button>'+
+      '</form>';
 
     renderHomeDirectMessageFeed(true);
 
@@ -1906,13 +1961,20 @@ async function openHomeDirectMessage(dmId){
       const term=q.trim().toLowerCase();
       document.querySelectorAll("#od-home-dm-messages .od-home-dm-message").forEach(row=>row.style.display=!term||row.innerText.toLowerCase().includes(term)?"grid":"none");
     };
-    $("#od-home-dm-profile").onclick=()=>openPulseProfile(u.id);
+    $("#od-home-dm-pin").onclick=()=>orbitToast("Pinned messages","Pinned message view is ready for this conversation.");
+    $("#od-home-dm-profile").onclick=()=>{
+      if(side.classList.contains("od-profile-active")) $("#od-profile-close")?.click();
+      else {
+        side.classList.add("od-profile-active");
+      }
+    };
     $("#od-home-dm-call").onclick=()=>orbitToast("Voice call","Use a community voice room to start a live call.");
-    $("#od-home-dm-video").onclick=()=>orbitToast("Video call","Use a community voice room to start a video call.");
+    $("#od-home-dm-video").onclick=()=>orbitToast("Video call","Use a community voice room to start a live video call.");
     document.querySelectorAll("[data-od-social]").forEach(btn=>btn.classList.toggle("active",btn.dataset.odSocial==="dms"));
     document.querySelectorAll("[data-od-dm]").forEach(btn=>btn.classList.toggle("active",String(btn.dataset.odDm)===String(dmId)));
   }catch(e){orbitToast("Direct message",e.message,"error")}
 }
+
 
 function renderHomeDirectMessageFeed(scrollBottom){
   const feed=$("#od-home-dm-messages");
