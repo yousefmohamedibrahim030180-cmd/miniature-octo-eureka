@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { Server } = require("socket.io");
 const { Pool } = require("pg");
+const bcrypt = require("bcryptjs");
 
 const app = express();
 const server = http.createServer(app);
@@ -240,7 +241,7 @@ function uniqueUsername(requested, ignoreUserId = null) {
 }
 function tokenFor(user) {
   return jwt.sign(
-    { id: user.id, username: user.username, guest: true },
+    { id: user.id, username: user.username, account: true },
     JWT_SECRET,
     { expiresIn: "30d" }
   );
@@ -252,7 +253,7 @@ function auth(req, res, next) {
   try {
     const payload = jwt.verify(readToken(req), JWT_SECRET);
     const user = memory.users.get(payload.id);
-    if (!user) return res.status(401).json({ error: "Guest session expired" });
+    if (!user) return res.status(401).json({ error: "Session expired. Please sign in again." });
     user.status = "online";
     req.user = user;
     next();
@@ -394,7 +395,8 @@ function publicUser(user) {
     activity: user.activity || "Online",
     activity_type: user.activityType || "custom",
     badges: userBadges(user),
-    guest: true
+    guest: false,
+    account: Boolean(user.passwordHash)
   };
 }
 function createGuest(username, existingId) {
@@ -457,6 +459,101 @@ app.get("/health", (req, res) => {
 app.post("/api/guest", (req, res) => {
   const user = createGuest(req.body?.username, req.body?.guestId);
   res.json({ user: publicUser(user), token: tokenFor(user) });
+});
+
+const accountLoginAttempts = new Map();
+
+function authAttemptKey(req, username="") {
+  return String(req.ip || req.headers["x-forwarded-for"] || "unknown") + ":" + String(username || "").toLowerCase();
+}
+
+function validAccountUsername(value) {
+  const username = cleanUsername(value, "");
+  return /^[a-z0-9][a-z0-9._-]{3,19}$/.test(username) ? username : "";
+}
+
+function validAccountPassword(value) {
+  const password = String(value || "");
+  return password.length >= 8 && password.length <= 72;
+}
+
+app.post("/api/auth/register", async (req, res) => {
+  const username = validAccountUsername(req.body?.username);
+  const password = String(req.body?.password || "");
+  const displayName = cleanName(req.body?.displayName || username, username);
+
+  if (!username) return res.status(400).json({ error: "Username must be 4–20 characters and use letters, numbers, dots, underscores or hyphens." });
+  if (!validAccountPassword(password)) return res.status(400).json({ error: "Password must be 8–72 characters." });
+  if ([...memory.users.values()].some(user => String(user.username || "").toLowerCase() === username.toLowerCase())) {
+    return res.status(409).json({ error: "That username is already in use." });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const user = {
+    id: id("user"),
+    username,
+    displayName,
+    passwordHash,
+    accountCreatedAt: now(),
+    status: "online",
+    activity: "Online",
+    activityType: "custom",
+    bio: "",
+    createdAt: now(),
+    avatarUrl: null,
+    avatarDecoration: "none",
+    avatarDecorationUrl: null,
+    stats: { messages:0, voiceJoins:0, serversCreated:0, friends:0 }
+  };
+  memory.users.set(user.id, user);
+  ensureDefaultServer(user);
+  schedulePersist();
+
+  res.status(201).json({ user: publicUser(user), token: tokenFor(user) });
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  const username = validAccountUsername(req.body?.username);
+  const password = String(req.body?.password || "");
+  if (!username || !password) return res.status(400).json({ error: "Username and password are required." });
+
+  const key = authAttemptKey(req, username);
+  const nowMs = Date.now();
+  const history = accountLoginAttempts.get(key) || { count: 0, resetAt: nowMs + 10 * 60 * 1000 };
+  if (nowMs > history.resetAt) {
+    history.count = 0;
+    history.resetAt = nowMs + 10 * 60 * 1000;
+  }
+  if (history.count >= 12) return res.status(429).json({ error: "Too many sign-in attempts. Try again later." });
+
+  const user = [...memory.users.values()].find(item => String(item.username || "").toLowerCase() === username.toLowerCase() && item.passwordHash);
+  const ok = Boolean(user) && await bcrypt.compare(password, user.passwordHash);
+  if (!ok) {
+    history.count += 1;
+    accountLoginAttempts.set(key, history);
+    return res.status(401).json({ error: "Incorrect username or password." });
+  }
+
+  accountLoginAttempts.delete(key);
+  user.status = "online";
+  user.activity = "Online";
+  schedulePersist();
+  res.json({ user: publicUser(user), token: tokenFor(user) });
+});
+
+app.post("/api/auth/convert-legacy", auth, async (req, res) => {
+  if (req.user.passwordHash) return res.status(400).json({ error: "This account is already configured." });
+  const username = validAccountUsername(req.body?.username || req.user.username);
+  const password = String(req.body?.password || "");
+  if (!username || !validAccountPassword(password)) return res.status(400).json({ error: "Choose a valid username and an 8–72 character password." });
+  const conflict = [...memory.users.values()].find(u => String(u.id) !== String(req.user.id) && String(u.username || "").toLowerCase() === username.toLowerCase());
+  if (conflict) return res.status(409).json({ error: "That username is already in use." });
+  req.user.username = username;
+  req.user.passwordHash = await bcrypt.hash(password, 12);
+  req.user.accountCreatedAt = req.user.accountCreatedAt || now();
+  req.user.guest = false;
+  schedulePersist();
+  res.json({ user: publicUser(req.user), token: tokenFor(req.user) });
 });
 
 app.get("/api/me", auth, (req, res) => {
