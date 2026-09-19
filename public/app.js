@@ -1289,8 +1289,7 @@ function renderPage(view) {
   if(view==="projects")renderProjectsPage();
   if(view==="files")renderFilesPage();
   if(view==="ai")renderAIPage();
-  if(view==="notifications")renderNotificationsPage();
-  if(view==="saved")renderSavedPage();
+    if(view==="saved")renderSavedPage();
   if(view==="explore")renderExplorePage();
   if(view==="settings")renderSettingsPage();
 }
@@ -2446,7 +2445,7 @@ function openCommandPalette(){
 function closeCommandPalette(){$("#command-palette").classList.add("hidden")}
 function renderCommandResults(q){
   const commands=[
-    ["⌂","Home","home"],["◌","Messages","dms"],["☎","Calls","calls"],["●","Live","live"],["◷","Events","events"],["◫","Projects","projects"],["□","Files","files"],["✧","ORBIT AI","ai"],["✦","Discover","discover"],["◎","Friends","friends"],["◇","Notifications","notifications"],["⌑","Saved","saved"],["⌖","Explore","explore"],["⚙","Settings","settings"],["+","Create server","create-server"],["#","Create channel","create-channel"],["☎","Start voice call","voice"],["▣","Start video call","video"],["↗","Share screen","share"],["⌕","Search","search"]
+    ["⌂","Home","home"],["◌","Messages","dms"],["☎","Calls","calls"],["●","Live","live"],["◷","Events","events"],["◫","Projects","projects"],["□","Files","files"],["✧","ORBIT AI","ai"],["✦","Discover","discover"],["◎","Friends","friends"],["⌑","Saved","saved"],["⌖","Explore","explore"],["⚙","Settings","settings"],["+","Create server","create-server"],["#","Create channel","create-channel"],["☎","Start voice call","voice"],["▣","Start video call","video"],["↗","Share screen","share"],["⌕","Search","search"]
   ].filter(x=>(x[1]+" "+x[2]).toLowerCase().includes(String(q||"").toLowerCase()));
   $("#command-results").innerHTML=(commands.length?commands:[["⌕","No matches",""]]).map((x,i)=>'<button class="command-item" data-command-index="'+i+'"><span class="command-icon">'+x[0]+'</span><div><strong>'+x[1]+'</strong><span>'+x[2]+'</span></div><span>↵</span></button>').join("");
   document.querySelectorAll("[data-command-index]").forEach((b,i)=>b.onclick=()=>runCommand(commands[i]));
