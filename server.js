@@ -806,7 +806,8 @@ async function requestOrbitModel(messages) {
     }
   }
   try {
-    const local = await requestLocalOrbitModel(messages);\n    return local ? {content:local,provider:"local"} : null;
+    const local = await requestLocalOrbitModel(messages);
+    return local ? {content:local,provider:"local"} : null;
   } catch (error) {
     console.error("[orbit] local NEXUS model unavailable:", error.message);
     return null;
