@@ -38,3 +38,16 @@ jobs:
             dist-desktop/*.exe
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish public ORBIT release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: orbit-latest
+          name: ORBIT Desktop (Latest)
+          body: |
+            Latest Windows build of ORBIT Desktop.
+            Download the installer (.exe) or portable executable.
+          files: |
+            dist-desktop/*.exe
+          make_latest: true
+          prerelease: false
