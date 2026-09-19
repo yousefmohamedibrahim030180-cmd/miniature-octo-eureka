@@ -1621,7 +1621,7 @@ function renderHomePage(){
 
   const meName=me?.display_name||me?.username||"Guest";
   const initialLiveUsers=(pulseState?.users||[]).filter(u=>String(u.status||"online").toLowerCase()!=="offline");
-  
+
   const avatarMarkup=(u, extra="")=>{
     const name=u?.display_name||u?.username||"Guest";
     const url=avatarImageUrl(u);
@@ -1630,7 +1630,6 @@ function renderHomePage(){
   const empty=(title,text)=>'<div class="od-empty"><strong>'+escapeHtml(title)+'</strong><span>'+escapeHtml(text)+'</span></div>';
   const userRow=(u, kind="friend")=>{
     const name=u?.display_name||u?.username||"Guest";
-    const status=String(u?.status||"online").toLowerCase()==="online";
     const activity=u?.activity||u?.status||"Online";
     return '<div class="od-user-row" data-od-user="'+escapeHtml(u?.id||"")+'">'+
       avatarMarkup(u)+
@@ -1638,7 +1637,7 @@ function renderHomePage(){
       '<div class="od-user-actions">'+
       (kind==="friend"?'<button class="od-row-btn" data-od-message="'+escapeHtml(u?.username||"")+'">Message</button>':"")+
       '</div>'+
-      '</div>';
+    '</div>';
   };
 
   body.innerHTML=
@@ -1658,7 +1657,7 @@ function renderHomePage(){
           '<button id="od-profile-settings" class="od-profile-icon" title="Settings">⚙</button>'+
         '</div>'+
       '</aside>'+
-      '<main class="od-friends-main">'+
+      '<main id="od-home-main" class="od-friends-main">'+
         '<header class="od-friends-head">'+
           '<div class="od-friends-label"><span class="od-friends-icon">♟</span><strong>Friends</strong></div>'+
           '<div class="od-friends-tabs">'+
@@ -1669,7 +1668,7 @@ function renderHomePage(){
           '</div>'+
           '<button id="od-add-friend" class="od-add-friend">Add Friend</button>'+
         '</header>'+
-        '<div class="od-home-notice"><span class="od-home-notice-icon">i</span><div><strong>Friends & conversations</strong><span>Your people, direct messages, and live activity all stay in one place.</span></div><button id="od-notice-close">×</button></div>'+
+        '<div class="od-home-notice"><span class="od-home-notice-icon">i</span><div><strong>Friends & conversations</strong><span>Choose a direct message from the left to open the chat here.</span></div><button id="od-notice-close">×</button></div>'+
         '<label class="od-friend-search"><span>⌕</span><input id="od-friend-search" placeholder="Search friends" autocomplete="off"></label>'+
         '<div id="od-tab-content" class="od-tab-content"></div>'+
       '</main>'+
@@ -1710,15 +1709,14 @@ function renderHomePage(){
       $("#od-dm-list").innerHTML=rows.length?rows.slice(0,30).map(dm=>{
         const u=dm.otherUser||{};
         const onlineNow=dmUserStatus(u)==="Online";
-        return '<button class="od-dm-row" data-od-dm="'+escapeHtml(dm.id)+'">'+
+        return '<button class="od-dm-row '+(String(dm.id)===String(dmState.activeId)?"active":"")+'" data-od-dm="'+escapeHtml(dm.id)+'">'+
           avatarMarkup({...u,status:onlineNow?"online":"offline"})+
           '<span><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><em>'+escapeHtml(dm.lastMessage?.content||"Start a conversation")+'</em></span>'+
           (dm.unreadCount?'<b>'+escapeHtml(dm.unreadCount)+'</b>':"")+
         '</button>';
       }).join(""):'<div class="od-dm-empty">No direct messages yet.</div>';
-      document.querySelectorAll("[data-od-dm]").forEach(btn=>btn.onclick=()=>{setView("dms");setTimeout(()=>openDM(btn.dataset.odDm),100)});
+      document.querySelectorAll("[data-od-dm]").forEach(btn=>btn.onclick=()=>openHomeDirectMessage(btn.dataset.odDm));
     };
-    renderDMs();
 
     const renderActive=()=>{
       const active=(liveUsers.length?liveUsers:online).slice(0,8);
@@ -1727,81 +1725,215 @@ function renderHomePage(){
       }).join(""):'<div class="od-active-empty"><strong>No one is active</strong><span>When friends come online, they will appear here.</span></div>';
       document.querySelectorAll("[data-od-active-user]").forEach(btn=>btn.onclick=()=>openPulseProfile(btn.dataset.odActiveUser));
     };
-    renderActive();
 
-    const activateTab=(mode)=>{
-      document.querySelectorAll("[data-od-tab]").forEach(b=>b.classList.toggle("active",b.dataset.odTab===mode));
-      const slot=$("#od-tab-content");
-      if(!slot)return;
-      let html="";
-      if(mode==="online"){
-        html='<div class="od-list-heading"><div><strong>Online — '+online.length+'</strong><span>Friends currently online</span></div></div>'+
-          '<div class="od-user-list">'+(online.length?online.map(u=>userRow(u)).join(""):empty("Nobody is online","Your online friends will appear here."))+'</div>';
-      }else if(mode==="all"){
-        html='<div class="od-list-heading"><div><strong>All Friends — '+friends.length+'</strong><span>Everyone in your friends list</span></div></div>'+
-          '<div class="od-user-list">'+(friends.length?friends.map(u=>userRow(u)).join(""):empty("No friends yet","Add people to build your Orbit circle."))+'</div>';
-      }else if(mode==="pending"){
-        html='<div class="od-list-heading"><div><strong>Pending</strong><span>Requests waiting for your response</span></div></div>'+
-          '<section class="od-request-section"><div class="od-subheading">Incoming — '+incoming.length+'</div><div class="od-user-list">'+
-          (incoming.length?incoming.map(r=>{
-            const u=r.fromUser||{};
-            return '<div class="od-user-row" data-od-user="'+escapeHtml(u.id||"")+'">'+avatarMarkup(u)+'<div class="od-user-copy"><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>Wants to be your friend</span></div><div class="od-user-actions"><button class="od-row-btn primary" data-od-accept="'+escapeHtml(r.id)+'">Accept</button><button class="od-row-btn" data-od-reject="'+escapeHtml(r.id)+'">Decline</button></div></div>';
-          }).join(""):empty("No incoming requests","You are all caught up."))+
-          '</div></section><section class="od-request-section"><div class="od-subheading">Outgoing — '+outgoing.length+'</div><div class="od-user-list">'+
-          (outgoing.length?outgoing.map(r=>{
-            const u=r.toUser||{};
-            return '<div class="od-user-row">'+avatarMarkup(u)+'<div class="od-user-copy"><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>Friend request · waiting</span></div><div class="od-user-actions"><span class="od-pending-chip">Pending</span></div></div>';
-          }).join(""):empty("No outgoing requests","Requests you send will appear here."))+
-          '</div></section>';
-      }else{
-        html='<div class="od-list-heading"><div><strong>Suggestions</strong><span>People you may want to connect with</span></div></div>'+
-          '<div class="od-user-list">'+(suggestions.length?suggestions.map(u=>{
-            return '<div class="od-user-row">'+avatarMarkup(u)+'<div class="od-user-copy"><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>'+escapeHtml(u.status||"online")+' · @'+escapeHtml(u.username||"guest")+'</span></div><div class="od-user-actions"><button class="od-row-btn primary" data-od-add="'+escapeHtml(u.username||"")+'">Add Friend</button></div></div>';
-          }).join(""):empty("No suggestions right now","Try searching for someone by username."))+'</div>';
-      }
-      slot.innerHTML=html;
+    const renderFriendsSurface=()=>{
+      const main=$("#od-home-main");
+      if(!main)return;
+      main.innerHTML=
+        '<header class="od-friends-head">'+
+          '<div class="od-friends-label"><span class="od-friends-icon">♟</span><strong>Friends</strong></div>'+
+          '<div class="od-friends-tabs">'+
+            '<button data-od-tab="online" class="active">Online</button>'+
+            '<button data-od-tab="all">All</button>'+
+            '<button data-od-tab="pending">Pending <span class="od-tab-badge" id="od-pending-badge">'+incoming.length+'</span></button>'+
+            '<button data-od-tab="suggestions">Suggestions <span class="od-tab-badge soft" id="od-suggestion-badge">'+suggestions.length+'</span></button>'+
+          '</div>'+
+          '<button id="od-add-friend" class="od-add-friend">Add Friend</button>'+
+        '</header>'+
+        '<div class="od-home-notice"><span class="od-home-notice-icon">i</span><div><strong>Friends & conversations</strong><span>Choose a direct message from the left to open the chat here.</span></div><button id="od-notice-close">×</button></div>'+
+        '<label class="od-friend-search"><span>⌕</span><input id="od-friend-search" placeholder="Search friends" autocomplete="off"></label>'+
+        '<div id="od-tab-content" class="od-tab-content"></div>';
 
-      slot.querySelectorAll("[data-od-message]").forEach(btn=>btn.onclick=async()=>{
-        try{
-          await api("/api/dms",{method:"POST",body:JSON.stringify({username:btn.dataset.odMessage})});
-          setView("dms");renderDMPage();
-        }catch(e){orbitToast("Message failed",e.message,"error")}
-      });
-      slot.querySelectorAll("[data-od-user]").forEach(btn=>btn.onclick=e=>{if(e.target.closest("button"))return;openPulseProfile(btn.dataset.odUser)});
-      slot.querySelectorAll("[data-od-accept]").forEach(btn=>btn.onclick=async()=>{
-        try{await api("/api/friends/request/"+encodeURIComponent(btn.dataset.odAccept)+"/accept",{method:"POST",body:"{}"});orbitToast("Friend added","Request accepted.","success");renderHomePage()}catch(e){orbitToast("Request failed",e.message,"error")}
-      });
-      slot.querySelectorAll("[data-od-reject]").forEach(btn=>btn.onclick=async()=>{
-        try{await api("/api/friends/request/"+encodeURIComponent(btn.dataset.odReject)+"/reject",{method:"POST",body:"{}"});orbitToast("Request declined","The request was rejected.");renderHomePage()}catch(e){orbitToast("Request failed",e.message,"error")}
-      });
-      slot.querySelectorAll("[data-od-add]").forEach(btn=>btn.onclick=async()=>{
-        try{await api("/api/friends/request",{method:"POST",body:JSON.stringify({username:btn.dataset.odAdd})});orbitToast("Friend request sent","Request sent.","success");btn.textContent="Sent";btn.disabled=true}catch(e){orbitToast("Friend request failed",e.message,"error")}
+      const activateTab=(mode)=>{
+        document.querySelectorAll("[data-od-tab]").forEach(b=>b.classList.toggle("active",b.dataset.odTab===mode));
+        const slot=$("#od-tab-content"); if(!slot)return;
+        let html="";
+        if(mode==="online"){
+          html='<div class="od-list-heading"><div><strong>Online — '+online.length+'</strong><span>Friends currently online</span></div></div>'+
+            '<div class="od-user-list">'+(online.length?online.map(u=>userRow(u)).join(""):empty("Nobody is online","Your online friends will appear here."))+'</div>';
+        }else if(mode==="all"){
+          html='<div class="od-list-heading"><div><strong>All Friends — '+friends.length+'</strong><span>Everyone in your friends list</span></div></div>'+
+            '<div class="od-user-list">'+(friends.length?friends.map(u=>userRow(u)).join(""):empty("No friends yet","Add people to build your Orbit circle."))+'</div>';
+        }else if(mode==="pending"){
+          html='<div class="od-list-heading"><div><strong>Pending</strong><span>Requests waiting for your response</span></div></div>'+
+            '<section class="od-request-section"><div class="od-subheading">Incoming — '+incoming.length+'</div><div class="od-user-list">'+
+            (incoming.length?incoming.map(r=>{
+              const u=r.fromUser||{};
+              return '<div class="od-user-row" data-od-user="'+escapeHtml(u.id||"")+'">'+avatarMarkup(u)+'<div class="od-user-copy"><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>Wants to be your friend</span></div><div class="od-user-actions"><button class="od-row-btn primary" data-od-accept="'+escapeHtml(r.id)+'">Accept</button><button class="od-row-btn" data-od-reject="'+escapeHtml(r.id)+'">Decline</button></div></div>';
+            }).join(""):empty("No incoming requests","You are all caught up."))+
+            '</div></section><section class="od-request-section"><div class="od-subheading">Outgoing — '+outgoing.length+'</div><div class="od-user-list">'+
+            (outgoing.length?outgoing.map(r=>{
+              const u=r.toUser||{};
+              return '<div class="od-user-row">'+avatarMarkup(u)+'<div class="od-user-copy"><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>Friend request · waiting</span></div><div class="od-user-actions"><span class="od-pending-chip">Pending</span></div></div>';
+            }).join(""):empty("No outgoing requests","Requests you send will appear here."))+
+            '</div></section>';
+        }else{
+          html='<div class="od-list-heading"><div><strong>Suggestions</strong><span>People you may want to connect with</span></div></div>'+
+            '<div class="od-user-list">'+(suggestions.length?suggestions.map(u=>{
+              return '<div class="od-user-row">'+avatarMarkup(u)+'<div class="od-user-copy"><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>'+escapeHtml(u.status||"online")+' · @'+escapeHtml(u.username||"guest")+'</span></div><div class="od-user-actions"><button class="od-row-btn primary" data-od-add="'+escapeHtml(u.username||"")+'">Add Friend</button></div></div>';
+            }).join(""):empty("No suggestions right now","Try searching for someone by username."))+'</div>';
+        }
+        slot.innerHTML=html;
+        slot.querySelectorAll("[data-od-message]").forEach(btn=>btn.onclick=async()=>{
+          try{
+            await api("/api/dms",{method:"POST",body:JSON.stringify({username:btn.dataset.odMessage})});
+            const fresh=await api("/api/dms");
+            dmState.list=fresh.dms||[];
+            const dm=dmState.list.find(x=>String(x.otherUser?.username||"").toLowerCase()===String(btn.dataset.odMessage||"").toLowerCase());
+            if(dm)await openHomeDirectMessage(dm.id);
+          }catch(e){orbitToast("Message failed",e.message,"error")}
+        });
+        slot.querySelectorAll("[data-od-user]").forEach(btn=>btn.onclick=e=>{if(e.target.closest("button"))return;openPulseProfile(btn.dataset.odUser)});
+        slot.querySelectorAll("[data-od-accept]").forEach(btn=>btn.onclick=async()=>{
+          try{await api("/api/friends/request/"+encodeURIComponent(btn.dataset.odAccept)+"/accept",{method:"POST",body:"{}"});orbitToast("Friend added","Request accepted.","success");renderHomePage()}catch(e){orbitToast("Request failed",e.message,"error")}
+        });
+        slot.querySelectorAll("[data-od-reject]").forEach(btn=>btn.onclick=async()=>{
+          try{await api("/api/friends/request/"+encodeURIComponent(btn.dataset.odReject)+"/reject",{method:"POST",body:"{}"});orbitToast("Request declined","The request was rejected.");renderHomePage()}catch(e){orbitToast("Request failed",e.message,"error")}
+        });
+        slot.querySelectorAll("[data-od-add]").forEach(btn=>btn.onclick=async()=>{
+          try{await api("/api/friends/request",{method:"POST",body:JSON.stringify({username:btn.dataset.odAdd})});orbitToast("Friend request sent","Request sent.","success");btn.textContent="Sent";btn.disabled=true}catch(e){orbitToast("Friend request failed",e.message,"error")}
+        });
+        document.querySelectorAll("[data-od-tab]").forEach(b=>b.onclick=()=>activateTab(b.dataset.odTab));
+        $("#od-add-friend").onclick=()=>{setView("friends");setTimeout(()=>$("#add-friend-page")?.click(),80)};
+        $("#od-notice-close").onclick=e=>e.currentTarget.closest(".od-home-notice")?.remove();
+        $("#od-friend-search").oninput=e=>{
+          const term=e.target.value.toLowerCase().trim();
+          document.querySelectorAll("#od-tab-content .od-user-row").forEach(row=>row.style.display=!term||row.innerText.toLowerCase().includes(term)?"flex":"none");
+        };
+      };
+      activateTab("online");
+    };
+
+    const renderActiveHome=()=>{
+      renderActive();
+      $("#od-profile-home").onclick=()=>setView("settings");
+      $("#od-profile-settings").onclick=()=>setView("settings");
+      $("#od-quick-search").oninput=e=>renderDMs(e.target.value);
+      $("#od-new-dm").onclick=()=>{setView("dms");setTimeout(()=>$("#dm-new-inline")?.click(),100)};
+      document.querySelectorAll("[data-od-social]").forEach(btn=>btn.onclick=()=>{
+        const target=btn.dataset.odSocial;
+        if(target==="friends"){renderFriendsSurface();return}
+        if(target==="dms"){
+          const first=dms[0];
+          if(first)openHomeDirectMessage(first.id);
+          else $("#od-new-dm")?.click();
+          return;
+        }
+        setView(target==="calls"?"calls":target);
       });
     };
 
-    document.querySelectorAll("[data-od-tab]").forEach(b=>b.onclick=()=>activateTab(b.dataset.odTab));
-    activateTab("online");
-
-    const addFriend=()=>{setView("friends");setTimeout(()=>$("#add-friend-page")?.click(),80)};
-    $("#od-add-friend").onclick=addFriend;
-    $("#od-profile-home").onclick=()=>setView("settings");
-    $("#od-profile-settings").onclick=()=>setView("settings");
-    $("#od-notice-close").onclick=e=>e.currentTarget.closest(".od-home-notice")?.remove();
-    $("#od-quick-search").oninput=e=>renderDMs(e.target.value);
-    $("#od-new-dm").onclick=()=>{setView("dms");setTimeout(()=>$("#dm-new-inline")?.click(),100)};
-    document.querySelectorAll("[data-od-social]").forEach(btn=>btn.onclick=()=>{
-      const target=btn.dataset.odSocial;
-      if(target==="friends") return activateTab("online");
-      setView(target==="dms"?"dms":target);
-    });
-    $("#od-friend-search").oninput=e=>{
-      const term=e.target.value.toLowerCase().trim();
-      document.querySelectorAll("#od-tab-content .od-user-row").forEach(row=>row.style.display=!term||row.innerText.toLowerCase().includes(term)?"flex":"none");
-    };
-    body.querySelectorAll("[data-od-user]").forEach(btn=>btn.onclick=e=>{if(e.target.closest("button"))return;openPulseProfile(btn.dataset.odUser)});
+    renderDMs();
+    renderFriendsSurface();
+    renderActiveHome();
   };
   loadHomeData();
 }
+
+async function openHomeDirectMessage(dmId){
+  try{
+    if(!dmState.list.length){
+      const data=await api("/api/dms");
+      dmState.list=data.dms||[];
+    }
+    const dm=dmState.list.find(x=>String(x.id)===String(dmId));
+    if(!dm)return;
+    if(dmState.activeId&&String(dmState.activeId)!==String(dmId))socket?.emit("dm:typing",{dmId:dmState.activeId,isTyping:false});
+    dmState.activeId=dm.id;
+    dmState.active=dm;
+    dmState.messages=[];
+    const data=await api("/api/dms/"+encodeURIComponent(dmId)+"/messages");
+    dmState.messages=data.messages||[];
+    socket?.emit("dm:join",dmId);
+    socket?.emit("dm:read",dmId);
+    api("/api/dms/"+encodeURIComponent(dmId)+"/read",{method:"POST",body:"{}"}).catch(()=>{});
+
+    const u=dm.otherUser||{};
+    const avatarUrl=avatarImageUrl(u);
+    const online=dmUserStatus(u)==="Online";
+    const home=$("#od-home-main");
+    if(!home)return;
+
+    home.innerHTML=
+      '<header class="od-home-dm-head">'+
+        '<div class="od-home-dm-user">'+
+          '<div class="od-home-dm-avatar">'+(avatarUrl?'<img src="'+escapeHtml(avatarUrl)+'" alt="">':escapeHtml(avatar(u.username||"G")))+'</div>'+
+          '<div><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span><i class="'+(online?"online":"offline")+'"></i>'+ (online?"Online":"Offline") +' · @'+escapeHtml(u.username||"guest")+'</span></div>'+
+        '</div>'+
+        '<div class="od-home-dm-actions"><button id="od-home-dm-call" title="Voice call">☎</button><button id="od-home-dm-video" title="Video call">▣</button><button id="od-home-dm-search" title="Search">⌕</button><button id="od-home-dm-profile" title="Profile">◉</button></div>'+
+      '</header>'+
+      '<div id="od-home-dm-messages" class="od-home-dm-messages">'+
+        '<div class="od-home-dm-welcome"><div class="od-home-dm-big-avatar">'+(avatarUrl?'<img src="'+escapeHtml(avatarUrl)+'" alt="">':escapeHtml(avatar(u.username||"G")))+'</div><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>That’s the beginning of your direct message with @'+escapeHtml(u.username||"guest")+'.</span></div>'+
+      '</div>'+
+      '<div id="od-home-dm-typing" class="od-home-dm-typing"></div>'+
+      '<form id="od-home-dm-form" class="od-home-dm-composer"><button type="button" id="od-home-dm-add">＋</button><textarea id="od-home-dm-input" rows="1" maxlength="4000" placeholder="Message @'+escapeHtml(u.username||"guest")+'"></textarea><button type="button" id="od-home-dm-emoji">☺</button><button type="submit" class="od-home-dm-send">➤</button></form>';
+
+    renderHomeDirectMessageFeed(true);
+
+    const input=$("#od-home-dm-input");
+    $("#od-home-dm-form").onsubmit=async e=>{
+      e.preventDefault();
+      const value=input?.value.trim();
+      if(!value)return;
+      try{
+        await api("/api/dms/"+encodeURIComponent(dmId)+"/messages",{method:"POST",body:JSON.stringify({content:value})});
+        input.value="";
+        input.style.height="auto";
+        socket?.emit("dm:typing",{dmId:dmId,isTyping:false});
+        input.focus();
+      }catch(err){orbitToast("Message failed",err.message,"error")}
+    };
+    input?.addEventListener("input",()=>{
+      input.style.height="auto";input.style.height=Math.min(input.scrollHeight,150)+"px";
+      if(!socket)return;
+      socket.emit("dm:typing",{dmId:dmId,isTyping:true});
+      clearTimeout(dmState.typingTimer);
+      dmState.typingTimer=setTimeout(()=>socket?.emit("dm:typing",{dmId:dmId,isTyping:false}),900);
+    });
+    input?.addEventListener("keydown",e=>{
+      if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("#od-home-dm-form")?.requestSubmit()}
+    });
+    $("#od-home-dm-emoji").onclick=()=>{
+      const el=$("#od-home-dm-input");if(!el)return;
+      const start=el.selectionStart??el.value.length;
+      el.value=el.value.slice(0,start)+"🙂"+el.value.slice(el.selectionEnd??start);
+      el.focus();el.selectionStart=el.selectionEnd=start+2;
+    };
+    $("#od-home-dm-add").onclick=()=>orbitToast("Attachments","Attachment upload is available in community channels.");
+    $("#od-home-dm-search").onclick=()=>{
+      const q=prompt("Search messages");
+      if(q===null)return;
+      const term=q.trim().toLowerCase();
+      document.querySelectorAll("#od-home-dm-messages .od-home-dm-message").forEach(row=>row.style.display=!term||row.innerText.toLowerCase().includes(term)?"grid":"none");
+    };
+    $("#od-home-dm-profile").onclick=()=>openPulseProfile(u.id);
+    $("#od-home-dm-call").onclick=()=>orbitToast("Voice call","Use a community voice room to start a live call.");
+    $("#od-home-dm-video").onclick=()=>orbitToast("Video call","Use a community voice room to start a video call.");
+    document.querySelectorAll("[data-od-social]").forEach(btn=>btn.classList.toggle("active",btn.dataset.odSocial==="dms"));
+    document.querySelectorAll("[data-od-dm]").forEach(btn=>btn.classList.toggle("active",String(btn.dataset.odDm)===String(dmId)));
+  }catch(e){orbitToast("Direct message",e.message,"error")}
+}
+
+function renderHomeDirectMessageFeed(scrollBottom){
+  const feed=$("#od-home-dm-messages");
+  if(!feed)return;
+  const other=dmState.active?.otherUser||{};
+  if(!dmState.messages.length){
+    feed.innerHTML='<div class="od-home-dm-welcome"><div class="od-home-dm-big-avatar">'+escapeHtml(avatar(other.username||"G"))+'</div><strong>'+escapeHtml(other.display_name||other.username||"Guest")+'</strong><span>Start a conversation with @'+escapeHtml(other.username||"guest")+'.</span></div>';
+    return;
+  }
+  feed.innerHTML=dmState.messages.map((m)=>{
+    const own=String(m.user_id)===String(me?.id);
+    const av=m.username===me?.username&&me?avatar(me.username):avatar(m.username||"G");
+    return '<article class="od-home-dm-message '+(own?"own":"")+'">'+
+      '<div class="od-home-dm-msg-avatar">'+escapeHtml(av)+'</div>'+
+      '<div class="od-home-dm-msg-stack"><div class="od-home-dm-meta"><strong>'+escapeHtml(m.username||"Guest")+'</strong><time>'+escapeHtml(formatDMTime(m.created_at))+'</time></div>'+
+      '<div class="od-home-dm-text">'+escapeHtml(m.content||"")+'</div></div>'+
+      '</article>';
+  }).join("");
+  if(scrollBottom)requestAnimationFrame(()=>feed.scrollTop=feed.scrollHeight);
+}
+
 
 /* ===== ORBIT PRODUCT EXPANSION / SOCIAL OS MODULES ===== */
 /* ===== ORBIT PRODUCT EXPANSION / SOCIAL OS MODULES ===== */
@@ -2928,22 +3060,32 @@ connectRealtime=function(){
   socket.on("dm:typing",x=>{
     if(!x||String(x.dmId)!==String(dmState.activeId))return;
     const typing=$("#dm-typing");if(typing)typing.textContent=x.isTyping?(x.username||"Your friend")+" is typing…":"";
+    const homeTyping=$("#od-home-dm-typing");if(homeTyping)homeTyping.textContent=x.isTyping?(x.username||"Your friend")+" is typing…":"";
   });
   socket.on("dm:message",m=>{
     const existing=dmState.list.find(d=>String(d.id)===String(m.dm_id));
     if(existing){existing.lastMessage=m;if(String(m.user_id)!==String(me?.id)&&String(dmState.activeId)!==String(m.dm_id))existing.unreadCount=Number(existing.unreadCount||0)+1;}
     if(String(dmState.activeId)===String(m.dm_id)){
-      if(!dmState.messages.some(x=>String(x.id)===String(m.id))){dmState.messages.push(m);renderDMMessageFeed(true);}
-      if(String(m.user_id)!==String(me?.id)){socket?.emit("dm:read",m.dm_id);api("/api/dms/"+encodeURIComponent(m.dm_id)+"/read",{method:"POST",body:"{}"}).catch(()=>{});}
+      if(!dmState.messages.some(x=>String(x.id)===String(m.id))){
+        dmState.messages.push(m);
+        renderDMMessageFeed(true);
+        renderHomeDirectMessageFeed(true);
+      }
+      if(String(m.user_id)!==String(me?.id)){
+        socket?.emit("dm:read",m.dm_id);
+        api("/api/dms/"+encodeURIComponent(m.dm_id)+"/read",{method:"POST",body:"{}"}).catch(()=>{});
+      }
     }else if(String(m.user_id)!==String(me?.id)){
       orbitToast("New message",(m.username||"Your friend")+": "+String(m.content||"").slice(0,90),"success");
     }
     if(orbitUI.view==="dms")renderDMList();
+    if(orbitUI.view==="home")document.querySelectorAll("[data-od-dm]").forEach(btn=>btn.classList.toggle("active",String(btn.dataset.odDm)===String(m.dm_id)));
   });
   socket.on("dm:read",event=>{
     if(!event||String(event.dmId)!==String(dmState.activeId))return;
     dmState.messages.forEach(m=>{if(String(m.user_id)===String(me?.id)&&String(event.readerId)!==String(me?.id))m.seen_at=event.readAt});
     renderDMMessageFeed(false);
+    renderHomeDirectMessageFeed(false);
   });
 };
 
