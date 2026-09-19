@@ -3,7 +3,6 @@ name: Build ORBIT Desktop
 on:
   workflow_dispatch:
   push:
-  push:
     paths:
       - "electron/**"
       - "package.json"
@@ -22,7 +21,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          - name: Install
+      - name: Install
         run: npm install
       - name: Build Windows app
         run: npm run desktop:dist
