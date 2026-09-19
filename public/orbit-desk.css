@@ -240,3 +240,26 @@ body.orbit-discord-home .sidebar{display:none}
 .od-dm-row.active{background:#404249!important;color:#fff}
 @media(max-width:900px){.od-home-dm-actions button:nth-child(1),.od-home-dm-actions button:nth-child(2){display:none}}
 @media(max-width:760px){.od-home-dm-head{padding:0 9px}.od-home-dm-messages{padding-left:5px;padding-right:5px}.od-home-dm-composer{grid-template-columns:28px minmax(0,1fr) 30px 32px;margin:0 7px 7px}}
+
+
+/* ===== Large Discord-style Home DM layout ===== */
+.od-home-chat-active{background:#313338!important}
+.od-profile-active{background:#2b2d31!important;border-left:1px solid #202225}
+.od-profile-head{height:57px;display:flex;align-items:center;justify-content:space-between;padding:0 13px;border-bottom:1px solid #202225;background:#313338;color:#fff}
+.od-profile-head strong{font-size:11px}.od-profile-head button{width:28px;height:28px;border:0;border-radius:6px;background:transparent;color:#b5bac1;font-size:18px;cursor:pointer}.od-profile-head button:hover{background:#35373c;color:#fff}
+.od-profile-cover{height:82px;background:linear-gradient(135deg,#5865f2 0%,#7b4de0 42%,#2c9fff 100%)}
+.od-profile-card{padding:0 13px 16px}.od-profile-avatar-xl{position:relative;margin-top:-25px;width:62px;height:62px;border-radius:50%;border:5px solid #2b2d31;background:#5865f2;color:#fff;display:grid;place-items:center;overflow:visible;font-weight:800;font-size:17px}
+.od-profile-avatar-xl img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.od-profile-avatar-xl i{position:absolute;right:-1px;bottom:0;width:13px;height:13px;border-radius:50%;background:#747f8d;border:3px solid #2b2d31}.od-profile-avatar-xl i.online{background:#23a55a}
+.od-profile-name{display:block;margin-top:8px;font-size:14px;color:#f2f3f5}.od-profile-handle{display:block;margin-top:3px;color:#949ba4;font-size:8px}.od-profile-status-line{display:flex;align-items:center;gap:5px;margin-top:6px;color:#b5bac1;font-size:8px}.od-profile-status-line i{width:7px;height:7px;border-radius:50%;background:#747f8d}.od-profile-status-line i.online{background:#23a55a}
+.od-profile-divider{height:1px;background:#3b3d42;margin:14px 0}.od-profile-section{color:#949ba4;font-size:7px;font-weight:800;letter-spacing:.08em;margin-top:11px}.od-profile-bio{margin:6px 0 0;color:#dbdee1;font-size:8px;line-height:1.55}.od-profile-info{display:flex;justify-content:space-between;gap:10px;padding:8px 0;color:#b5bac1;font-size:8px;border-bottom:1px solid #35373c}.od-profile-info strong{color:#dbdee1;font-size:8px}.od-profile-view{width:100%;height:35px;margin-top:14px;border:0;border-radius:6px;background:#404249;color:#fff;font-size:9px;font-weight:700;cursor:pointer}.od-profile-view:hover{background:#4a4c55}
+.od-home-chat-active .od-home-dm-head{box-shadow:0 1px 0 #202225}
+.od-home-chat-active .od-home-dm-messages{padding-left:18px;padding-right:18px}
+.od-home-chat-active .od-home-dm-message{padding:6px 9px}
+.od-home-chat-active .od-home-dm-text{font-size:11px}
+.od-home-chat-active .od-home-dm-welcome{padding:46px 22px 28px}
+.od-home-chat-active .od-home-dm-big-avatar{width:72px;height:72px;font-size:22px}
+.od-home-chat-active .od-home-dm-welcome strong{font-size:19px}
+.od-home-chat-active .od-home-dm-composer{margin-left:14px;margin-right:14px;margin-bottom:14px}
+@media(max-width:1100px){.od-profile-active{display:none}}
+@media(max-width:760px){.od-home-chat-active .od-home-dm-messages{padding-left:6px;padding-right:6px}.od-home-chat-active .od-home-dm-composer{margin-left:7px;margin-right:7px;margin-bottom:7px}}
