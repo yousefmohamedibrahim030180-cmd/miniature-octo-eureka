@@ -246,6 +246,20 @@ function connectRealtime() {
     playUiTone("call");
   });
 
+  socket.on("dm:call:incoming", call => {
+    if (callState.active || String(call.userId) === String(me?.id)) return;
+    pendingIncomingCall = { ...call, scope: "dm" };
+    const box = $("#incoming-call");
+    $("#incoming-call")?.classList.add("private-incoming");
+    $("#incoming-title").textContent = (call.username || call.fromUser?.username || "Someone") + " is calling you";
+    $("#incoming-subtitle").textContent = (call.mode === "voice" ? "Private voice call" : "Private video call") + " · Direct message";
+    const incoming = call.fromUser || call;
+    const incomingUrl = avatarImageUrl(incoming);
+    $("#incoming-avatar").innerHTML = incomingUrl ? '<img src="' + escapeHtml(incomingUrl) + '" alt="">' : escapeHtml(avatar(call.username || "G"));
+    box.classList.remove("hidden");
+    playUiTone("call");
+  });
+
   socket.on("call:participants", participants => {
     participants.forEach(p => createPeer(p.socketId, true, p));
     updateCallMeta();
@@ -255,6 +269,57 @@ function connectRealtime() {
     addRemoteTile(p.socketId, p);
     try { await ensurePeer(p.socketId, false, p); } catch (err) { console.error("peer setup", err); }
     updateCallMeta();
+  });
+
+  socket.on("dm:call:accepted", payload => {
+    if (callState.scope !== "dm" || !callState.active || String(payload?.dmId) !== String(callState.dmId)) return;
+    callState.callId = payload.callId || callState.callId;
+    callState.roomId = payload.roomId || callState.roomId;
+    callState.joined = true;
+    callState.remoteUser = payload.participant || callState.remoteUser;
+    const name = callState.remoteUser?.display_name || callState.remoteUser?.username || "Private call";
+    $("#call-title").textContent = name;
+    $("#call-quality-indicator").textContent = "CONNECTING";
+    addRemoteTile(payload.participant?.socketId, payload.participant || {});
+    emitCallMediaState();
+    updateDMCallSurface("Connecting…");
+    updateCallMeta();
+  });
+
+  socket.on("dm:call:participants", participants => {
+    if (callState.scope !== "dm" || !callState.active) return;
+    callState.joined = true;
+    participants.forEach(p => createPeer(p.socketId, true, p));
+    updateCallMeta();
+  });
+
+  socket.on("dm:call:participant-left", ({ socketId }) => {
+    if (callState.scope !== "dm") return;
+    removePeer(socketId);
+    orbitToast("Private call", "The call has ended.", "");
+    leaveCall();
+  });
+
+  socket.on("dm:call:declined", ({ callId, username }) => {
+    if (callState.scope !== "dm" || String(callId) !== String(callState.callId)) return;
+    orbitToast("Private call", (username || "The other person") + " declined the call.");
+    leaveCall();
+  });
+
+  socket.on("dm:call:cancelled", ({ callId }) => {
+    if (pendingIncomingCall?.scope === "dm" && String(pendingIncomingCall.callId) === String(callId)) closeIncomingCall();
+    if (callState.scope === "dm" && String(callState.callId) === String(callId) && !callState.joined) {
+      leaveCall();
+    }
+  });
+
+  socket.on("dm:call:media-state", ({ socketId, muted, cameraOff, screenShare }) => {
+    if (callState.scope !== "dm") return;
+    const tile = document.querySelector('.call-tile[data-peer="' + socketId + '"]');
+    if (!tile) return;
+    tile.classList.toggle("remote-muted", Boolean(muted));
+    tile.classList.toggle("voice-only", Boolean(cameraOff));
+    tile.classList.toggle("screen-sharing", Boolean(screenShare));
   });
 
   socket.on("call:participant-left", ({ socketId }) => {
@@ -316,6 +381,51 @@ function connectRealtime() {
       }
       await item.pc.addIceCandidate(candidate);
     } catch (err) { console.error("ICE candidate", err); }
+  });
+
+  const handleDMRtcOffer = async ({ from, fromUser, offer }) => {
+    if (callState.scope !== "dm" || !callState.active) return;
+    try {
+      const pc = await ensurePeer(from, false, fromUser);
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      const item = callState.peers.get(from);
+      if (item?.pendingCandidates?.length) {
+        for (const candidate of item.pendingCandidates.splice(0)) {
+          try { await pc.addIceCandidate(candidate); } catch (err) { console.warn("queued DM ICE", err); }
+        }
+      }
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit("dmrtc:answer", { to: from, answer: pc.localDescription });
+    } catch (err) {
+      console.error("DM offer handling", err);
+    }
+  };
+  socket.on("dmrtc:offer", handleDMRtcOffer);
+  socket.on("dmrtc:answer", async ({ from, answer }) => {
+    if (callState.scope !== "dm") return;
+    const item = callState.peers.get(from);
+    if (!item?.pc) return;
+    try {
+      await item.pc.setRemoteDescription(new RTCSessionDescription(answer));
+      if (item.pendingCandidates?.length) {
+        for (const candidate of item.pendingCandidates.splice(0)) {
+          try { await item.pc.addIceCandidate(candidate); } catch (err) { console.warn("queued DM ICE", err); }
+        }
+      }
+    } catch (err) { console.error("DM answer", err); }
+  });
+  socket.on("dmrtc:ice", async ({ from, candidate }) => {
+    if (callState.scope !== "dm") return;
+    const item = callState.peers.get(from);
+    if (!item?.pc || !candidate) return;
+    try {
+      if (!item.pc.remoteDescription) {
+        item.pendingCandidates.push(candidate);
+        return;
+      }
+      await item.pc.addIceCandidate(candidate);
+    } catch (err) { console.error("DM ICE candidate", err); }
   });
 
   socket.on("connect", () => {
