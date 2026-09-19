@@ -1672,7 +1672,7 @@ function renderHomePage(){
         '<label class="od-friend-search"><span>⌕</span><input id="od-friend-search" placeholder="Search friends" autocomplete="off"></label>'+
         '<div id="od-tab-content" class="od-tab-content"></div>'+
       '</main>'+
-      '<aside class="od-active-sidebar">'+
+      '<aside id="od-active-sidebar" class="od-active-sidebar">'+
         '<div class="od-active-title"><strong>Active Now</strong></div>'+
         '<div id="od-active-list" class="od-active-list"></div>'+
       '</aside>'+
