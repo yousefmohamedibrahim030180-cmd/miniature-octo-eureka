@@ -328,3 +328,8 @@ body.orbit-discord-home .od-dm-row::before{pointer-events:none!important}
 
 /* DM rows stay clickable while chat loads */
 .od-dm-list,.od-dm-row{pointer-events:auto!important}
+
+
+/* Legacy Messages screen is never the primary surface anymore. */
+body.orbit-discord-home .dm-shell,
+body.orbit-discord-home .dm-discord-shell{display:none!important}
