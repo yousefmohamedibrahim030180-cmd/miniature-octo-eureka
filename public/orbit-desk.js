@@ -15,8 +15,8 @@
     const name=u.display_name||u.username||"Guest";
     const state=u.activity||u.status||"Online";
     return '<button class="oh-user-row" data-oh-user="'+esc(u.id||"")+'">'+
-      '<span class="oh-avatar">'+esc(avatar(u.username||"G"))+'</span>'+\
-      '<span class="oh-user-copy"><strong>'+esc(name)+'</strong><span>'+esc(state)+'</span></span>'+\
+      '<span class="oh-avatar">'+esc(avatar(u.username||"G"))+'</span>'+
+      '<span class="oh-user-copy"><strong>'+esc(name)+'</strong><span>'+esc(state)+'</span></span>'+
       (compact?'':'<span class="oh-user-action">Message</span>')+
       '</button>';
   }
@@ -45,42 +45,42 @@
     body.innerHTML='<div class="orbit-home-simple">'+
       '<div class="oh-homebar">'+
         '<div class="oh-home-tabs">'+
-          '<button class="oh-tab active">Friends</button>'+\
-          '<button class="oh-tab" id="oh-online">Online</button>'+\
-          '<button class="oh-tab" id="oh-all">All</button>'+\
-          '<button class="oh-tab" id="oh-pending">Pending <span class="oh-badge">0</span></button>'+\
-          '<button class="oh-tab" id="oh-suggested">Suggestions</button>'+\
-        '</div>'+\
-        '<button class="oh-top-btn primary" id="oh-add-friend-2">Add Friend</button>'+\
-      '</div>'+\
-      '<div class="oh-columns">'+\
-        '<main class="oh-main">'+\
-          '<div class="oh-notice"><span class="oh-notice-icon">i</span><div><strong>Welcome to Orbit</strong><span>Your communities, friends, messages and live rooms stay connected here.</span></div><button id="oh-notice-close">×</button></div>'+\
-          '<div class="oh-search"><span>⌕</span><input id="oh-friend-search" placeholder="Search friends, communities, or conversations" autocomplete="off"></div>'+\
-          '<section class="oh-section"><div class="oh-section-head"><div><strong>Online — '+online.length+'</strong><span>People currently around you</span></div><button id="oh-open-friends">View All</button></div>'+\
-            '<div class="oh-user-list" id="oh-online-list">'+\
-              (online.length?online.map(u=>userRow(u)).join(""):(users.length?users.slice(0,6).map(u=>userRow(u)).join(""):'<div class="oh-empty"><strong>Nobody is online yet</strong><span>Invite people to Orbit and they will appear here.</span></div>'))+\
-            '</div>'+\
-          '</section>'+\
-          '<section class="oh-section"><div class="oh-section-head"><div><strong>Recent conversations</strong><span>Jump back into the people and places you use most</span></div><button id="oh-open-dms">Open Messages</button></div>'+\
-            '<div class="oh-recent-list">'+\
-              (friends.length?friends.slice(0,6).map(u=>userRow(u)).join(""):'<div class="oh-empty"><strong>No conversations yet</strong><span>Start a message from the Messages page.</span></div>')+\
-            '</div>'+\
-          '</section>'+\
-        '</main>'+\
-        '<aside class="oh-side">'+\
-          '<section class="oh-side-card"><div class="oh-side-head"><strong>Active Now</strong><button id="oh-open-calls">View All</button></div>'+\
-            '<div class="oh-side-body">'+\
-              (calls.length?calls.map(callCard).join(""):'<div class="oh-empty"><strong>No active rooms</strong><span>Voice, video and screen sharing will appear here.</span></div>')+\
-            '</div>'+\
-          '</section>'+\
-          '<section class="oh-side-card"><div class="oh-side-head"><strong>Your Space</strong><button id="oh-open-community">Open</button></div>'+\
-            '<div class="oh-space-card"><span class="oh-space-avatar">'+esc((current?.name||"O").slice(0,1).toUpperCase())+'</span><div><strong>'+esc(current?.name||"Orbit Lobby")+'</strong><span>'+esc(current?'Jump into your current community':'Choose a community from the left rail')+'</span></div></div>'+\
-            '<div class="oh-space-actions"><button id="oh-open-chat">Open Chat</button><button id="oh-open-events">Events</button></div>'+\
-          '</section>'+\
-          '<section class="oh-side-card oh-profile-card"><div class="oh-profile-row"><span class="oh-avatar large">'+esc(avatar(me?.username||"G"))+'</span><div><strong>'+esc(meName)+'</strong><span>@'+esc(me?.username||"guest")+'</span></div><button id="oh-profile">Edit</button></div></section>'+\
-        '</aside>'+\
-      '</div>'+\
+          '<button class="oh-tab active">Friends</button>'+
+          '<button class="oh-tab" id="oh-online">Online</button>'+
+          '<button class="oh-tab" id="oh-all">All</button>'+
+          '<button class="oh-tab" id="oh-pending">Pending <span class="oh-badge">0</span></button>'+
+          '<button class="oh-tab" id="oh-suggested">Suggestions</button>'+
+        '</div>'+
+        '<button class="oh-top-btn primary" id="oh-add-friend-2">Add Friend</button>'+
+      '</div>'+
+      '<div class="oh-columns">'+
+        '<main class="oh-main">'+
+          '<div class="oh-notice"><span class="oh-notice-icon">i</span><div><strong>Welcome to Orbit</strong><span>Your communities, friends, messages and live rooms stay connected here.</span></div><button id="oh-notice-close">×</button></div>'+
+          '<div class="oh-search"><span>⌕</span><input id="oh-friend-search" placeholder="Search friends, communities, or conversations" autocomplete="off"></div>'+
+          '<section class="oh-section"><div class="oh-section-head"><div><strong>Online — '+online.length+'</strong><span>People currently around you</span></div><button id="oh-open-friends">View All</button></div>'+
+            '<div class="oh-user-list" id="oh-online-list">'+
+              (online.length?online.map(u=>userRow(u)).join(""):(users.length?users.slice(0,6).map(u=>userRow(u)).join(""):'<div class="oh-empty"><strong>Nobody is online yet</strong><span>Invite people to Orbit and they will appear here.</span></div>'))+
+            '</div>'+
+          '</section>'+
+          '<section class="oh-section"><div class="oh-section-head"><div><strong>Recent conversations</strong><span>Jump back into the people and places you use most</span></div><button id="oh-open-dms">Open Messages</button></div>'+
+            '<div class="oh-recent-list">'+
+              (friends.length?friends.slice(0,6).map(u=>userRow(u)).join(""):'<div class="oh-empty"><strong>No conversations yet</strong><span>Start a message from the Messages page.</span></div>')+
+            '</div>'+
+          '</section>'+
+        '</main>'+
+        '<aside class="oh-side">'+
+          '<section class="oh-side-card"><div class="oh-side-head"><strong>Active Now</strong><button id="oh-open-calls">View All</button></div>'+
+            '<div class="oh-side-body">'+
+              (calls.length?calls.map(callCard).join(""):'<div class="oh-empty"><strong>No active rooms</strong><span>Voice, video and screen sharing will appear here.</span></div>')+
+            '</div>'+
+          '</section>'+
+          '<section class="oh-side-card"><div class="oh-side-head"><strong>Your Space</strong><button id="oh-open-community">Open</button></div>'+
+            '<div class="oh-space-card"><span class="oh-space-avatar">'+esc((current?.name||"O").slice(0,1).toUpperCase())+'</span><div><strong>'+esc(current?.name||"Orbit Lobby")+'</strong><span>'+esc(current?'Jump into your current community':'Choose a community from the left rail')+'</span></div></div>'+
+            '<div class="oh-space-actions"><button id="oh-open-chat">Open Chat</button><button id="oh-open-events">Events</button></div>'+
+          '</section>'+
+          '<section class="oh-side-card oh-profile-card"><div class="oh-profile-row"><span class="oh-avatar large">'+esc(avatar(me?.username||"G"))+'</span><div><strong>'+esc(meName)+'</strong><span>@'+esc(me?.username||"guest")+'</span></div><button id="oh-profile">Edit</button></div></section>'+
+        '</aside>'+
+      '</div>'+
     '</div>';
 
     const addFriend=()=>{go("friends");setTimeout(()=>q("#friend-add-btn")?.click(),50)};
