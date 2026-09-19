@@ -603,3 +603,151 @@ body.orbit-desktop-app .message:hover{
 }
 body.orbit-desktop-app .profile-spark{animation:orbitSpark 2.6s ease-in-out infinite}
 @keyframes orbitSpark{0%,100%{opacity:.45;transform:rotate(-8deg) scale(.92)}50%{opacity:1;transform:rotate(8deg) scale(1.08)}}
+
+
+/* ===== ORBIT PRIVATE DM CALL / AURORA UI PASS ===== */
+.od-home-dm-head{
+  background:
+    radial-gradient(circle at 72% 50%,rgba(104,119,255,.10),transparent 26%),
+    linear-gradient(180deg,rgba(53,55,62,.98),rgba(47,49,54,.96))!important;
+  box-shadow:0 1px 0 rgba(255,255,255,.025),0 10px 28px rgba(0,0,0,.12);
+}
+.od-home-dm-user-copy strong{letter-spacing:.01em}
+.od-home-dm-actions button{
+  position:relative;
+  overflow:hidden;
+  transition:transform .16s ease,background .16s ease,color .16s ease,box-shadow .16s ease;
+}
+.od-home-dm-actions button:after{
+  content:"";
+  position:absolute;
+  inset:-1px;
+  opacity:0;
+  border-radius:inherit;
+  background:linear-gradient(135deg,rgba(124,134,255,.20),transparent 55%,rgba(74,214,255,.14));
+  transition:opacity .16s ease;
+  pointer-events:none;
+}
+.od-home-dm-actions button:hover:after{opacity:1}
+.od-home-dm-actions button:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(74,87,255,.16)}
+#od-home-dm-call:hover,#od-home-dm-video:hover{
+  color:#fff!important;
+  background:linear-gradient(135deg,rgba(88,101,242,.36),rgba(77,188,255,.16))!important;
+  box-shadow:0 8px 26px rgba(88,101,242,.22)!important;
+}
+.od-home-dm-call-strip{
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-height:48px;
+  margin:10px 16px 0;
+  padding:9px 10px;
+  border:1px solid rgba(123,135,255,.22);
+  border-radius:12px;
+  background:
+    radial-gradient(circle at 12% 50%,rgba(88,101,242,.22),transparent 30%),
+    linear-gradient(135deg,rgba(29,33,56,.94),rgba(22,25,35,.96));
+  box-shadow:0 12px 34px rgba(12,15,26,.22),inset 0 1px 0 rgba(255,255,255,.025);
+  overflow:hidden;
+}
+.od-home-dm-call-strip:before{
+  content:"";
+  position:absolute;
+  left:-30%;
+  top:0;
+  width:36%;
+  height:100%;
+  background:linear-gradient(90deg,transparent,rgba(128,143,255,.18),transparent);
+  transform:skewX(-18deg);
+  animation:orbitDmCallSweep 3.6s ease-in-out infinite;
+  pointer-events:none;
+}
+.od-home-dm-call-strip.hidden{display:none!important}
+.od-home-dm-call-lock{
+  width:30px;height:30px;flex:0 0 30px;
+  display:grid;place-items:center;
+  border-radius:9px;
+  background:rgba(91,105,255,.14);
+  border:1px solid rgba(125,138,255,.20);
+  box-shadow:0 0 24px rgba(87,101,255,.12);
+  font-size:13px;
+}
+.od-home-dm-call-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+.od-home-dm-call-copy strong{color:#f4f6ff;font-size:10px}
+.od-home-dm-call-copy span{color:#828ba8;font-size:7px;letter-spacing:.10em;text-transform:uppercase}
+.od-home-dm-call-state{
+  margin-left:auto;
+  color:#9eb4ff;
+  font-size:8px;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.od-home-dm-call-strip button{
+  position:relative;z-index:1;
+  height:30px;padding:0 11px;
+  border:1px solid rgba(113,126,255,.20);
+  border-radius:8px;
+  background:rgba(255,255,255,.045);
+  color:#dfe4ff;
+  font-size:8px;font-weight:800;cursor:pointer;
+}
+.od-home-dm-call-strip button:hover{background:rgba(100,116,255,.16);border-color:rgba(124,138,255,.36)}
+@keyframes orbitDmCallSweep{0%,20%{transform:translateX(0);opacity:0}35%{opacity:1}72%{opacity:1}100%{transform:translateX(360%);opacity:0}}
+
+body.private-dm-call #call-panel{
+  border-color:rgba(122,136,255,.28)!important;
+  box-shadow:
+    0 34px 100px rgba(0,0,0,.55),
+    0 0 0 1px rgba(126,137,255,.08),
+    0 0 80px rgba(87,104,255,.12);
+}
+body.private-dm-call #call-panel.dm-private-mode .call-head{
+  background:
+    radial-gradient(circle at 28% 50%,rgba(107,124,255,.13),transparent 24%),
+    linear-gradient(180deg,rgba(15,18,31,.97),rgba(10,12,21,.96))!important;
+}
+body.private-dm-call #call-panel.dm-private-mode .call-room strong{color:#f4f6ff}
+body.private-dm-call #call-panel.dm-private-mode .call-live-dot{
+  background:#7c86ff;
+  box-shadow:0 0 14px rgba(124,134,255,.95),0 0 32px rgba(85,215,255,.28);
+}
+body.private-dm-call #call-panel.dm-private-mode .call-stage{
+  background:
+    radial-gradient(circle at 50% 24%,rgba(88,101,242,.09),transparent 28%),
+    radial-gradient(circle at 15% 82%,rgba(60,205,255,.06),transparent 26%),
+    #090b12!important;
+}
+body.private-dm-call #call-panel.dm-private-mode .call-btn:hover{
+  box-shadow:0 10px 28px rgba(87,102,255,.18);
+  transform:translateY(-1px);
+}
+body.private-dm-call #call-panel.dm-private-mode .hangup-btn{
+  box-shadow:0 10px 30px rgba(217,65,93,.20);
+}
+body.private-dm-call #call-panel.dm-private-mode .call-empty-icon{
+  color:#aeb7ff;
+  text-shadow:0 0 26px rgba(119,135,255,.48);
+}
+
+#incoming-call.private-incoming{
+  border-color:rgba(125,139,255,.34)!important;
+  background:
+    radial-gradient(circle at 6% 50%,rgba(89,103,255,.20),transparent 34%),
+    linear-gradient(135deg,rgba(17,20,35,.98),rgba(10,12,20,.98))!important;
+  box-shadow:0 22px 60px rgba(0,0,0,.45),0 0 40px rgba(82,101,255,.12);
+}
+#incoming-call.private-incoming .incoming-avatar{
+  box-shadow:0 0 0 1px rgba(126,139,255,.30),0 0 30px rgba(83,103,255,.20);
+}
+#incoming-call.private-incoming .incoming-actions button:first-child{
+  background:linear-gradient(135deg,#6e78ff,#4aa9ff);
+  box-shadow:0 10px 24px rgba(84,107,255,.24);
+}
+
+@media(max-width:780px){
+  .od-home-dm-call-strip{margin:7px 8px 0}
+  .od-home-dm-call-state{display:none}
+  .od-home-dm-call-strip button{margin-left:auto}
+}
