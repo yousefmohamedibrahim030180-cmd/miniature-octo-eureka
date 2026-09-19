@@ -17,7 +17,9 @@ const io = new Server(server, {
 const PORT = Number(process.env.PORT || 8080);
 const JWT_SECRET = process.env.JWT_SECRET || "orbit-guest-dev-secret";
 const ADMIN_CONTROL_KEY = String(process.env.ADMIN_CONTROL_KEY || "").trim();
+const ORBIT_OWNER_CONTROL_KEY = String(process.env.ORBIT_OWNER_CONTROL_KEY || "").trim();
 const adminKeyAttempts = new Map();
+const ownerKeyAttempts = new Map();
 const AVATAR_DECORATIONS = new Set(["none","halo","crown","orbit","spark","fire","ice","cyber","royal","dragon"]);
 
 const memory = {
@@ -254,6 +256,7 @@ function authenticate(req, res, next, allowLegacy = false) {
     const payload = jwt.verify(readToken(req), JWT_SECRET);
     const user = memory.users.get(payload.id);
     if (!user) return res.status(401).json({ error: "Session expired. Please sign in again." });
+    if (user.suspended) return res.status(403).json({ error: "This ORBIT account is suspended." });
     if (!allowLegacy && !payload.account) return res.status(401).json({ error: "An ORBIT account is required. Please create an account or sign in." });
     user.status = "online";
     req.user = user;
@@ -381,6 +384,34 @@ function requireAdminToken(req, res, serverId) {
     return false;
   }
   return true;
+}
+function ownerTokenFor(user) {
+  return jwt.sign(
+    { owner: true, userId: String(user.id) },
+    JWT_SECRET,
+    { expiresIn: "8h" }
+  );
+}
+function hasOwnerToken(req) {
+  const raw = String(req.headers["x-owner-token"] || "").trim();
+  if (!raw) return false;
+  try {
+    const payload = jwt.verify(raw, JWT_SECRET);
+    return Boolean(payload?.owner) &&
+      String(payload.userId) === String(req.user?.id);
+  } catch {
+    return false;
+  }
+}
+function requireOwner(req, res) {
+  if (!hasOwnerToken(req)) {
+    res.status(401).json({ error: "Owner session expired or missing" });
+    return false;
+  }
+  return true;
+}
+function ownerAttemptKey(req) {
+  return String(req.ip || req.headers["x-forwarded-for"] || "unknown") + ":" + String(req.user?.id || "unknown");
 }
 function adminAttemptKey(req) {
   return String(req.ip || req.headers["x-forwarded-for"] || "unknown") + ":" + String(req.user?.id || "unknown");
@@ -1744,6 +1775,186 @@ app.patch("/api/servers/:id/members/:userId/role", auth, (req, res) => {
   res.json({ ok: true });
 });
 
+
+// ============================================================
+// ORBIT OWNER CONSOLE — platform-wide administration
+// ============================================================
+app.post("/api/owner/auth", auth, (req, res) => {
+  if (!ORBIT_OWNER_CONTROL_KEY) return res.status(503).json({ error: "Owner control key is not configured" });
+  const attemptKey = ownerAttemptKey(req);
+  const nowMs = Date.now();
+  const history = ownerKeyAttempts.get(attemptKey) || { count: 0, resetAt: nowMs + 10 * 60 * 1000 };
+  if (nowMs > history.resetAt) {
+    history.count = 0;
+    history.resetAt = nowMs + 10 * 60 * 1000;
+  }
+  if (history.count >= 8) return res.status(429).json({ error: "Too many owner key attempts. Try again later." });
+  const provided = String(req.body?.key || "").trim();
+  if (provided !== ORBIT_OWNER_CONTROL_KEY) {
+    history.count += 1;
+    ownerKeyAttempts.set(attemptKey, history);
+    audit(req.user.id, "OWNER_KEY_FAILED", req.user.id, {});
+    return res.status(401).json({ error: "Invalid owner key" });
+  }
+  ownerKeyAttempts.delete(attemptKey);
+  audit(req.user.id, "OWNER_KEY_AUTH", req.user.id, {});
+  res.json({ ok: true, token: ownerTokenFor(req.user), expiresIn: 8 * 60 * 60 });
+});
+
+function ownerUsersSnapshot() {
+  return [...memory.users.values()].map(user => {
+    let channelMessages = 0;
+    let dmMessages = 0;
+    let serverCount = 0;
+    for (const server of memory.servers.values()) if (server.members.has(String(user.id))) serverCount += 1;
+    for (const list of memory.messages.values()) for (const message of list) if (String(message.user_id) === String(user.id)) channelMessages += 1;
+    for (const list of memory.dmMessages.values()) for (const message of list) if (String(message.user_id) === String(user.id)) dmMessages += 1;
+    return {
+      ...publicUser(user),
+      suspended: Boolean(user.suspended),
+      suspendedAt: user.suspendedAt || null,
+      suspendedReason: user.suspendedReason || null,
+      serverCount,
+      channelMessages,
+      dmMessages,
+      totalMessages: channelMessages + dmMessages
+    };
+  }).sort((a,b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+}
+
+app.get("/api/owner/dashboard", auth, (req, res) => {
+  if (!requireOwner(req, res)) return;
+  let messages = 0;
+  for (const list of memory.messages.values()) messages += list.length;
+  let dmMessages = 0;
+  for (const list of memory.dmMessages.values()) dmMessages += list.length;
+  const calls = livePulseSnapshot().calls;
+  res.json({
+    ok: true,
+    me: { id: req.user.id, username: req.user.username },
+    stats: {
+      users: memory.users.size,
+      online: [...memory.users.values()].filter(u => u.status === "online" && !u.suspended).length,
+      suspended: [...memory.users.values()].filter(u => u.suspended).length,
+      servers: memory.servers.size,
+      channels: memory.channels.size,
+      messages,
+      dmConversations: memory.dms.size,
+      dmMessages,
+      uploads: memory.uploads.size,
+      activeCalls: calls.length,
+      callParticipants: calls.reduce((n, c) => n + c.participants.length, 0),
+      auditEvents: memory.audit.length,
+      uptime: Math.floor(process.uptime()),
+      persistence: persistMode
+    },
+    users: ownerUsersSnapshot().slice(0, 500),
+    calls,
+    audit: memory.audit.slice(0, 200)
+  });
+});
+
+app.get("/api/owner/users/:id", auth, (req, res) => {
+  if (!requireOwner(req, res)) return;
+  const user = memory.users.get(String(req.params.id));
+  if (!user) return res.status(404).json({ error: "User not found" });
+  const servers = [...memory.servers.values()].filter(s => s.members.has(String(user.id))).map(s => ({
+    id: s.id, name: s.name, role: s.members.get(String(user.id)), ownerId: s.ownerId
+  }));
+  const messages = [];
+  for (const channel of memory.channels.values()) {
+    const list = memory.messages.get(channel.id) || [];
+    for (const message of list) if (String(message.user_id) === String(user.id)) {
+      const server = memory.servers.get(String(channel.serverId));
+      messages.push({ ...message, kind: "channel", serverId: channel.serverId, serverName: server?.name || "Community", channelId: channel.id, channelName: channel.name });
+    }
+  }
+  messages.sort((a,b) => String(b.created_at).localeCompare(String(a.created_at)));
+  const dms = [...memory.dms.values()].filter(dm => dm.members.includes(String(user.id))).map(dm => {
+    const members = dm.members.map(idValue => {
+      const memberUser = memory.users.get(String(idValue));
+      return memberUser ? { id: memberUser.id, username: memberUser.username, display_name: memberUser.displayName || memberUser.username } : { id: idValue };
+    });
+    return { ...dm, members, messages: memory.dmMessages.get(dm.id) || [] };
+  });
+  const uploads = [...memory.uploads.values()].filter(file => String(file.user_id) === String(user.id))
+    .sort((a,b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .map(file => ({id:file.id,name:file.name,type:file.type,size:file.size,created_at:file.created_at}));
+  res.json({
+    ok: true,
+    user: {
+      ...publicUser(user),
+      suspended: Boolean(user.suspended),
+      suspendedAt: user.suspendedAt || null,
+      suspendedReason: user.suspendedReason || null,
+      accountCreatedAt: user.accountCreatedAt || user.createdAt || null
+    },
+    servers,
+    messages,
+    dms,
+    uploads
+  });
+});
+
+app.post("/api/owner/users/:id/suspend", auth, (req, res) => {
+  if (!requireOwner(req, res)) return;
+  const targetId = String(req.params.id);
+  if (targetId === String(req.user.id)) return res.status(400).json({ error: "The owner cannot suspend the current owner session." });
+  const user = memory.users.get(targetId);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  user.suspended = true;
+  user.suspendedAt = now();
+  user.suspendedReason = String(req.body?.reason || "Suspended by platform owner").trim().slice(0, 300);
+  user.status = "offline";
+  for (const socket of io.sockets.sockets.values()) {
+    if (String(socket.user?.id) === targetId) socket.disconnect(true);
+  }
+  audit(req.user.id, "OWNER_USER_SUSPEND", targetId, { reason: user.suspendedReason });
+  schedulePersist();
+  res.json({ ok: true, user: publicUser(user), suspended: true });
+});
+
+app.post("/api/owner/users/:id/unsuspend", auth, (req, res) => {
+  if (!requireOwner(req, res)) return;
+  const user = memory.users.get(String(req.params.id));
+  if (!user) return res.status(404).json({ error: "User not found" });
+  user.suspended = false;
+  user.suspendedAt = null;
+  user.suspendedReason = null;
+  user.status = "offline";
+  audit(req.user.id, "OWNER_USER_UNSUSPEND", user.id, {});
+  schedulePersist();
+  res.json({ ok: true, user: publicUser(user), suspended: false });
+});
+
+app.post("/api/owner/messages/delete", auth, (req, res) => {
+  if (!requireOwner(req, res)) return;
+  const kind = String(req.body?.kind || "channel");
+  const messageId = String(req.body?.messageId || "");
+  if (!messageId) return res.status(400).json({ error: "Message id is required" });
+  if (kind === "channel") {
+    const found = findMessage(messageId);
+    if (!found) return res.status(404).json({ error: "Message not found" });
+    found.list.splice(found.index, 1);
+    io.to("channel:" + found.channelId).emit("message:delete", { messageId });
+    const channel = memory.channels.get(found.channelId);
+    audit(req.user.id, "OWNER_MESSAGE_DELETE", messageId, { kind, serverId: channel?.serverId || null, channelId: found.channelId });
+    schedulePersist();
+    return res.json({ ok: true });
+  }
+  for (const [dmId, list] of memory.dmMessages.entries()) {
+    const index = list.findIndex(m => String(m.id) === messageId);
+    if (index !== -1) {
+      const [deleted] = list.splice(index, 1);
+      io.to(socketRoom("dm", dmId)).emit("dm:message:delete", { dmId, messageId });
+      audit(req.user.id, "OWNER_DM_MESSAGE_DELETE", messageId, { kind: "dm", dmId, userId: deleted.user_id });
+      schedulePersist();
+      return res.json({ ok: true });
+    }
+  }
+  return res.status(404).json({ error: "Message not found" });
+});
+
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: "Internal server error" });
@@ -1754,6 +1965,7 @@ io.use((socket, next) => {
     const payload = jwt.verify(socket.handshake.auth?.token, JWT_SECRET);
     const user = memory.users.get(payload.id);
     if (!user || !payload.account || !user.passwordHash) return next(new Error("Account authentication required"));
+    if (user.suspended) return next(new Error("Account suspended"));
     socket.user = user;
     user.status = "online";
     next();
