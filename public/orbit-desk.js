@@ -39,17 +39,43 @@
     const friendsData=await (async()=>{try{return await api("/api/friends")}catch(e){return {friends:[]}}})();
     const friends=(friendsData.friends||[]).slice(0,8);
     const online=friends.filter(u=>String(u.status||"").toLowerCase()!=="offline").slice(0,8);
+    const incoming=friendsData.incoming||[];
+    const outgoing=friendsData.outgoing||[];
+    const allFriends=friendsData.friends||[];
+    const friendIds=new Set(allFriends.map(u=>String(u.id)));
+    const suggestions=(pulseState?.users||[]).filter(u=>String(u.id)!==String(me?.id)&&!friendIds.has(String(u.id))).slice(0,10);
+
+    function emptyTab(title,bodyText){return '<div class="oh-empty"><strong>'+esc(title)+'</strong><span>'+esc(bodyText)+'</span></div>}
+    function friendListMarkup(list,emptyTitle,emptyText){
+      return list.length?list.map(u=>userRow(u)).join(""):emptyTab(emptyTitle,emptyText);
+    }
+    function tabContent(mode){
+      if(mode==="friends") return '<section class="oh-section"><div class="oh-section-head"><div><strong>Friends — '+allFriends.length+'</strong><span>Your people on Orbit</span></div><button data-oh-open-dms>Messages</button></div><div class="oh-user-list">'+friendListMarkup(allFriends,"No friends yet","Add people to build your Orbit circle.")+'</div></section><section class="oh-section"><div class="oh-section-head"><div><strong>Recent conversations</strong><span>Jump back into people you know</span></div><button data-oh-open-dms>Open Messages</button></div><div class="oh-recent-list">'+(friends.length?friends.slice(0,6).map(u=>userRow(u)).join(""):emptyTab("No conversations yet","Start a message from the Messages page."))+'</div></section>';
+      if(mode==="online") return '<section class="oh-section"><div class="oh-section-head"><div><strong>Online — '+online.length+'</strong><span>Friends currently online</span></div><button data-oh-open-friends>View All</button></div><div class="oh-user-list">'+friendListMarkup(online,"Nobody is online","Your online friends will appear here.")+'</div></section>';
+      if(mode==="all") return '<section class="oh-section"><div class="oh-section-head"><div><strong>All Friends — '+allFriends.length+'</strong><span>Everyone in your friends list</span></div></div><div class="oh-user-list">'+friendListMarkup(allFriends,"No friends yet","Add people to see them here.")+'</div></section>';
+      if(mode==="pending") return '<section class="oh-section"><div class="oh-section-head"><div><strong>Incoming — '+incoming.length+'</strong><span>Friend requests waiting for you</span></div></div><div class="oh-user-list">'+(incoming.length?incoming.map(r=>'<div class="oh-user-row oh-request-row"><span class="oh-avatar">'+esc(avatar(r.fromUser?.username||"G"))+'</span><span class="oh-user-copy"><strong>'+esc(r.fromUser?.username||"Guest")+'</strong><span>Wants to be your friend</span></span><span class="oh-request-actions"><button data-oh-accept="'+esc(r.id)+'">Accept</button><button data-oh-reject="'+esc(r.id)+'">Decline</button></span></div>').join(""):emptyTab("No incoming requests","You are all caught up."))+'</div></section><section class="oh-section"><div class="oh-section-head"><div><strong>Outgoing — '+outgoing.length+'</strong><span>Requests waiting for a response</span></div></div><div class="oh-user-list">'+(outgoing.length?outgoing.map(r=>'<div class="oh-user-row"><span class="oh-avatar">'+esc(avatar(r.toUser?.username||"G"))+'</span><span class="oh-user-copy"><strong>'+esc(r.toUser?.username||"Guest")+'</strong><span>Friend request · waiting</span></span><span class="oh-user-action">Pending</span></div>').join(""):emptyTab("No outgoing requests","Requests you send will appear here."))+'</div></section>';
+      return '<section class="oh-section"><div class="oh-section-head"><div><strong>Suggestions</strong><span>People you may want to connect with</span></div></div><div class="oh-user-list">'+(suggestions.length?suggestions.map(u=>'<div class="oh-user-row"><span class="oh-avatar">'+esc(avatar(u.username||"G"))+'</span><span class="oh-user-copy"><strong>'+esc(u.display_name||u.username||"Guest")+'</strong><span>'+esc(u.status||"online")+' · @'+esc(u.username||"guest")+'</span></span><button class="oh-suggestion-add" data-oh-add="'+esc(u.username||"")+'+">Add</button></div>').join(""):emptyTab("No suggestions right now","Try searching for someone by username."))+'</div></section><section class="oh-section"><div class="oh-search-hint">Use the search box above to find people and start a connection.</div></section>';
+    }
+    function activateTab(mode){
+      document.querySelectorAll(".oh-tab").forEach(b=>b.classList.toggle("active",b.dataset.ohTab===mode));
+      const slot=q("#oh-tab-content"); if(slot)slot.innerHTML=tabContent(mode);
+      slot?.querySelectorAll("[data-oh-open-dms]").forEach(b=>b.onclick=()=>go("dms"));
+      slot?.querySelectorAll("[data-oh-open-friends]").forEach(b=>b.onclick=()=>go("friends"));
+      slot?.querySelectorAll("[data-oh-accept]").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request/"+encodeURIComponent(b.dataset.ohAccept)+"/accept",{method:"POST",body:"{}"});orbitToast("Friend added","Request accepted.","success");renderOrbitHome()}catch(e){orbitToast("Request failed",e.message,"error")}});
+      slot?.querySelectorAll("[data-oh-reject]").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request/"+encodeURIComponent(b.dataset.ohReject)+"/reject",{method:"POST",body:"{}"});orbitToast("Request declined","The request was rejected.","");renderOrbitHome()}catch(e){orbitToast("Request failed",e.message,"error")}});
+      slot?.querySelectorAll("[data-oh-add]").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request",{method:"POST",body:JSON.stringify({username:b.dataset.ohAdd})});orbitToast("Friend request sent","Request sent to @"+b.dataset.ohAdd+".","success");b.textContent="Sent";b.disabled=true}catch(e){orbitToast("Friend request failed",e.message,"error")}});
+    }
 
     q("#page-actions").innerHTML='<button class="oh-top-btn" id="oh-add-friend">Add Friend</button>';
 
     body.innerHTML='<div class="orbit-home-simple">'+
       '<div class="oh-homebar">'+
         '<div class="oh-home-tabs">'+
-          '<button class="oh-tab active">Friends</button>'+
-          '<button class="oh-tab" id="oh-online">Online</button>'+
-          '<button class="oh-tab" id="oh-all">All</button>'+
-          '<button class="oh-tab" id="oh-pending">Pending <span class="oh-badge">0</span></button>'+
-          '<button class="oh-tab" id="oh-suggested">Suggestions</button>'+
+          '<button class="oh-tab active" data-oh-tab="friends" id="oh-friends">Friends</button>'+
+          '<button class="oh-tab" data-oh-tab="online" id="oh-online">Online</button>'+
+          '<button class="oh-tab" data-oh-tab="all" id="oh-all">All</button>'+
+          '<button class="oh-tab" data-oh-tab="pending" id="oh-pending">Pending <span class="oh-badge">'+incoming.length+'</span></button>'+
+          '<button class="oh-tab" data-oh-tab="suggestions" id="oh-suggested">Suggestions</button>'+
         '</div>'+
         '<button class="oh-top-btn primary" id="oh-add-friend-2">Add Friend</button>'+
       '</div>'+
@@ -57,16 +83,7 @@
         '<main class="oh-main">'+
           '<div class="oh-notice"><span class="oh-notice-icon">i</span><div><strong>Welcome to Orbit</strong><span>Your communities, friends, messages and live rooms stay connected here.</span></div><button id="oh-notice-close">×</button></div>'+
           '<div class="oh-search"><span>⌕</span><input id="oh-friend-search" placeholder="Search friends, communities, or conversations" autocomplete="off"></div>'+
-          '<section class="oh-section"><div class="oh-section-head"><div><strong>Online — '+online.length+'</strong><span>People currently around you</span></div><button id="oh-open-friends">View All</button></div>'+
-            '<div class="oh-user-list" id="oh-online-list">'+
-              (online.length?online.map(u=>userRow(u)).join(""):(users.length?users.slice(0,6).map(u=>userRow(u)).join(""):'<div class="oh-empty"><strong>Nobody is online yet</strong><span>Invite people to Orbit and they will appear here.</span></div>'))+
-            '</div>'+
-          '</section>'+
-          '<section class="oh-section"><div class="oh-section-head"><div><strong>Recent conversations</strong><span>Jump back into the people and places you use most</span></div><button id="oh-open-dms">Open Messages</button></div>'+
-            '<div class="oh-recent-list">'+
-              (friends.length?friends.slice(0,6).map(u=>userRow(u)).join(""):'<div class="oh-empty"><strong>No conversations yet</strong><span>Start a message from the Messages page.</span></div>')+
-            '</div>'+
-          '</section>'+
+          '<div id="oh-tab-content"></div>'+
         '</main>'+
         '<aside class="oh-side">'+
           '<section class="oh-side-card"><div class="oh-side-head"><strong>Active Now</strong><button id="oh-open-calls">View All</button></div>'+
@@ -86,12 +103,8 @@
     const addFriend=()=>{go("friends");setTimeout(()=>q("#friend-add-btn")?.click(),50)};
     q("#oh-add-friend").onclick=addFriend;
     q("#oh-add-friend-2").onclick=addFriend;
-    q("#oh-online").onclick=()=>go("friends");
-    q("#oh-all").onclick=()=>go("friends");
-    q("#oh-pending").onclick=()=>go("friends");
-    q("#oh-suggested").onclick=()=>go("friends");
-    q("#oh-open-friends").onclick=()=>go("friends");
-    q("#oh-open-dms").onclick=()=>go("dms");
+    document.querySelectorAll("[data-oh-tab]").forEach(b=>b.onclick=()=>activateTab(b.dataset.ohTab));
+    activateTab("friends");
     q("#oh-open-calls").onclick=()=>go("calls");
     q("#oh-open-community").onclick=()=>go("communities");
     q("#oh-open-chat").onclick=chat;
@@ -100,7 +113,7 @@
     q("#oh-notice-close").onclick=e=>e.currentTarget.closest(".oh-notice")?.remove();
     q("#oh-friend-search").oninput=e=>{
       const term=e.target.value.toLowerCase().trim();
-      document.querySelectorAll(".oh-user-row").forEach(row=>row.style.display=!term||row.innerText.toLowerCase().includes(term)?"flex":"none");
+      document.querySelectorAll("#oh-tab-content .oh-user-row").forEach(row=>row.style.display=!term||row.innerText.toLowerCase().includes(term)?"flex":"none");
     };
 
     document.querySelectorAll("[data-oh-user]").forEach(b=>b.onclick=()=>openPulseProfile(b.dataset.ohUser));
