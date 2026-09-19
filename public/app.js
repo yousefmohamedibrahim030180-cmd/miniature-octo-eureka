@@ -1710,7 +1710,7 @@ function renderHomePage(){
       $("#od-dm-list").innerHTML=rows.length?rows.slice(0,30).map(dm=>{
         const u=dm.otherUser||{};
         const onlineNow=dmUserStatus(u)==="Online";
-        return '<button type="button" class="od-dm-row '+(String(dm.id)===String(dmState.activeId)?"active":"")+'" data-od-dm="'+escapeHtml(dm.id)+'" onclick="window.__orbitDMClick(this.dataset.odDm);return false" onpointerup="window.__orbitDMClick(this.dataset.odDm)">'+
+        return '<button type="button" class="od-dm-row '+(String(dm.id)===String(dmState.activeId)?"active":"")+'" data-od-dm="'+escapeHtml(dm.id)+'">'+
           avatarMarkup({...u,status:onlineNow?"online":"offline"})+
           '<span><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><em>'+escapeHtml(dm.lastMessage?.content||"Start a conversation")+'</em></span>'+
           (dm.unreadCount?'<b>'+escapeHtml(dm.unreadCount)+'</b>':"")+
@@ -2015,7 +2015,8 @@ async function openHomeDirectMessage(dmId){
 }
 window.openHomeDirectMessage=openHomeDirectMessage;
 window.__orbitDMClick=async function(id){
-  if(!id)return false;
+  if(!id || window.__orbitDMOpening===String(id))return false;
+  window.__orbitDMOpening=String(id);
   try{
     const root=$("#od-dm-list");
     root?.querySelectorAll(".od-dm-row").forEach(b=>b.classList.toggle("active",String(b.dataset.odDm)===String(id)));
@@ -2023,6 +2024,8 @@ window.__orbitDMClick=async function(id){
   }catch(err){
     console.error("DM click failed",err);
     orbitToast("Direct message",err.message||"Could not open chat.","error");
+  }finally{
+    setTimeout(()=>{if(window.__orbitDMOpening===String(id))window.__orbitDMOpening=null},120);
   }
   return false;
 };
@@ -3416,3 +3419,26 @@ closeServerSidebar();
   new MutationObserver(scrub).observe(document.body,{subtree:true,childList:true});
 })();
 
+
+(function installRobustHomeDMPointerBridge(){
+  let downId=null;
+  function rowAtPoint(e){
+    const list=document.elementsFromPoint?.(e.clientX,e.clientY)||[];
+    return list.find(el=>el?.closest?.(".od-dm-row[data-od-dm]"))?.closest(".od-dm-row[data-od-dm]")||null;
+  }
+  document.addEventListener("pointerdown",e=>{
+    const row=rowAtPoint(e);
+    downId=row?.dataset?.odDm||null;
+  },true);
+  document.addEventListener("pointerup",e=>{
+    const row=rowAtPoint(e);
+    const id=row?.dataset?.odDm||downId;
+    downId=null;
+    if(!id)return;
+    const dmRoot=$("#od-dm-list");
+    if(!dmRoot || !dmRoot.contains(row))return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    window.__orbitDMClick(id);
+  },true);
+})();
