@@ -9,7 +9,7 @@ on:
       - ".github/workflows/orbit-desktop.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   windows:
@@ -39,5 +39,3 @@ jobs:
             dist-desktop/*.exe
           if-no-files-found: error
           retention-days: 14
-
-# ORBIT desktop release trigger: build current main on demand.
