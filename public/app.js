@@ -1905,31 +1905,33 @@ async function openHomeDirectMessage(dmId){
     home.innerHTML=
       '<header class="od-home-dm-head">'+
         '<div class="od-home-dm-user">'+
-          '<div class="od-home-dm-avatar">'+(avatarUrl?'<img src="'+escapeHtml(avatarUrl)+'" alt="">':escapeHtml(avatar(username)))+'</div>'+
-          '<div><strong>'+escapeHtml(displayName)+'</strong><span><i class="'+(online?"online":"offline")+'"></i>'+statusText+' · @'+escapeHtml(username)+'</span></div>'+
+          '<div class="od-home-dm-avatar">'+(avatarUrl?'<img src="'+escapeHtml(avatarUrl)+'" alt="">':escapeHtml(avatar(username)))+'<i class="'+(online?"online":"offline")+'"></i></div>'+
+          '<div class="od-home-dm-user-copy"><strong>'+escapeHtml(displayName)+'</strong><span><i class="'+(online?"online":"offline")+'"></i>'+statusText+' · @'+escapeHtml(username)+'</span></div>'+
         '</div>'+
         '<div class="od-home-dm-actions">'+
-          '<button id="od-home-dm-call" title="Start voice call">☎</button>'+
-          '<button id="od-home-dm-video" title="Start video call">▣</button>'+
+          '<button id="od-home-dm-call" title="Voice call">☎</button>'+
+          '<button id="od-home-dm-video" title="Video call">▣</button>'+
           '<button id="od-home-dm-pin" title="Pinned messages">⌖</button>'+
           '<button id="od-home-dm-add-user" title="Add friend">♙</button>'+
           '<button id="od-home-dm-search" title="Search messages">⌕</button>'+
-          '<button id="od-home-dm-profile" title="Toggle profile">◉</button>'+
+          '<span class="od-dm-action-divider"></span>'+
+          '<button id="od-home-dm-profile" class="od-home-dm-profile-btn" title="Toggle profile">◉</button>'+
         '</div>'+
       '</header>'+
       '<div class="od-home-dm-messages" id="od-home-dm-messages">'+
         '<div class="od-home-dm-welcome">'+
           '<div class="od-home-dm-big-avatar">'+(avatarUrl?'<img src="'+escapeHtml(avatarUrl)+'" alt="">':escapeHtml(avatar(username)))+'</div>'+
+          '<div class="od-home-dm-welcome-kicker">DIRECT MESSAGE</div>'+
           '<strong>'+escapeHtml(displayName)+'</strong>'+
-          '<span>That’s the beginning of your direct message with @'+escapeHtml(username)+'.</span>'+
+          '<span>Start a conversation with @'+escapeHtml(username)+' · Messages stay private between you.</span>'+
         '</div>'+
       '</div>'+
       '<div id="od-home-dm-typing" class="od-home-dm-typing"></div>'+
       '<form id="od-home-dm-form" class="od-home-dm-composer">'+
-        '<button type="button" id="od-home-dm-add" title="Add attachment">＋</button>'+
+        '<div class="od-home-dm-compose-left"><button type="button" id="od-home-dm-add" title="Add attachment">＋</button></div>'+
         '<textarea id="od-home-dm-input" rows="1" maxlength="4000" placeholder="Message @'+escapeHtml(username)+'"></textarea>'+
-        '<button type="button" id="od-home-dm-emoji" title="Emoji">☺</button>'+
-        '<button type="submit" class="od-home-dm-send" title="Send">➤</button>'+
+        '<button type="button" id="od-home-dm-emoji" title="Add emoji">☺</button>'+
+        '<button type="submit" class="od-home-dm-send" title="Send message">➤</button>'+
       '</form>';
 
     renderHomeDirectMessageFeed(true);
@@ -2035,19 +2037,58 @@ function renderHomeDirectMessageFeed(scrollBottom){
   if(!feed)return;
   const other=dmState.active?.otherUser||{};
   if(!dmState.messages.length){
-    feed.innerHTML='<div class="od-home-dm-welcome"><div class="od-home-dm-big-avatar">'+escapeHtml(avatar(other.username||"G"))+'</div><strong>'+escapeHtml(other.display_name||other.username||"Guest")+'</strong><span>Start a conversation with @'+escapeHtml(other.username||"guest")+'.</span></div>';
+    feed.innerHTML='<div class="od-home-dm-welcome"><div class="od-home-dm-big-avatar">'+escapeHtml(avatar(other.username||"G"))+'</div><div class="od-home-dm-welcome-kicker">DIRECT MESSAGE</div><strong>'+escapeHtml(other.display_name||other.username||"Guest")+'</strong><span>Start the conversation by sending the first message.</span></div>';
     return;
   }
-  feed.innerHTML=dmState.messages.map((m)=>{
+
+  const rows=[];
+  let lastDay="";
+  let lastUser="";
+  let lastTime=0;
+
+  for(const m of dmState.messages){
+    const ts=Date.parse(m.created_at||"")||Date.now();
+    const day=new Date(ts).toLocaleDateString([], {year:"numeric",month:"short",day:"numeric"});
     const own=String(m.user_id)===String(me?.id);
-    const av=m.username===me?.username&&me?avatar(me.username):avatar(m.username||"G");
-    return '<article class="od-home-dm-message '+(own?"own":"")+'">'+
-      '<div class="od-home-dm-msg-avatar">'+escapeHtml(av)+'</div>'+
-      '<div class="od-home-dm-msg-stack"><div class="od-home-dm-meta"><strong>'+escapeHtml(m.username||"Guest")+'</strong><time>'+escapeHtml(formatDMTime(m.created_at))+'</time></div>'+
-      '<div class="od-home-dm-text">'+escapeHtml(m.content||"")+'</div></div>'+
-      '</article>';
-  }).join("");
-  if(scrollBottom)requestAnimationFrame(()=>feed.scrollTop=feed.scrollHeight);
+    const userName=m.username||"Guest";
+    const grouped=lastUser===userName && (ts-lastTime)<300000 && lastDay===day;
+
+    if(day!==lastDay){
+      rows.push('<div class="od-home-dm-day"><span>'+escapeHtml(day)+'</span></div>');
+      lastDay=day;
+      lastUser="";
+    }
+
+    const stamp=escapeHtml(formatDMTime(m.created_at));
+    const av=escapeHtml(m.username===me?.username&&me?avatar(me.username):avatar(userName));
+    const body=escapeHtml(m.content||"");
+
+    if(grouped){
+      rows.push(
+        '<article class="od-home-dm-message od-home-dm-message-grouped '+(own?"own":"")+'">'+
+          '<div class="od-home-dm-msg-spacer"></div>'+
+          '<div class="od-home-dm-msg-stack">'+
+            '<div class="od-home-dm-text">'+body+'</div>'+
+          '</div>'+
+        '</article>'
+      );
+    }else{
+      rows.push(
+        '<article class="od-home-dm-message '+(own?"own":"")+'">'+
+          '<div class="od-home-dm-msg-avatar">'+av+'</div>'+
+          '<div class="od-home-dm-msg-stack">'+
+            '<div class="od-home-dm-meta"><strong>'+escapeHtml(userName)+'</strong><time>'+stamp+'</time></div>'+
+            '<div class="od-home-dm-text">'+body+'</div>'+
+          '</div>'+
+        '</article>'
+      );
+    }
+    lastUser=userName;
+    lastTime=ts;
+  }
+
+  feed.innerHTML=rows.join("");
+  if(scrollBottom)requestAnimationFrame(()=>{feed.scrollTop=feed.scrollHeight});
 }
 
 
