@@ -8,7 +8,7 @@
     "start": "node server.js",
     "dev": "node server.js",
     "desktop": "electron .",
-    "desktop:dist": "electron-builder --win nsis portable"
+    "desktop:dist": "electron-builder --win nsis portable --publish never"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
