@@ -355,3 +355,8 @@ body.orbit-discord-home .od-dm-row{
   display:flex!important;
 }
 body.orbit-discord-home .od-dm-row *{pointer-events:none!important}
+
+/* Final DM click surface: inline handlers + no pointer interception. */
+body.orbit-discord-home #od-dm-list{position:relative;z-index:999999!important;pointer-events:auto!important}
+body.orbit-discord-home #od-dm-list .od-dm-row{position:relative;z-index:1000000!important;pointer-events:auto!important;touch-action:manipulation!important;cursor:pointer!important}
+body.orbit-discord-home #od-dm-list .od-dm-row *{pointer-events:none!important}
