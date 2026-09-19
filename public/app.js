@@ -1719,21 +1719,15 @@ function renderHomePage(){
       if(dmListRoot){
         dmListRoot.style.pointerEvents="auto";
         dmListRoot.querySelectorAll("[data-od-dm]").forEach(btn=>{
+          const open=()=>{
+            const id=btn.dataset.odDm;
+            if(!id)return;
+            openDMFromAnywhere(id);
+          };
           btn.style.pointerEvents="auto";
-          btn.onpointerdown=e=>{
-            e.preventDefault();
-            e.stopPropagation();
-          };
-          btn.onpointerup=e=>{
-            e.preventDefault();
-            e.stopPropagation();
-            openHomeDirectMessage(btn.dataset.odDm);
-          };
-          btn.onclick=e=>{
-            e.preventDefault();
-            e.stopPropagation();
-            openHomeDirectMessage(btn.dataset.odDm);
-          };
+          btn.onpointerdown=e=>{e.preventDefault();e.stopPropagation()};
+          btn.onpointerup=e=>{e.preventDefault();e.stopPropagation();open()};
+          btn.onclick=e=>{e.preventDefault();e.stopPropagation();open()};
         });
       }
     };
@@ -3371,24 +3365,32 @@ closeServerSidebar();
 
 /* Root DM compatibility bridge: every legacy conversation row opens in Home. */
 (function bridgeLegacyConversationClicks(){
-  function openLegacy(id){
+  window.openDMFromAnywhere=async function(id){
     if(!id)return;
     try{
+      const onHome=orbitUI.view==="home" && $("#od-home-main");
       orbitUI.view="home";
       document.body.classList.add("orbit-discord-home");
       $("#global-page")?.classList.add("discord-home-active");
       $("#global-page")?.classList.remove("hidden");
       $("#chat-view")?.classList.add("hidden");
-      renderHomePage();
-      Promise.resolve().then(async()=>{
-        if(!dmState.list.length){
-          const d=await api("/api/dms");
-          dmState.list=d.dms||[];
-        }
-        if(dmState.list.some(x=>String(x.id)===String(id))) await openHomeDirectMessage(id);
-      });
-    }catch(err){orbitToast("Direct message",err.message,"error")}
-  }
+
+      if(!onHome) renderHomePage();
+
+      if(!dmState.list.length){
+        const d=await api("/api/dms");
+        dmState.list=d.dms||[];
+      }
+      const exists=dmState.list.some(x=>String(x.id)===String(id));
+      if(!exists)return orbitToast("Direct message","Conversation not found.","error");
+
+      await openHomeDirectMessage(id);
+    }catch(err){
+      console.error("openDMFromAnywhere failed",err);
+      orbitToast("Direct message",err.message||"Could not open chat.","error");
+    }
+  };
+
   document.addEventListener("click",e=>{
     const row=e.target.closest(".dm-conversation,[data-dm-open]");
     if(!row)return;
@@ -3396,7 +3398,7 @@ closeServerSidebar();
     if(!id)return;
     e.preventDefault();
     e.stopPropagation();
-    openLegacy(id);
+    window.openDMFromAnywhere(id);
   },true);
 })();
  
