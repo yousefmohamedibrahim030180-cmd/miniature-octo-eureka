@@ -341,3 +341,7 @@ body.orbit-discord-home .dm-discord-shell{display:none!important}
 body.orbit-discord-home .od-dm-list{pointer-events:auto!important;position:relative;z-index:9999}
 body.orbit-discord-home .od-dm-row{pointer-events:auto!important;position:relative;z-index:10000;cursor:pointer!important}
 body.orbit-discord-home .od-dm-row *{pointer-events:none!important}
+
+/* Native DM links: the browser owns navigation, the app restores the chat on boot. */
+.od-dm-row{display:flex!important;text-decoration:none!important}
+.od-dm-row:visited,.od-dm-row:hover,.od-dm-row:active{text-decoration:none!important}
