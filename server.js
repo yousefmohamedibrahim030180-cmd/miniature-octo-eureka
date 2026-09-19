@@ -7,9 +7,14 @@ const { Server } = require("socket.io");
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
 const { pipeline, env: hfEnv } = require("@huggingface/transformers");
+const { applySecurity, createApiLimiter } = require("./platform/security");
+const { env, assertProductionBasics } = require("./platform/config");
+const platformManifest = require("./platform/manifest");
+const { migrate } = require("./db/migrate");
 
 const app = express();
 const server = http.createServer(app);
+app.set("trust proxy", 1);
 const io = new Server(server, {
   cors: { origin: true, credentials: true },
   transports: ["polling"],
@@ -468,6 +473,8 @@ function createGuest(username, existingId) {
   return user;
 }
 
+applySecurity(app);
+app.use("/api", createApiLimiter());
 app.use(express.json({ limit: "6mb" }));
 app.use(express.static(path.join(__dirname, "public"), {
   setHeaders(res) {
@@ -486,12 +493,36 @@ app.get("/health", (req, res) => {
   res.status(200).json({
     ok: true,
     service: "orbit-chat",
+    version: platformManifest.version,
     mode: persistMode,
     db: dbReady,
     users: memory.users.size,
     servers: memory.servers.size,
     calls: [...io.sockets.adapter.rooms.keys()].filter(k => k.startsWith(CALL_EVENT_PREFIX)).length,
-    time: now()
+    time: now(),
+    requestId: req.orbitRequestId || null
+  });
+});
+
+app.get("/readyz", (req, res) => {
+  const persistenceRequired = env.nodeEnv === "production";
+  const ready = !persistenceRequired || dbReady;
+  res.status(ready ? 200 : 503).json({
+    ok: ready,
+    persistence: persistMode,
+    databaseReady: dbReady,
+    requestId: req.orbitRequestId || null
+  });
+});
+
+app.get("/api/v1/platform/manifest", (req, res) => {
+  res.json({
+    ...platformManifest,
+    runtime: {
+      node: process.version,
+      uptime: Math.floor(process.uptime()),
+      persistence: persistMode
+    }
   });
 });
 
@@ -2592,6 +2623,11 @@ io.on("connection", socket => {
 });
 
 async function boot() {
+  assertProductionBasics();
+  if (env.autoMigrate) {
+    if (!env.databaseUrl) throw new Error("ORBIT_AUTO_MIGRATE=true requires DATABASE_URL.");
+    await migrate();
+  }
   await initPersistence();
   server.listen(PORT, "0.0.0.0", () => console.log("[orbit] guest mode listening on " + PORT + (dbReady ? " with PostgreSQL" : " in memory mode")));
 }
