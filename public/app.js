@@ -53,6 +53,7 @@ const callState = {
 };
 
 Object.defineProperty(window, "__orbitCallState", { configurable: true, get: () => callState });
+Object.defineProperty(window, "__orbitSocket", { configurable: true, get: () => socket });
 Object.defineProperty(window, "__orbitCurrentChannel", { configurable: true, get: () => currentChannel });
 
 const QUALITY_PRESETS = {
