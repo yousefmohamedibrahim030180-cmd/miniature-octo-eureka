@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ORBIT Admin Upload</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    .admin { max-width: 720px; margin: 90px auto; }
+    .panel { padding: 28px; border:1px solid rgba(255,255,255,.09); border-radius:24px; background:rgba(14,16,24,.84); }
+    input, button { width:100%; margin-top:10px; padding:14px 16px; border-radius:12px; border:1px solid rgba(255,255,255,.12); background:#090b12; color:#fff; }
+    button { cursor:pointer; background:#8be9ff; color:#041016; font-weight:800; }
+    #result { margin-top:18px; white-space:pre-wrap; color:#a6adbb; }
+  </style>
+</head>
+<body>
+  <main class="shell admin">
+    <div class="panel">
+      <div class="eyebrow">PRIVATE ADMIN</div>
+      <h2>Upload ORBIT build</h2>
+      <p>Upload the Windows ZIP once. The public site will immediately serve it from <code>/download</code>.</p>
+      <form id="form">
+        <input id="key" type="password" placeholder="Admin key" required>
+        <input id="file" type="file" accept=".zip,application/zip" required>
+        <button>Upload Windows build</button>
+      </form>
+      <div id="result"></div>
+    </div>
+  </main>
+  <script>
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const key = document.getElementById("key").value;
+      const file = document.getElementById("file").files[0];
+      const result = document.getElementById("result");
+      if (!file) return;
+      result.textContent = "Uploading…";
+      const fd = new FormData();
+      fd.append("file", file, "ORBIT-Windows.zip");
+      const r = await fetch("/admin/upload", { method:"POST", headers:{ "x-admin-key": key }, body:fd });
+      const data = await r.json().catch(() => ({ ok:false, error:"Invalid server response" }));
+      result.textContent = data.ok
+        ? `Uploaded successfully.\nSize: ${(data.size / 1024 / 1024).toFixed(1)} MB\nPublic download: ${location.origin}/download`
+        : `Upload failed: ${data.error || "Unknown error"}`;
+    });
+  </script>
+</body>
+</html>
