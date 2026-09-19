@@ -393,11 +393,13 @@ async function selectServer(serverItem) {
   channels = data.channels;
   $("#workspace-role").textContent = data.role + " · guest";
   renderChannels();
-  if (channels[0]) await selectChannel(channels[0]);
+  const firstVisibleChannel = channels.find(c => c.type === "voice" || String(c.name||"").trim().toLowerCase() !== "notifications");
+  if (firstVisibleChannel) await selectChannel(firstVisibleChannel);
   await loadMembers();
 }
 function renderChannels() {
-  $("#channel-list").innerHTML = channels.filter(c => c.type !== "voice").map(c => {
+  const visibleTextChannels = channels.filter(c => c.type !== "voice" && String(c.name||"").trim().toLowerCase() !== "notifications");
+  $("#channel-list").innerHTML = visibleTextChannels.map(c => {
     const unread = Number(unreadChannels[c.id] || 0);
     const icon = c.type === "announcement" ? "!" : "#";
     return '<button class="channel ' + (String(currentChannel?.id) === String(c.id) ? "active" : "") +
