@@ -2596,12 +2596,6 @@ $("#join-server")?.addEventListener("click",openJoinCommunityModal);
   $("#close-thread")?.addEventListener("click",()=>$("#thread-panel").classList.add("hidden"));
   $("#member-filter")?.addEventListener("input",e=>{const q=e.target.value.toLowerCase();document.querySelectorAll("#member-list .member").forEach(m=>m.classList.toggle("hidden",!m.textContent.toLowerCase().includes(q)))});
   document.addEventListener("click",async e=>{
-    if(e.target.id==="join-by-invite"){
-      const raw=$("#invite-code").value.trim();
-      let code=raw;
-      try{if(raw.includes("invite="))code=new URL(raw).searchParams.get("invite")||raw}catch{}
-      try{await api("/api/invites/"+encodeURIComponent(code)+"/accept",{method:"POST",body:"{}"});closeModal();await loadServers();orbitToast("Joined community","Server added to your workspace.","success")}catch(err){orbitToast("Invite failed",err.message,"error")}
-    }
     if(e.target.id==="dm-create"){try{const result=await api("/api/dms",{method:"POST",body:JSON.stringify({username:$("#dm-target").value.trim()})});closeModal();setView("dms");await renderDMPage(result.dm?.id);orbitToast("DM created","Conversation is ready.","success")}catch(err){orbitToast("DM failed",err.message,"error")}}
     if(e.target.id==="friend-create"){
       try{
@@ -2821,7 +2815,7 @@ function openChannelModal(defaultType){
 
 // Ensure create server has a real post-create channel/voice refresh.
 document.addEventListener("click",async e=>{
-  if(e.target.id==="create-server-now"){try{const d=await api("/api/servers",{method:"POST",body:JSON.stringify({name:$("#server-name-input").value})});closeModal();await loadServers();const s=servers.find(x=>String(x.id)===String(d.server.id));if(s)await selectServer(s);orbitToast("Server created",d.server.name+" is ready.","success")}catch(err){orbitToast("Server creation failed",err.message,"error")}}
+  
 });
 
 // Boot premium nav after DOM is parsed, then launch guest session.
