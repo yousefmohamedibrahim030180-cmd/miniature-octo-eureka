@@ -550,3 +550,98 @@ body{
   }
   .call-action span{font-size:15px!important}
 }
+
+/* ORBIT UI V4 — simplify primary actions */
+.head-actions{
+  position:relative!important;
+  display:flex!important;
+  align-items:center!important;
+}
+.utility-hidden{
+  position:absolute!important;
+  width:1px!important;
+  height:1px!important;
+  padding:0!important;
+  margin:-1px!important;
+  overflow:hidden!important;
+  clip:rect(0,0,0,0)!important;
+  white-space:nowrap!important;
+  border:0!important;
+}
+.head-action.call-action{
+  min-width:92px!important;
+  padding:0 14px!important;
+  justify-content:center!important;
+  gap:7px!important;
+}
+.head-action.call-action b{
+  font-size:12px!important;
+  font-weight:800!important;
+}
+.secondary-channel-action{
+  min-width:126px!important;
+  justify-content:center!important;
+}
+.channel-more-btn{
+  min-width:76px!important;
+  justify-content:center!important;
+  gap:5px!important;
+  background:#171c24!important;
+}
+.channel-more-btn span{font-size:17px!important;line-height:1!important}
+.channel-more-menu{
+  position:absolute!important;
+  right:0!important;
+  top:calc(100% + 10px)!important;
+  z-index:4100!important;
+  width:220px!important;
+  padding:7px!important;
+  border:1px solid rgba(255,255,255,.11)!important;
+  border-radius:14px!important;
+  background:rgba(13,17,24,.98)!important;
+  box-shadow:0 24px 70px rgba(0,0,0,.48)!important;
+  backdrop-filter:blur(20px)!important;
+}
+.channel-more-menu button{
+  display:flex!important;
+  width:100%!important;
+  min-height:42px!important;
+  align-items:center!important;
+  padding:0 12px!important;
+  border:0!important;
+  border-radius:10px!important;
+  background:transparent!important;
+  color:#d9deea!important;
+  font-size:12px!important;
+  font-weight:700!important;
+  text-align:left!important;
+  cursor:pointer!important;
+}
+.channel-more-menu button:hover{
+  background:rgba(141,120,255,.12)!important;
+  color:#fff!important;
+}
+@media(max-width:1180px){
+  .secondary-channel-action{display:none!important}
+  .head-action.call-action{min-width:82px!important}
+}
+@media(max-width:720px){
+  .head-actions{max-width:none!important}
+  .head-action.call-action{
+    width:44px!important;
+    min-width:44px!important;
+    padding:0!important;
+  }
+  .head-action.call-action b{display:none!important}
+  .channel-more-btn{
+    width:44px!important;
+    min-width:44px!important;
+    padding:0!important;
+    font-size:0!important;
+  }
+  .channel-more-btn span{font-size:20px!important}
+  .channel-more-menu{
+    right:0!important;
+    width:205px!important;
+  }
+}
