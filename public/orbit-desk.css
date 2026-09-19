@@ -360,3 +360,8 @@ body.orbit-discord-home .od-dm-row *{pointer-events:none!important}
 body.orbit-discord-home #od-dm-list{position:relative;z-index:999999!important;pointer-events:auto!important}
 body.orbit-discord-home #od-dm-list .od-dm-row{position:relative;z-index:1000000!important;pointer-events:auto!important;touch-action:manipulation!important;cursor:pointer!important}
 body.orbit-discord-home #od-dm-list .od-dm-row *{pointer-events:none!important}
+
+/* Robust DM hit-target: keep the actual list in its own top stacking layer. */
+body.orbit-discord-home .od-social-sidebar{position:relative;z-index:100000!important}
+body.orbit-discord-home .od-dm-list{position:relative;z-index:100001!important;pointer-events:auto!important}
+body.orbit-discord-home .od-dm-row{position:relative;z-index:100002!important;pointer-events:auto!important;cursor:pointer!important}
