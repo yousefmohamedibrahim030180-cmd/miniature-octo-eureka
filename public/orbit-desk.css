@@ -309,3 +309,10 @@ body.orbit-discord-home .global-page.discord-home-active{min-height:0}
 .od-dm-row{position:relative;z-index:6;pointer-events:auto!important;cursor:pointer!important;user-select:none;-webkit-user-select:none}
 .od-dm-row *{pointer-events:none}
 .od-dm-row.active{background:#404249!important}
+
+
+/* Force Home DM list above adjacent Home surfaces */
+body.orbit-discord-home .od-social-sidebar{position:relative;z-index:100}
+body.orbit-discord-home .od-dm-list{position:relative;z-index:110;pointer-events:auto!important}
+body.orbit-discord-home .od-dm-row{position:relative;z-index:120;pointer-events:auto!important;touch-action:manipulation}
+body.orbit-discord-home .od-dm-row::before{pointer-events:none!important}
