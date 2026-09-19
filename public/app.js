@@ -1710,25 +1710,14 @@ function renderHomePage(){
       $("#od-dm-list").innerHTML=rows.length?rows.slice(0,30).map(dm=>{
         const u=dm.otherUser||{};
         const onlineNow=dmUserStatus(u)==="Online";
-        return '<button type="button" class="od-dm-row '+(String(dm.id)===String(dmState.activeId)?"active":"")+'" data-od-dm="'+escapeHtml(dm.id)+'">'+
+        return '<button type="button" class="od-dm-row '+(String(dm.id)===String(dmState.activeId)?"active":"")+'" data-od-dm="'+escapeHtml(dm.id)+'" onclick="window.__orbitDMClick(this.dataset.odDm);return false" onpointerup="window.__orbitDMClick(this.dataset.odDm)">'+
           avatarMarkup({...u,status:onlineNow?"online":"offline"})+
           '<span><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><em>'+escapeHtml(dm.lastMessage?.content||"Start a conversation")+'</em></span>'+
           (dm.unreadCount?'<b>'+escapeHtml(dm.unreadCount)+'</b>':"")+
         '</button>';
       }).join(""):'<div class="od-dm-empty">No direct messages yet.</div>';
       const dmListRoot=$("#od-dm-list");
-      if(dmListRoot){
-        dmListRoot.style.pointerEvents="auto";
-        dmListRoot.querySelectorAll("[data-od-dm]").forEach(btn=>{
-          btn.onclick=async e=>{
-            e.preventDefault();
-            e.stopPropagation();
-            const id=btn.dataset.odDm;
-            if(!id)return;
-            await openHomeDirectMessage(id);
-          };
-        });
-      }
+      if(dmListRoot)dmListRoot.style.pointerEvents="auto";
     };
 
     const renderActive=()=>{
@@ -2025,6 +2014,18 @@ async function openHomeDirectMessage(dmId){
   }
 }
 window.openHomeDirectMessage=openHomeDirectMessage;
+window.__orbitDMClick=async function(id){
+  if(!id)return false;
+  try{
+    const root=$("#od-dm-list");
+    root?.querySelectorAll(".od-dm-row").forEach(b=>b.classList.toggle("active",String(b.dataset.odDm)===String(id)));
+    await openHomeDirectMessage(String(id));
+  }catch(err){
+    console.error("DM click failed",err);
+    orbitToast("Direct message",err.message||"Could not open chat.","error");
+  }
+  return false;
+};
 
 function renderHomeDirectMessageFeed(scrollBottom){
   const feed=$("#od-home-dm-messages");
