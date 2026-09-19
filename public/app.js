@@ -923,6 +923,7 @@ async function ensurePeer(socketId, initiator, info = {}) {
     if (state === "connected") {
       setCallIndicator("LIVE");
       updateCallNetwork();
+      if(callState.scope==="dm")updateDMCallSurface("Connected");
     }
     if (["failed", "closed", "disconnected"].includes(state)) {
       if (state !== "disconnected") removePeer(socketId);
@@ -1373,12 +1374,18 @@ $("#video-call-btn").onclick = () => startCall("video");
 function closeIncomingCall() {
   pendingIncomingCall = null;
   $("#incoming-call").classList.add("hidden");
+  $("#incoming-call")?.classList.remove("private-incoming");
 }
 $("#incoming-accept").onclick = async () => {
   const pending = pendingIncomingCall;
   closeIncomingCall();
   if (!pending) return;
   try {
+    if (pending.scope === "dm") {
+      await openHomeDirectMessage(pending.dmId);
+      await acceptDMCall(pending);
+      return;
+    }
     if (pending.serverId) {
       const targetServer = servers.find(s => String(s.id) === String(pending.serverId));
       if (targetServer && String(currentServer?.id) !== String(targetServer.id)) await selectServer(targetServer);
@@ -1396,7 +1403,9 @@ $("#incoming-accept").onclick = async () => {
 $("#incoming-decline").onclick = () => {
   const pending = pendingIncomingCall;
   closeIncomingCall();
-  if (pending && socket) socket.emit("call:decline", { channelId: pending.channelId, callerSocketId: pending.socketId });
+  if (!pending || !socket) return;
+  if (pending.scope === "dm") socket.emit("dm:call:decline", { callId: pending.callId });
+  else socket.emit("call:decline", { channelId: pending.channelId, callerSocketId: pending.socketId });
 };
 $("#hangup-btn").onclick = leaveCall;
 $("#close-call").onclick = leaveCall;
@@ -2086,6 +2095,22 @@ function renderHomePage(){
   loadHomeData();
 }
 
+function updateDMCallSurface(text=""){
+  const strip=$("#od-home-dm-call-strip");
+  const state=$("#od-home-dm-call-state");
+  const meta=$("#od-home-dm-call-meta");
+  const activeId=String(dmState.activeId||"");
+  const show=Boolean(callState.active&&callState.scope==="dm"&&String(callState.dmId)===activeId);
+  if(!strip)return;
+  strip.classList.toggle("hidden",!show);
+  if(!show)return;
+  if(state)state.textContent=text||"Private call";
+  if(meta)meta.textContent=(callState.mode==="voice"?"VOICE":"VIDEO")+" · "+(callState.joined?"CONNECTED SECURELY":"PRIVATE RINGING");
+  $("#od-home-dm-call-focus")?.addEventListener("click",()=>{
+    $("#call-panel")?.classList.remove("hidden","minimized");
+  },{once:true});
+}
+
 async function openHomeDirectMessage(dmId){
   try{
     if(!dmState.list.length){
@@ -2165,6 +2190,12 @@ async function openHomeDirectMessage(dmId){
           '<button id="od-home-dm-profile" class="od-home-dm-profile-btn" title="Toggle profile">◉</button>'+
         '</div>'+
       '</header>'+
+      '<div id="od-home-dm-call-strip" class="od-home-dm-call-strip hidden">'+
+        '<div class="od-home-dm-call-lock">🔒</div>'+
+        '<div class="od-home-dm-call-copy"><strong>Private call</strong><span id="od-home-dm-call-meta">VOICE · PRIVATE RINGING</span></div>'+
+        '<div class="od-home-dm-call-state" id="od-home-dm-call-state">Calling…</div>'+
+        '<button type="button" id="od-home-dm-call-focus">Open call</button>'+
+      '</div>'+
       '<div class="od-home-dm-messages" id="od-home-dm-messages">'+
         '<div class="od-home-dm-welcome">'+
           '<div class="od-home-dm-big-avatar">'+(avatarUrl?'<img src="'+escapeHtml(avatarUrl)+'" alt="">':escapeHtml(avatar(username)))+'</div>'+
@@ -2286,8 +2317,8 @@ async function openHomeDirectMessage(dmId){
         renderProfilePanel();
       }
     };
-    $("#od-home-dm-call").onclick=()=>orbitToast("Voice call","Use a community voice room to start a live call.");
-    $("#od-home-dm-video").onclick=()=>orbitToast("Video call","Use a community voice room to start a live video call.");
+    $("#od-home-dm-call").onclick=()=>startDMCall("voice");
+    $("#od-home-dm-video").onclick=()=>startDMCall("video");
 
     document.querySelectorAll("[data-od-social]").forEach(btn=>btn.classList.toggle("active",btn.dataset.odSocial==="dms"));
     document.querySelectorAll("[data-od-dm]").forEach(btn=>btn.classList.toggle("active",String(btn.dataset.odDm)===String(dmId)));
@@ -2825,14 +2856,8 @@ function bindDMPage(){
     if(target==="friends")setView("home");
     if(target==="calls")setView("calls");
   });
-  $("#dm-call-inline")?.addEventListener("click",()=>{
-    const u=dmCurrentOther();
-    if(u)orbitToast("Voice call","Start a voice call from a community voice room or use the call controls there.");
-  });
-  $("#dm-video-inline")?.addEventListener("click",()=>{
-    const u=dmCurrentOther();
-    if(u)orbitToast("Video call","Start a video call from a community voice room or use the call controls there.");
-  });
+  $("#dm-call-inline")?.addEventListener("click",()=>startDMCall("voice"));
+  $("#dm-video-inline")?.addEventListener("click",()=>startDMCall("video"));
   $("#dm-pin-inline")?.addEventListener("click",()=>orbitToast("Pinned messages","Pinned message view is ready for this conversation."));
   $("#dm-message-search")?.addEventListener("input",e=>{
     const q=e.target.value.trim().toLowerCase();
