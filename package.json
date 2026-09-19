@@ -21,7 +21,9 @@
     "socket.io": "^4.8.1",
     "@huggingface/transformers": "^3.8.1",
     "helmet": "^8.3.0",
-    "express-rate-limit": "^8.7.0"
+    "express-rate-limit": "^8.7.0",
+    "redis": "^6.2.1",
+    "@socket.io/redis-adapter": "^8.3.0"
   },
   "engines": {
     "node": ">=22.0.0 <23.0.0"
