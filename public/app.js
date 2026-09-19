@@ -3494,6 +3494,9 @@ function renderSettingsPage(section="appearance"){
     card.innerHTML=setting("Performance mode","Reduce expensive visual effects.",false,"perf-mode")+setting("Lazy media","Load rich media on demand.",true,"perf-lazy");
   }else if(section==="security"){
     card.innerHTML='<h3>Security center</h3><p>Current guest session and moderation visibility.</p><div class="list-card"><div class="list-row"><div class="chip">✓</div><div><strong>Guest session</strong><span>Signed session token</span></div><span>Active</span></div><div class="list-row"><div class="chip">◎</div><div><strong>Persistent storage</strong><span>PostgreSQL</span></div><span>Pending setup</span></div></div>';
+  }else if(section==="advanced"){
+    card.innerHTML='<h3>Advanced</h3><p>Platform owner tools and advanced Orbit controls.</p>'+setting("Command palette","Enable Ctrl+K.",true,"advanced-palette")+setting("Developer diagnostics","Expose realtime diagnostics.",false,"advanced-dev")+'<div class="setting-row owner-console-row"><div><strong>ORBIT Owner Command</strong><span>Platform-level control for users, messages, calls, communities and security. Protected by a separate owner key.</span></div><button type="button" class="primary" id="open-owner-console">Open Owner Command</button></div>';
+    $("#open-owner-console").onclick=()=>{location.href="/owner.html"};
   }else{
     card.innerHTML=setting("Command palette","Enable Ctrl+K.",true,"advanced-palette")+setting("Developer diagnostics","Expose realtime diagnostics.",false,"advanced-dev");
   }
