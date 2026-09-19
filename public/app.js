@@ -3869,7 +3869,10 @@ function openPoll(){
   openModal("Create poll",'<input id="poll-q" placeholder="Question"><input id="poll-a" placeholder="Option A"><input id="poll-b" placeholder="Option B"><input id="poll-c" placeholder="Option C (optional)"><button class="primary" id="publish-poll">Publish poll</button>');
 }
 function openEvent(){
-  openModal("Create event",'<input id="event-title" placeholder="Event title"><input id="event-time" placeholder="Date & time"><select id="event-type"><option>Voice</option><option>Video</option><option>Community</option></select><textarea id="event-description" placeholder="Description"></textarea><button class="primary" id="publish-event">Create event</button>');
+  if(!currentServer)return orbitToast("Create event","Select a community first.","error");
+  const min=new Date(Date.now()+10*60*1000);
+  const defaultWhen=new Date(min.getTime()-min.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  openModal("Create event",'<div class="orbit-form-stack"><input id="event-title" maxlength="140" placeholder="Event title"><input id="event-time" type="datetime-local" value="'+defaultWhen+'"><select id="event-type"><option>Community</option><option>Gaming</option><option>Class</option><option>Meeting</option><option>Watch party</option><option>Voice</option><option>Video</option></select><textarea id="event-description" maxlength="800" placeholder="What is happening?"></textarea><button class="primary" id="publish-event">Create event</button></div>');
 }
 function openCommandPalette(){
   $("#command-palette").classList.remove("hidden");
@@ -4084,7 +4087,21 @@ $("#join-server")?.addEventListener("click",openJoinCommunityModal);
       const options=["#poll-a","#poll-b","#poll-c"].map(s=>$(s)?.value.trim()).filter(Boolean);
       try{const d=await api("/api/channels/"+currentChannel.id+"/polls",{method:"POST",body:JSON.stringify({question:$("#poll-q").value.trim(),options})});closeModal();orbitToast("Poll published","Vote collection is live.","success");renderPoll(d.poll)}catch(err){orbitToast("Poll failed",err.message,"error")}
     }
-    if(e.target.id==="publish-event"){closeModal();orbitToast("Event created","Event controls are ready in Explore.","success")}
+    if(e.target.id==="publish-event"){
+      const title=$("#event-title")?.value.trim(),when=$("#event-time")?.value,type=$("#event-type")?.value,description=$("#event-description")?.value.trim();
+      if(!title||!when)return orbitToast("Create event","Add a title and date/time.","error");
+      if(!currentServer)return orbitToast("Create event","Select a community first.","error");
+      const btn=$("#publish-event"); if(btn){btn.disabled=true;btn.textContent="Creating…";}
+      try{
+        await api("/api/servers/"+encodeURIComponent(currentServer.id)+"/events",{method:"POST",body:JSON.stringify({title,when,type,description})});
+        closeModal();
+        orbitToast("Event created","Members can now RSVP.","success");
+        if(orbitUI.view==="events")renderEventsPage();
+      }catch(err){
+        if(btn){btn.disabled=false;btn.textContent="Create event";}
+        orbitToast("Create event failed",err.message,"error");
+      }
+    }
   });
   document.addEventListener("keydown",e=>{
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openCommandPalette()}
