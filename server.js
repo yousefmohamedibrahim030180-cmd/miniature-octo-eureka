@@ -6,6 +6,7 @@ const jwt = require("jsonwebtoken");
 const { Server } = require("socket.io");
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
+const { pipeline, env: hfEnv } = require("@huggingface/transformers");
 
 const app = express();
 const server = http.createServer(app);
@@ -754,21 +755,35 @@ function localOrbitReply(message) {
   if (q.startsWith("search ")) return "Opening global search for: " + String(message).trim().slice(7);
   return "I can navigate and organize Orbit locally. Add an AI provider on the server to enable full generative answers, summaries, translations and document analysis.";
 }
-async function requestPollinationsModel(messages) {
-  if (String(process.env.ORBIT_AI_ANONYMOUS_FALLBACK || "true").toLowerCase() === "false") return null;
-  const response = await fetch("https://text.pollinations.ai/openai", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      model: String(process.env.ORBIT_AI_FALLBACK_MODEL || "openai"),
-      messages: messages.slice(-20),
-      private: true
-    })
+let nexusLocalPipeline = null;
+let nexusLocalPipelinePromise = null;
+
+async function requestLocalOrbitModel(messages) {
+  if (!nexusLocalPipelinePromise) {
+    nexusLocalPipelinePromise = (async () => {
+      hfEnv.cacheDir = String(process.env.ORBIT_AI_CACHE_DIR || path.join(__dirname, ".cache", "nexus-ai"));
+      return await pipeline(
+        "text-generation",
+        String(process.env.ORBIT_AI_LOCAL_MODEL || "HuggingFaceTB/SmolLM2-135M-Instruct"),
+        { dtype: String(process.env.ORBIT_AI_LOCAL_DTYPE || "q4") }
+      );
+    })().catch(error => {
+      nexusLocalPipelinePromise = null;
+      throw error;
+    });
+  }
+  nexusLocalPipeline = await nexusLocalPipelinePromise;
+  const output = await nexusLocalPipeline(messages.slice(-10), {
+    max_new_tokens: Math.max(32, Math.min(220, Number(process.env.ORBIT_AI_LOCAL_MAX_TOKENS || 180))),
+    temperature: 0.7,
+    do_sample: true
   });
-  if (!response.ok) throw new Error("Anonymous AI fallback returned HTTP " + response.status);
-  const data = await response.json().catch(() => null);
-  const content = data?.choices?.[0]?.message?.content || data?.response || "";
-  return typeof content === "string" && content.trim() ? content.trim() : null;
+  const generated = output?.[0]?.generated_text;
+  if (Array.isArray(generated)) {
+    const assistant = [...generated].reverse().find(item => item?.role === "assistant");
+    return typeof assistant?.content === "string" && assistant.content.trim() ? assistant.content.trim() : null;
+  }
+  return typeof generated === "string" && generated.trim() ? generated.trim() : null;
 }
 
 async function requestOrbitModel(messages) {
@@ -787,12 +802,16 @@ async function requestOrbitModel(messages) {
       const content=data?.choices?.[0]?.message?.content;
       if(typeof content==="string"&&content.trim()) return content.trim();
     }catch(error){
-      console.error("[orbit] configured AI provider failed, using anonymous fallback:", error.message);
+      console.error("[orbit] configured AI provider failed, using local NEXUS model:", error.message);
     }
   }
-  return await requestPollinationsModel(messages);
+  try {
+    return await requestLocalOrbitModel(messages);
+  } catch (error) {
+    console.error("[orbit] local NEXUS model unavailable:", error.message);
+    return null;
+  }
 }
-
 app.get("/api/servers/:id/nexus/world", auth, (req, res) => {
   const access = member(req.params.id, req.user.id);
   if (!access) return res.status(403).json({ error: "Not a member" });
