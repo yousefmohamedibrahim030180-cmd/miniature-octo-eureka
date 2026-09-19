@@ -11,7 +11,7 @@
     "desktop:dist": "electron-builder --win nsis portable --publish never",
     "test": "node --test tests",
     "db:migrate": "node db/migrate.js",
-    "check": "node --check server.js && node --check platform/security.js && node --check platform/config.js && node --check platform/manifest.js"
+    "check": "node --check server.js && node --check platform/security.js && node --check platform/config.js && node --check platform/manifest.js && node --check platform/session.js && node --check platform/realtime.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
