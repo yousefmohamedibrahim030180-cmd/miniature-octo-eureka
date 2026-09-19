@@ -690,7 +690,6 @@ function openForumComposer(channel){
 async function openForumPost(postId){
   try{
     const postData=await api("/api/v1/posts/"+encodeURIComponent(postId)+"/comments");
-    const post=postData?.post||memory;
     const postMeta=await api("/api/v1/channels/"+encodeURIComponent(currentChannel.id)+"/posts?limit=50");
     const found=(postMeta.posts||[]).find(x=>String(x.id)===String(postId));
     if(!found)return;
@@ -749,6 +748,7 @@ async function selectChannel(channel) {
   $("#channel-name").textContent = channel.name;
   $("#channel-meta").textContent = channel.type === "announcement" ? "Announcement channel" : channel.type === "forum" ? "Forum discussions" : channel.type === "media" ? "Media channel" : "Realtime conversation";
   if(channel.type==="forum"){
+    if(socket) socket.emit("channel:join",channel.id);
     await renderForumChannel(channel);
   }else{
     $("#composer")?.classList.remove("hidden");
