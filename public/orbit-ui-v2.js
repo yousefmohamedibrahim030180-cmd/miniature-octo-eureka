@@ -15,7 +15,7 @@
     });
     menu.querySelectorAll("button[data-action]").forEach(item=>{
       item.addEventListener("click",()=>{
-        const map={quick-share:"quick-share-btn",invite:"invite-btn",members:"members-btn",admin:"admin-btn"};
+        const map={"quick-share":"quick-share-btn",invite:"invite-btn",members:"members-btn",admin:"admin-btn"};
         const target=document.getElementById(map[item.dataset.action]);
         close();
         if(target) target.click();
