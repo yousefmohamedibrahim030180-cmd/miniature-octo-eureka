@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="/orbit-nexus.css?v=nexus-v4-20260919">
 <link rel="stylesheet" href="/orbit-core.css?v=core-v3-20260919">
 <link rel="stylesheet" href="/orbit-call-fix.css?v=call-fix-v1-20260920">
-<link rel="stylesheet" href="/orbit-pro-ui.css?v=orbit-pro-ui-v3-20260920">
+<link rel="stylesheet" href="/orbit-pro-ui.css?v=orbit-pro-ui-v4-20260920">
 </head>
 <body>
 <div id="app" class="app">
@@ -82,13 +82,21 @@
           <span class="hash" id="channel-symbol">#</span>
           <div><strong id="channel-name">general</strong><span id="channel-meta">Realtime conversation</span></div>
         </div>
-        <div class="head-actions">
-          <button id="voice-call-btn" class="head-action"><span>☎</span> Voice</button>
-          <button id="video-call-btn" class="head-action primary-soft"><span>▣</span> Video</button>
-          <button id="quick-share-btn" class="head-action"><span>↗</span> Share link</button><button id="quick-screen-share-btn" class="head-action screen-head-action"><span>▣</span> Share screen</button>
-          <button id="invite-btn" class="head-action">Invite</button>
-          <button id="members-btn" class="head-action">Members</button>
-          <button id="admin-btn" class="head-action">Control</button>
+        <div class="head-actions" aria-label="Channel actions">
+          <button id="voice-call-btn" class="head-action call-action" title="Start voice call" aria-label="Start voice call"><span>☎</span><b>Voice</b></button>
+          <button id="video-call-btn" class="head-action primary-soft call-action" title="Start video call" aria-label="Start video call"><span>▣</span><b>Video</b></button>
+          <button id="quick-screen-share-btn" class="head-action screen-head-action secondary-channel-action" title="Share your screen" aria-label="Share your screen"><span>▣</span><b>Share screen</b></button>
+          <button id="channel-more-btn" class="head-action channel-more-btn" title="More channel actions" aria-label="More channel actions">More <span>⋯</span></button>
+          <div id="channel-more-menu" class="channel-more-menu hidden" role="menu">
+            <button type="button" data-action="quick-share">Share channel link</button>
+            <button type="button" data-action="invite">Invite people</button>
+            <button type="button" data-action="members">View members</button>
+            <button type="button" data-action="admin">Channel control</button>
+          </div>
+          <button id="quick-share-btn" class="head-action utility-hidden" aria-hidden="true" tabindex="-1">Share link</button>
+          <button id="invite-btn" class="head-action utility-hidden" aria-hidden="true" tabindex="-1">Invite</button>
+          <button id="members-btn" class="head-action utility-hidden" aria-hidden="true" tabindex="-1">Members</button>
+          <button id="admin-btn" class="head-action utility-hidden" aria-hidden="true" tabindex="-1">Control</button>
         </div>
       </header>
 
@@ -163,5 +171,6 @@
 <a href="/store.html" class="orbit-store-launch" aria-label="Open ORBIT Store">STORE <span>↗</span></a>
 <style>.orbit-store-launch{position:fixed;right:20px;bottom:20px;z-index:99999;padding:11px 14px;border:1px solid rgba(139,233,255,.22);border-radius:999px;background:rgba(8,12,20,.82);backdrop-filter:blur(16px);color:#eefaff;text-decoration:none;font:800 10px/1 Inter,system-ui;letter-spacing:.16em;box-shadow:0 12px 35px rgba(0,0,0,.28)}.orbit-store-launch span{color:#8be9ff;margin-left:5px}</style>
 <script src="/orbit-call-fix.js?v=call-fix-v1-20260920"></script>
+<script src="/orbit-ui-v2.js?v=orbit-ui-v2-20260920"></script>
 </body>
 </html>
