@@ -460,3 +460,56 @@ body.orbit-discord-home .orbit-discord-home{background:#1e1f22}
   .od-home-chat-active .od-home-dm-messages{padding-left:9px!important;padding-right:9px!important}
   .od-home-chat-active .od-home-dm-composer{margin-left:8px!important;margin-right:8px!important}
 }
+
+
+/* ===== DM Pro Workspace 2.0 ===== */
+.od-home-chat-active{position:relative;overflow:hidden}
+.od-home-dm-message{position:relative}
+.od-home-dm-hover-actions{position:absolute;right:14px;top:-7px;display:flex;gap:3px;padding:3px;opacity:0;pointer-events:none;transform:translateY(2px);border:1px solid #41434a;border-radius:8px;background:#1f2024;box-shadow:0 8px 24px rgba(0,0,0,.28);transition:opacity .12s ease,transform .12s ease;z-index:4}
+.od-home-dm-message:hover .od-home-dm-hover-actions{opacity:1;pointer-events:auto;transform:translateY(0)}
+.od-home-dm-hover-actions button{width:28px;height:26px;border:0;border-radius:5px;background:transparent;color:#b5bac1;cursor:pointer;font-size:12px}
+.od-home-dm-hover-actions button:hover{background:#36383d;color:#fff}
+.od-home-dm-reactions{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.od-home-dm-reaction{height:22px;display:inline-flex;align-items:center;gap:4px;padding:0 7px;border:1px solid #45474d;border-radius:999px;background:#2b2d31;color:#dbdee1;cursor:pointer;font-size:10px}
+.od-home-dm-reaction:hover,.od-home-dm-reaction.mine{border-color:#5865f2;background:rgba(88,101,242,.16)}
+.od-home-dm-reaction b{font-size:8px;color:#b5bac1}
+.od-home-dm-pin-mark{padding:2px 5px;border-radius:4px;background:rgba(88,101,242,.14);color:#8ea1ff;font-size:6px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+.od-home-dm-attachment{display:block;max-width:min(430px,92%);margin-top:8px;border:1px solid #45474d;border-radius:10px;overflow:hidden;background:#24262b}
+.od-home-dm-image img{display:block;width:100%;max-height:340px;object-fit:cover;background:#18191c}
+.od-home-dm-video video{display:block;width:100%;max-height:300px;background:#18191c}
+.od-home-dm-attachment-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;font-size:8px;color:#b5bac1}
+.od-home-dm-attachment-meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.od-home-dm-attachment-meta a{color:#9aa5ff;font-weight:700;text-decoration:none}
+.od-home-dm-file{display:flex;align-items:center;gap:10px;padding:10px;text-decoration:none;color:#dbdee1}
+.od-home-dm-file-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:8px;background:#313338;color:#9aa5ff;font-weight:800;flex:0 0 auto}
+.od-home-dm-file>span:nth-child(2){min-width:0;display:flex;flex-direction:column;gap:3px;flex:1}
+.od-home-dm-file strong,.od-home-dm-audio strong{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.od-home-dm-file small,.od-home-dm-audio small{font-size:7px;color:#72767d}
+.od-home-dm-file b{font-size:7px;color:#8ea1ff}
+.od-home-dm-audio{display:grid;grid-template-columns:34px minmax(0,1fr);gap:9px;padding:10px}
+.od-home-dm-audio audio{grid-column:1/-1;width:100%;height:32px}
+.od-home-dm-drawer{position:absolute;right:0;top:0;bottom:0;width:min(360px,92%);z-index:20;display:flex;flex-direction:column;background:#232428;border-left:1px solid #3b3d42;box-shadow:-18px 0 40px rgba(0,0,0,.28);animation:odDmDrawerIn .16s ease}
+.od-home-dm-drawer.hidden{display:none}
+@keyframes odDmDrawerIn{from{transform:translateX(18px);opacity:0}to{transform:translateX(0);opacity:1}}
+.od-home-dm-drawer-head{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid #36383d;background:#2b2d31}
+.od-home-dm-drawer-head strong{display:block;color:#f2f3f5;font-size:11px}.od-home-dm-drawer-head span{display:block;margin-top:3px;color:#72767d;font-size:7px}
+.od-home-dm-drawer-head button{width:28px;height:28px;border:0;border-radius:6px;background:transparent;color:#b5bac1;font-size:18px;cursor:pointer}.od-home-dm-drawer-head button:hover{background:#3a3c42;color:#fff}
+.od-home-dm-drawer-tabs{display:flex;gap:4px;padding:10px;border-bottom:1px solid #36383d;background:#202125;overflow:auto}
+.od-home-dm-drawer-tabs button{height:30px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#949ba4;font-size:8px;font-weight:700;cursor:pointer;white-space:nowrap}.od-home-dm-drawer-tabs button:hover{background:#2f3136;color:#fff}.od-home-dm-drawer-tabs button.active{background:#5865f2;color:#fff}
+.od-home-dm-drawer-tools{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;padding:11px 12px;border-bottom:1px solid #34363b;color:#b5bac1;font-size:8px}
+.od-home-dm-drawer-tools>strong{font-size:9px;color:#f2f3f5}.od-home-dm-drawer-tools>span{font-size:7px;color:#72767d}
+.od-home-dm-drawer-tools label{display:flex;flex-direction:column;gap:5px;width:100%;color:#949ba4;font-size:7px;font-weight:800}
+.od-home-dm-drawer-tools input{height:34px;margin-top:2px;padding:0 9px;border:1px solid #44464d;border-radius:7px;background:#1b1c1f;color:#f2f3f5;outline:0;font:inherit;font-size:9px}
+.od-home-dm-drawer-list{flex:1;overflow:auto;padding:9px}
+.od-home-dm-result{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;padding:10px;border:1px solid transparent;border-radius:8px;background:#2b2d31;color:#dbdee1;text-align:left;cursor:pointer;margin-bottom:6px}
+.od-home-dm-result:hover{border-color:#45474d;background:#313338}
+.od-home-dm-result>strong{grid-column:1/2;font-size:9px;color:#f2f3f5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.od-home-dm-result>span{grid-column:1/2;font-size:8px;color:#949ba4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.od-home-dm-result>small{grid-column:1/2;color:#72767d;font-size:7px}
+.od-home-dm-result>time{grid-column:2;grid-row:1/3;align-self:center;color:#72767d;font-size:7px}
+.od-home-dm-result.link{display:grid;text-decoration:none}
+.od-home-dm-drawer-file-icon{width:32px;height:32px;display:grid;place-items:center;grid-row:1/3;border-radius:7px;background:#313338;color:#9aa5ff}
+.od-home-dm-drawer-empty{display:grid;place-items:center;min-height:180px;padding:20px;text-align:center;color:#72767d;font-size:9px}
+.dm-highlight{animation:dmHighlight 1.4s ease}
+@keyframes dmHighlight{0%,100%{background:transparent}25%,65%{background:rgba(88,101,242,.24)}}
+@media(max-width:760px){.od-home-dm-drawer{width:100%}.od-home-dm-hover-actions{right:6px}}
