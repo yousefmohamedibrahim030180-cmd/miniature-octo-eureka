@@ -322,3 +322,5 @@ body.orbit-discord-home .od-dm-row::before{pointer-events:none!important}
 [data-od-social="dms"],
 [data-dm-nav="messages"],
 .global-nav [data-view="dms"]{display:none!important}
+
+[data-view="dms"],[data-od-social="dms"],[data-dm-nav="messages"]{display:none!important}
