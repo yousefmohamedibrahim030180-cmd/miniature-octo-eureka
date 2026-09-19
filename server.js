@@ -62,6 +62,7 @@ const memory = {
   notificationPreferences: new Map(),
   apiKeys: new Map(),
   developerApplications: new Map(),
+  bookmarks: new Map(),
   analyticsEvents: []
 };
 
@@ -130,6 +131,7 @@ function serializeMemory() {
     postComments: [...memory.postComments.entries()],
     apiKeys: [...memory.apiKeys.entries()],
     developerApplications: [...memory.developerApplications.entries()],
+    bookmarks: [...memory.bookmarks.entries()],
     analyticsEvents: memory.analyticsEvents
   };
 }
@@ -162,6 +164,7 @@ function hydrateMemory(data) {
   restoreMap("postComments");
   restoreMap("apiKeys");
   restoreMap("developerApplications");
+  restoreMap("bookmarks");
   memory.analyticsEvents = Array.isArray(data.analyticsEvents) ? data.analyticsEvents.slice(-10000) : [];
 }
 
@@ -1651,6 +1654,37 @@ app.post("/api/messages/:id/thread", auth, (req, res) => {
   thread.replies.push(reply);
   notify(found.message.user_id, { type: "reply", title: "New thread reply", body: req.user.username + " replied to your message", actorId: req.user.id, messageId: found.message.id });
   res.status(201).json({ reply, thread });
+});
+
+app.get("/api/v1/bookmarks",auth,(req,res)=>{
+  const rows=[...memory.bookmarks.values()]
+    .filter(b=>String(b.userId)===String(req.user.id))
+    .sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)))
+    .map(b=>{
+      const found=findMessage(b.messageId);
+      return {id:b.id,messageId:b.messageId,channelId:found?.channelId||null,createdAt:b.createdAt,message:found?.message||null};
+    })
+    .filter(b=>b.message);
+  res.json({bookmarks:rows});
+});
+
+app.post("/api/v1/messages/:id/bookmark",auth,(req,res)=>{
+  const found=findMessage(req.params.id);
+  if(!found)return res.status(404).json({error:"Message not found"});
+  const channel=memory.channels.get(found.channelId);
+  if(!channel || !member(channel.serverId,req.user.id))return res.status(403).json({error:"Not a member"});
+  const key=String(req.user.id)+":"+String(found.message.id);
+  const existing=memory.bookmarks.get(key);
+  if(existing){
+    memory.bookmarks.delete(key);
+    schedulePersist();
+    return res.json({bookmarked:false});
+  }
+  const bookmark={id:id("bookmark"),key,userId:String(req.user.id),messageId:String(found.message.id),channelId:String(channel.id),createdAt:now()};
+  memory.bookmarks.set(key,bookmark);
+  audit(req.user.id,"MESSAGE_BOOKMARK",found.message.id,{channelId:channel.id});
+  schedulePersist();
+  res.status(201).json({bookmarked:true,bookmark});
 });
 
 app.post("/api/messages/:id/reaction", auth, (req, res) => {
