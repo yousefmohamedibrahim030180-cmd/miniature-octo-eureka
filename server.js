@@ -754,20 +754,43 @@ function localOrbitReply(message) {
   if (q.startsWith("search ")) return "Opening global search for: " + String(message).trim().slice(7);
   return "I can navigate and organize Orbit locally. Add an AI provider on the server to enable full generative answers, summaries, translations and document analysis.";
 }
+async function requestPollinationsModel(messages) {
+  if (String(process.env.ORBIT_AI_ANONYMOUS_FALLBACK || "true").toLowerCase() === "false") return null;
+  const response = await fetch("https://text.pollinations.ai/openai", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      model: String(process.env.ORBIT_AI_FALLBACK_MODEL || "openai"),
+      messages: messages.slice(-20),
+      private: true
+    })
+  });
+  if (!response.ok) throw new Error("Anonymous AI fallback returned HTTP " + response.status);
+  const data = await response.json().catch(() => null);
+  const content = data?.choices?.[0]?.message?.content || data?.response || "";
+  return typeof content === "string" && content.trim() ? content.trim() : null;
+}
+
 async function requestOrbitModel(messages) {
   const url=String(process.env.ORBIT_AI_API_URL || "").trim();
   const key=String(process.env.ORBIT_AI_API_KEY || "").trim();
   const model=String(process.env.ORBIT_AI_MODEL || "orbit").trim();
-  if(!url || !key) return null;
-  const response=await fetch(url,{
-    method:"POST",
-    headers:{"content-type":"application/json","authorization":"Bearer "+key},
-    body:JSON.stringify({model,messages})
-  });
-  if(!response.ok) throw new Error("AI provider returned HTTP "+response.status);
-  const data=await response.json();
-  const content=data?.choices?.[0]?.message?.content;
-  return typeof content==="string"&&content.trim()?content.trim():null;
+  if(url && key){
+    try{
+      const response=await fetch(url,{
+        method:"POST",
+        headers:{"content-type":"application/json","authorization":"Bearer "+key},
+        body:JSON.stringify({model,messages})
+      });
+      if(!response.ok) throw new Error("AI provider returned HTTP "+response.status);
+      const data=await response.json();
+      const content=data?.choices?.[0]?.message?.content;
+      if(typeof content==="string"&&content.trim()) return content.trim();
+    }catch(error){
+      console.error("[orbit] configured AI provider failed, using anonymous fallback:", error.message);
+    }
+  }
+  return await requestPollinationsModel(messages);
 }
 
 app.get("/api/servers/:id/nexus/world", auth, (req, res) => {
