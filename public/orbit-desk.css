@@ -28,3 +28,6 @@
 @media (max-width:1050px){.oh-columns{grid-template-columns:minmax(0,1fr) 290px}.oh-tab{padding:0 9px}.oh-main{padding-left:14px;padding-right:14px}}
 @media (max-width:800px){.oh-columns{grid-template-columns:1fr}.oh-side{border-top:1px solid #34363b}.oh-main{border-right:0}.oh-homebar{overflow:auto}.oh-homebar>.oh-top-btn{display:none}}
 @media (max-width:560px){.oh-main{padding:12px 10px 22px}.oh-notice span{display:none}.oh-section-head span{display:none}.oh-user-action{opacity:1}.oh-side{padding:10px}.oh-homebar{padding:0 10px}}
+
+/* Home tab controls */
+.oh-request-actions{display:flex;gap:6px;margin-left:auto}.oh-request-actions button,.oh-suggestion-add{border:0;border-radius:6px;padding:6px 9px;background:#313338;color:#e3e5e8;font-size:10px;font-weight:700;cursor:pointer}.oh-request-actions button:first-child,.oh-suggestion-add{background:#5865f2;color:#fff}.oh-request-actions button:hover,.oh-suggestion-add:hover{filter:brightness(1.08)}.oh-search-hint{padding:12px 4px;color:#72777f;font-size:10px}
