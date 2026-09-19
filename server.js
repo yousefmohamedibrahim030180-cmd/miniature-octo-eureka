@@ -13,6 +13,7 @@ const platformManifest = require("./platform/manifest");
 const { migrate } = require("./db/migrate");
 const { createSessionManager, cookieMap, setRefreshCookie, clearRefreshCookie } = require("./platform/session");
 const { configureRedisAdapter, closeRedisAdapter } = require("./platform/realtime");
+const { createStorage } = require("./platform/storage");
 
 const app = express();
 const server = http.createServer(app);
@@ -61,6 +62,7 @@ const dmCalls = new Map();
 const serverMessageRate = new Map();
 const v1Sessions = createSessionManager({ jwtSecret: JWT_SECRET, sessions: memory.sessions, users: memory.users });
 let realtimeScale = { enabled: false, reason: "Redis adapter not initialized" };
+let objectStorage = { enabled: false, reason: "S3-compatible storage not initialized" };
 
 const DATABASE_URL = String(process.env.DATABASE_URL || "").trim();
 const PERSIST_URL = String(process.env.ORBIT_PERSIST_URL || "").trim().replace(/\/$/, "");
@@ -549,7 +551,8 @@ app.get("/api/v1/platform/manifest", (req, res) => {
       node: process.version,
       uptime: Math.floor(process.uptime()),
       persistence: persistMode,
-    realtimeScaling: realtimeScale.enabled
+      realtimeScaling: realtimeScale.enabled,
+      objectStorage: objectStorage.enabled
     }
   });
 });
@@ -737,6 +740,20 @@ app.post("/api/auth/convert-legacy", authLegacy, async (req, res) => {
 
 app.get("/api/me", authLegacy, (req, res) => {
   res.json({ user: publicUser(req.user) });
+});
+
+app.post("/api/v1/uploads/presign", authV1, async (req,res)=>{
+  if(!objectStorage.enabled) return res.status(503).json({error:"Object storage is not configured.",code:"STORAGE_NOT_CONFIGURED"});
+  try{
+    const result=await objectStorage.presignUpload({
+      filename:req.body?.filename,
+      contentType:req.body?.contentType,
+      size:req.body?.size
+    },req.user.id);
+    res.status(201).json({upload:result});
+  }catch(error){
+    res.status(400).json({error:error.message});
+  }
 });
 
 app.get("/api/pulse", auth, (req, res) => {
@@ -2787,6 +2804,9 @@ io.on("connection", socket => {
 async function boot() {
   assertProductionBasics();
   realtimeScale = await configureRedisAdapter(io, env.redisUrl, console);
+  objectStorage = createStorage(process.env);
+  if(objectStorage.enabled) console.log("[orbit] S3-compatible object storage enabled.");
+  else console.log("[orbit] Object storage not configured; legacy attachment storage remains active.");
 
   if (env.autoMigrate) {
     if (!env.databaseUrl) throw new Error("ORBIT_AUTO_MIGRATE=true requires DATABASE_URL.");
