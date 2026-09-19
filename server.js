@@ -2404,7 +2404,7 @@ io.on("connection", socket => {
     }
   });
 
-  socket.on("dm:join", dmId => {
+  socket.on("nexus:event", ({ serverId, type, payload } = {}) => {\n    const access = member(String(serverId || ""), socket.user.id);\n    if (!access || !canManage(access.role)) return;\n    const safeType = String(type || "custom").slice(0, 40);\n    const raw = payload && typeof payload === "object" ? payload : {};\n    const safePayload = JSON.parse(JSON.stringify(raw));\n    const size = JSON.stringify(safePayload).length;\n    if (size > 5000) return;\n    const event = { type: safeType, payload: safePayload, user: publicUser(socket.user), serverId: access.server.id, createdAt: now() };\n    emitToServer(access.server.id, "nexus:event", event);\n    emitPulse("nexus", event);\n  });\n\n  socket.on("dm:join", dmId => {
     const dm = memory.dms.get(String(dmId));
     if (!dm || !dm.members.includes(String(socket.user.id))) return;
     socket.join(socketRoom("dm", dmId));
