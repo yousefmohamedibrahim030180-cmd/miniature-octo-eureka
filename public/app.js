@@ -1975,7 +1975,7 @@ function renderHomePage(){
     const name=u?.display_name||u?.username||"Guest";
     const activity=u?.activity||u?.status||"Online";
     return '<div class="od-user-row" data-od-user="'+escapeHtml(u?.id||"")+'">'+
-      avatarMarkup(u)+
+      avatarMarkup(u, "od-friend-avatar")+
       '<div class="od-user-copy"><strong>'+escapeHtml(name)+'</strong><span>'+escapeHtml(activity)+(u?.username?' · @'+escapeHtml(u.username):"")+'</span></div>'+
       '<div class="od-user-actions">'+
       (kind==="friend"?'<button class="od-row-btn" data-od-message="'+escapeHtml(u?.username||"")+'">Message</button>':"")+
@@ -2134,6 +2134,27 @@ function renderHomePage(){
             const dm=dmState.list.find(x=>String(x.otherUser?.username||"").toLowerCase()===String(btn.dataset.odMessage||"").toLowerCase());
             if(dm)await openHomeDirectMessage(dm.id);
           }catch(e){orbitToast("Message failed",e.message,"error")}
+        });
+        slot.querySelectorAll(".od-friend-avatar").forEach(avatarEl=>avatarEl.onclick=async e=>{
+          e.preventDefault();
+          e.stopPropagation();
+          const row=avatarEl.closest(".od-user-row");
+          const user=friends.find(x=>String(x?.id)===String(row?.dataset?.odUser));
+          if(!user?.username)return;
+          try{
+            let dm=(dmState.list||[]).find(x=>String(x?.otherUser?.id)===String(user.id)||String(x?.otherUser?.username||"").toLowerCase()===String(user.username).toLowerCase());
+            if(!dm){
+              await api("/api/dms",{method:"POST",body:JSON.stringify({username:user.username})});
+              const fresh=await api("/api/dms");
+              dmState.list=fresh.dms||[];
+              dm=dmState.list.find(x=>String(x?.otherUser?.id)===String(user.id)||String(x?.otherUser?.username||"").toLowerCase()===String(user.username).toLowerCase());
+            }
+            if(!dm)throw new Error("Conversation could not be opened.");
+            closeModal?.();
+            await openHomeDirectMessage(dm.id);
+          }catch(err){
+            orbitToast("Chat failed",err.message||"Could not open this conversation.","error");
+          }
         });
         slot.querySelectorAll("[data-od-user]").forEach(btn=>btn.onclick=e=>{if(e.target.closest("button"))return;openPulseProfile(btn.dataset.odUser)});
         slot.querySelectorAll("[data-od-accept]").forEach(btn=>btn.onclick=async()=>{
