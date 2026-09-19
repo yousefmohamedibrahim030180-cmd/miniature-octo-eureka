@@ -22,3 +22,8 @@ The server checks the API key scope and the user's actual ORBIT community permis
 
 Unsupported integrations remain disabled/configuration-driven; no endpoint fabricates third-party provider behavior.
 
+
+
+## Analytics
+
+Authenticated clients may batch up to 50 events with `POST /api/v1/analytics/events`. Event names are restricted to letters, numbers, `_.:-`; sensitive fields such as passwords, tokens, secrets, authorization headers and message content are rejected from event properties. Owner sessions can read aggregated analytics from `GET /api/v1/admin/analytics/overview?days=30`.
