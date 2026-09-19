@@ -65,17 +65,36 @@ const QUALITY_PRESETS = {
   "1080p60": { width: 1920, height: 1080, frameRate: 60 }
 };
 
-function api(url, opts = {}) {
-  opts.headers = {
+let refreshInFlight=null;
+async function refreshAccountSession(){
+  if(!token||refreshInFlight)return refreshInFlight||false;
+  refreshInFlight=(async()=>{
+    try{
+      const r=await fetch("/api/v1/auth/refresh",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"}});
+      if(!r.ok)return false;
+      const data=await r.json().catch(()=>({}));
+      if(!data.token)return false;
+      saveAccountSession(data);
+      return true;
+    }catch{return false}
+    finally{refreshInFlight=null}
+  })();
+  return refreshInFlight;
+}
+async function api(url, opts = {}, allowRefresh = true) {
+  const headers={
     ...(opts.headers || {}),
     ...(token ? { Authorization: "Bearer " + token } : {})
   };
-  if (opts.body && !opts.headers["Content-Type"]) opts.headers["Content-Type"] = "application/json";
-  return fetch(url, opts).then(async r => {
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || "Request failed");
-    return data;
-  });
+  if (opts.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+  const request={...opts,headers,credentials:"same-origin"};
+  const response=await fetch(url,request);
+  if(response.status===401 && allowRefresh && token && !String(url).includes("/api/v1/auth/refresh")){
+    if(await refreshAccountSession()) return api(url,opts,false);
+  }
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(data.error || "Request failed");
+  return data;
 }
 function fmt(ts) { return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
 function avatar(name) { return (name || "G").slice(0, 1).toUpperCase(); }
@@ -196,7 +215,7 @@ function showAuthScreen(mode="signin", legacy=false){
     if(submit){submit.disabled=true;submit.classList.add("loading");submit.querySelector("span").textContent=convertMode?"Securing…":mode==="signin"?"Signing in…":"Creating…";}
     if(error)error.textContent="";
     try{
-      const endpoint=convertMode?"/api/auth/convert-legacy":mode==="signin"?"/api/auth/login":"/api/auth/register";
+      const endpoint=convertMode?"/api/auth/convert-legacy":mode==="signin"?"/api/v1/auth/login":"/api/v1/auth/register";
       const body=convertMode?{username,password}:{username,password,...(mode==="register"?{displayName}:{})};
       const data=await api(endpoint,{method:"POST",body:JSON.stringify(body)});
       saveAccountSession(data);
@@ -3527,7 +3546,37 @@ function renderSettingsPage(section="appearance"){
   }else if(section==="performance"){
     card.innerHTML=setting("Performance mode","Reduce expensive visual effects.",false,"perf-mode")+setting("Lazy media","Load rich media on demand.",true,"perf-lazy");
   }else if(section==="security"){
-    card.innerHTML='<h3>Security center</h3><p>Current guest session and moderation visibility.</p><div class="list-card"><div class="list-row"><div class="chip">✓</div><div><strong>Guest session</strong><span>Signed session token</span></div><span>Active</span></div><div class="list-row"><div class="chip">◎</div><div><strong>Persistent storage</strong><span>PostgreSQL</span></div><span>Pending setup</span></div></div>';
+    card.innerHTML='<h3>Security center</h3><p>Manage active sessions and see how this account is connected to ORBIT.</p><div class="list-card" id="orbit-session-list"><div class="content-card"><h4>Loading sessions…</h4><p>Checking active devices.</p></div></div><div class="setting-row"><div><strong>Session policy</strong><span>New account sessions use short-lived access tokens with revocable refresh sessions.</span></div><span class="setting-status-badge">V1 SECURITY</span></div><div class="setting-row"><div><strong>Sign out other devices</strong><span>Immediately revoke every other active session.</span></div><button class="primary" id="revoke-other-sessions">Revoke others</button></div>';
+    (async()=>{
+      try{
+        const data=await api("/api/v1/auth/sessions");
+        const list=data.sessions||[];
+        const current=String(data.currentSessionId||"");
+        const root=$("#orbit-session-list");
+        root.innerHTML=list.length?list.map(session=>{
+          const active=String(session.id)===current;
+          const when=new Date(session.lastSeenAt||session.createdAt).toLocaleString();
+          return '<div class="list-row"><div class="chip">'+(active?"●":"◎")+'</div><div><strong>'+escapeHtml(active?"This device":"Other device")+'</strong><span>'+escapeHtml(session.device||"Unknown browser")+' · '+escapeHtml(session.ip||"unknown IP")+' · last active '+escapeHtml(when)+'</span></div><span>'+(active?"Current":'<button class="session-revoke" data-session-id="'+escapeHtml(session.id)+'">Revoke</button>')+'</span></div>';
+        }).join(""):'<div class="content-card"><h4>No active account sessions</h4><p>You are using a legacy guest session or the account has no v1 session yet.</p></div>';
+        document.querySelectorAll(".session-revoke").forEach(btn=>btn.onclick=async()=>{
+          try{
+            await api("/api/v1/auth/sessions/"+encodeURIComponent(btn.dataset.sessionId)+"/revoke",{method:"POST",body:"{}"});
+            orbitToast("Session revoked","That device can no longer use its ORBIT account session.","success");
+            renderSettingsPage("security");
+          }catch(err){orbitToast("Could not revoke session",err.message,"error")}
+        });
+        $("#revoke-other-sessions")?.addEventListener("click",async()=>{
+          try{
+            const result=await api("/api/v1/auth/sessions/revoke-others",{method:"POST",body:"{}"});
+            orbitToast("Other sessions revoked",String(result.revoked||0)+" session(s) were signed out.","success");
+            renderSettingsPage("security");
+          }catch(err){orbitToast("Could not revoke sessions",err.message,"error")}
+        });
+      }catch{
+        $("#orbit-session-list").innerHTML='<div class="content-card"><h4>Legacy guest session</h4><p>Account security sessions activate after you sign in with an ORBIT account. Your current connection is still protected by the compatibility session system.</p></div>';
+        $("#revoke-other-sessions")?.setAttribute("disabled","disabled");
+      }
+    })();
   }else if(section==="advanced"){
     card.innerHTML='<h3>Advanced</h3><p>Platform owner tools and advanced Orbit controls.</p>'+setting("Command palette","Enable Ctrl+K.",true,"advanced-palette")+setting("Developer diagnostics","Expose realtime diagnostics.",false,"advanced-dev")+'<div class="setting-row owner-console-row"><div><strong>ORBIT Owner Command</strong><span>Platform-level control for users, messages, calls, communities and security. Protected by a separate owner key.</span></div><button type="button" class="primary" id="open-owner-console">Open Owner Command</button></div>';
     $("#open-owner-console").onclick=()=>{location.href="/owner.html"};
