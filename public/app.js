@@ -1716,14 +1716,24 @@ function renderHomePage(){
         '</button>';
       }).join(""):'<div class="od-dm-empty">No direct messages yet.</div>';
       const dmListRoot=$("#od-dm-list");
-      if(dmListRoot && !dmListRoot.dataset.bound){
-        dmListRoot.dataset.bound="1";
-        dmListRoot.addEventListener("click",e=>{
-          const btn=e.target.closest("[data-od-dm]");
-          if(!btn || !dmListRoot.contains(btn))return;
-          e.preventDefault();
-          e.stopPropagation();
-          openHomeDirectMessage(btn.dataset.odDm);
+      if(dmListRoot){
+        dmListRoot.style.pointerEvents="auto";
+        dmListRoot.querySelectorAll("[data-od-dm]").forEach(btn=>{
+          btn.style.pointerEvents="auto";
+          btn.onpointerdown=e=>{
+            e.preventDefault();
+            e.stopPropagation();
+          };
+          btn.onpointerup=e=>{
+            e.preventDefault();
+            e.stopPropagation();
+            openHomeDirectMessage(btn.dataset.odDm);
+          };
+          btn.onclick=e=>{
+            e.preventDefault();
+            e.stopPropagation();
+            openHomeDirectMessage(btn.dataset.odDm);
+          };
         });
       }
     };
