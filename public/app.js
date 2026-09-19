@@ -1696,6 +1696,7 @@ function renderHomePage(){
     const incoming=friendsData.incoming||[];
     const outgoing=friendsData.outgoing||[];
     const dms=dmData.dms||[];
+    dmState.list=dms;
 
     $("#od-pending-badge").textContent=String(incoming.length);
     $("#od-suggestion-badge").textContent=String(suggestions.length);
@@ -1718,17 +1719,14 @@ function renderHomePage(){
       const dmListRoot=$("#od-dm-list");
       if(dmListRoot){
         dmListRoot.style.pointerEvents="auto";
-        dmListRoot.querySelectorAll("[data-od-dm]").forEach(btn=>{
-          const open=()=>{
-            const id=btn.dataset.odDm;
-            if(!id)return;
-            openDMFromAnywhere(id);
-          };
-          btn.style.pointerEvents="auto";
-          btn.onpointerdown=e=>{e.preventDefault();e.stopPropagation()};
-          btn.onpointerup=e=>{e.preventDefault();e.stopPropagation();open()};
-          btn.onclick=e=>{e.preventDefault();e.stopPropagation();open()};
-        });
+        dmListRoot.onclick=e=>{
+          const btn=e.target.closest("[data-od-dm]");
+          if(!btn || !dmListRoot.contains(btn))return;
+          e.preventDefault();
+          e.stopPropagation();
+          const id=btn.dataset.odDm;
+          if(id) window.openHomeDirectMessage?.(id);
+        };
       }
     };
 
@@ -2020,9 +2018,12 @@ async function openHomeDirectMessage(dmId){
 
     document.querySelectorAll("[data-od-social]").forEach(btn=>btn.classList.toggle("active",btn.dataset.odSocial==="dms"));
     document.querySelectorAll("[data-od-dm]").forEach(btn=>btn.classList.toggle("active",String(btn.dataset.odDm)===String(dmId)));
-  }catch(e){orbitToast("Direct message",e.message,"error")}
+  }catch(e){
+    console.error("openHomeDirectMessage failed",e);
+    orbitToast("Direct message",e.message||"Could not open chat.","error");
+  }
 }
-
+window.openHomeDirectMessage=openHomeDirectMessage;
 
 function renderHomeDirectMessageFeed(scrollBottom){
   const feed=$("#od-home-dm-messages");
@@ -3369,22 +3370,23 @@ closeServerSidebar();
     if(!id)return;
     try{
       const onHome=orbitUI.view==="home" && $("#od-home-main");
-      orbitUI.view="home";
-      document.body.classList.add("orbit-discord-home");
-      $("#global-page")?.classList.add("discord-home-active");
-      $("#global-page")?.classList.remove("hidden");
-      $("#chat-view")?.classList.add("hidden");
-
-      if(!onHome) renderHomePage();
-
+      if(!onHome){
+        orbitUI.view="home";
+        document.body.classList.add("orbit-discord-home");
+        $("#global-page")?.classList.add("discord-home-active");
+        $("#global-page")?.classList.remove("hidden");
+        $("#chat-view")?.classList.add("hidden");
+        renderHomePage();
+        await new Promise(resolve=>requestAnimationFrame(resolve));
+      }
       if(!dmState.list.length){
         const d=await api("/api/dms");
         dmState.list=d.dms||[];
       }
-      const exists=dmState.list.some(x=>String(x.id)===String(id));
-      if(!exists)return orbitToast("Direct message","Conversation not found.","error");
-
-      await openHomeDirectMessage(id);
+      if(!dmState.list.some(x=>String(x.id)===String(id))){
+        return orbitToast("Direct message","Conversation not found.","error");
+      }
+      await window.openHomeDirectMessage(id);
     }catch(err){
       console.error("openDMFromAnywhere failed",err);
       orbitToast("Direct message",err.message||"Could not open chat.","error");
@@ -3410,4 +3412,15 @@ closeServerSidebar();
   }
   scrub();
   new MutationObserver(scrub).observe(document.body,{subtree:true,childList:true});
+})();
+
+(function installHomeDMClickGuard(){
+  document.addEventListener("click",function(e){
+    const btn=e.target.closest && e.target.closest(".od-dm-row[data-od-dm]");
+    if(!btn)return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const id=btn.dataset.odDm;
+    if(id) window.openHomeDirectMessage?.(id);
+  },true);
 })();
