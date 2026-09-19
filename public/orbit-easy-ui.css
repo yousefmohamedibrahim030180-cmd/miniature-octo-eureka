@@ -215,8 +215,7 @@
 }
 
 /* Hide empty voice section chrome when no voice channels exist. */
-.voice-section-title:has(+ .voice-list:empty),
-.voice-section-title:has(+ .voice-list:not(:has(*))){display:none!important}
+.voice-section-title:has(+ .voice-list:empty){display:none!important}
 
 /* Tablet. */
 @media(max-width:1050px){
