@@ -651,19 +651,74 @@ async function selectServer(serverItem) {
   if (firstVisibleChannel) await selectChannel(firstVisibleChannel);
   await loadMembers();
 }
+function channelIcon(type){
+  return ({announcement:"!",forum:"≡",media:"▧",video:"▣",stage:"◉",stream:"▶",voice:"◉",text:"#"}[String(type||"text")]||"#");
+}
+function isRealtimeChannel(type){return ["voice","video","stage","stream"].includes(String(type))}
+async function renderForumChannel(channel){
+  $("#messages").innerHTML='<div class="orbit-forum-toolbar"><div><span class="eyebrow">FORUM</span><h2>'+escapeHtml(channel.name)+'</h2><p>'+escapeHtml(channel.topic||"Community discussion")+'</p></div><button class="primary" id="forum-new-post">New post</button></div><div id="orbit-forum-list" class="orbit-forum-list"><div class="os-empty"><strong>Loading discussions…</strong><span>Fetching live forum posts.</span></div></div>';
+  $("#composer")?.classList.add("hidden");
+  $("#forum-new-post").onclick=()=>openForumComposer(channel);
+  try{
+    const data=await api("/api/v1/channels/"+encodeURIComponent(channel.id)+"/posts?limit=40");
+    const rows=data.posts||[];
+    const root=$("#orbit-forum-list");
+    root.innerHTML=rows.length?rows.map(renderForumPostCard).join(""):'<div class="os-empty"><strong>No discussions yet</strong><span>Start the first conversation in this forum.</span></div>';
+    root.querySelectorAll("[data-forum-post]").forEach(btn=>btn.onclick=()=>openForumPost(btn.dataset.forumPost));
+  }catch(err){
+    $("#orbit-forum-list").innerHTML='<div class="os-empty"><strong>Forum unavailable</strong><span>'+escapeHtml(err.message)+'</span></div>';
+  }
+}
+function renderForumPostCard(post){
+  const reactions=Object.entries(post.reactions||{}).slice(0,4).map(([emoji,users])=>'<span>'+escapeHtml(emoji)+' '+(Array.isArray(users)?users.length:0)+'</span>').join("");
+  return '<article class="orbit-forum-card" data-forum-post="'+escapeHtml(post.id)+'"><div class="orbit-forum-card-main"><div class="eyebrow">'+(post.pinned?"PINNED · ":"")+'DISCUSSION</div><h3>'+escapeHtml(post.title)+'</h3><p>'+escapeHtml(post.body).slice(0,260)+'</p><div class="orbit-forum-meta"><span>'+escapeHtml(post.author?.display_name||post.author?.username||"Member")+'</span><span>'+Number(post.commentCount||0)+' replies</span><span>'+new Date(post.updatedAt||post.createdAt).toLocaleString()+'</span>'+reactions+'</div></div><div class="orbit-forum-open">Open →</div></article>';
+}
+function openForumComposer(channel){
+  openModal("Create forum post",
+    '<div class="orbit-form-stack"><input id="forum-post-title" maxlength="180" placeholder="Post title"><textarea id="forum-post-body" maxlength="10000" placeholder="Start the discussion..."></textarea><input id="forum-post-tags" maxlength="240" placeholder="Tags (comma separated)"><button class="primary" id="forum-post-submit">Publish post</button></div>');
+  $("#forum-post-submit").onclick=async()=>{
+    const title=$("#forum-post-title").value.trim(), body=$("#forum-post-body").value.trim(), tags=$("#forum-post-tags").value.split(",").map(x=>x.trim()).filter(Boolean);
+    if(!title||!body)return orbitToast("Forum post","Title and body are required.","error");
+    try{
+      await api("/api/v1/channels/"+encodeURIComponent(channel.id)+"/posts",{method:"POST",body:JSON.stringify({title,body,tags})});
+      closeModal();
+      await renderForumChannel(channel);
+      orbitToast("Post published","Your discussion is now live.","success");
+    }catch(err){orbitToast("Post failed",err.message,"error")}
+  };
+}
+async function openForumPost(postId){
+  try{
+    const postData=await api("/api/v1/posts/"+encodeURIComponent(postId)+"/comments");
+    const post=postData?.post||memory;
+    const postMeta=await api("/api/v1/channels/"+encodeURIComponent(currentChannel.id)+"/posts?limit=50");
+    const found=(postMeta.posts||[]).find(x=>String(x.id)===String(postId));
+    if(!found)return;
+    const comments=postData.comments||[];
+    openModal(found.title,
+      '<div class="orbit-forum-detail"><p>'+escapeHtml(found.body)+'</p><div class="orbit-forum-meta"><span>'+escapeHtml(found.author?.display_name||found.author?.username||"Member")+'</span><span>'+comments.length+' replies</span></div><div class="orbit-forum-comments">'+(comments.length?comments.map(c=>'<div class="orbit-forum-comment"><strong>'+escapeHtml(c.author?.display_name||c.author?.username||"Member")+'</strong><p>'+escapeHtml(c.body)+'</p></div>').join(""):'<div class="os-empty"><span>No replies yet.</span></div>')+'</div><textarea id="forum-comment-body" maxlength="4000" placeholder="Reply to this discussion..."></textarea><button class="primary" id="forum-comment-submit">Reply</button></div>');
+    $("#forum-comment-submit").onclick=async()=>{
+      const body=$("#forum-comment-body").value.trim(); if(!body)return;
+      try{await api("/api/v1/posts/"+encodeURIComponent(postId)+"/comments",{method:"POST",body:JSON.stringify({body})});closeModal();await openForumPost(postId);orbitToast("Reply posted","Your reply is live.","success")}
+      catch(err){orbitToast("Reply failed",err.message,"error")}
+    };
+  }catch(err){orbitToast("Forum post",err.message,"error")}
+}
+
 function renderChannels() {
-  const visibleTextChannels = channels.filter(c => c.type !== "voice" && String(c.name||"").trim().toLowerCase() !== "notifications");
+  const visibleTextChannels = channels.filter(c => !isRealtimeChannel(c.type) && String(c.name||"").trim().toLowerCase() !== "notifications");
   $("#channel-list").innerHTML = visibleTextChannels.map(c => {
     const unread = Number(unreadChannels[c.id] || 0);
-    const icon = c.type === "announcement" ? "!" : "#";
+    const icon = channelIcon(c.type);
+    const tag = c.type==="forum"?"FORUM":c.type==="announcement"?"ANN":c.type==="media"?"MEDIA":"TEXT";
     return '<button class="channel ' + (String(currentChannel?.id) === String(c.id) ? "active" : "") +
-      '" data-id="' + c.id + '"><span class="hash">' + icon + '</span><span class="channel-name-text">' + escapeHtml(c.name) + '</span>' +
+      '" data-id="' + c.id + '" title="'+escapeHtml(tag)+'"><span class="hash channel-type-icon">' + icon + '</span><span class="channel-name-text">' + escapeHtml(c.name) + '</span>' +
       (unread ? '<b class="channel-unread">' + (unread > 99 ? "99+" : unread) + '</b>' : '') +
       '</button>';
   }).join("");
-  $("#voice-channel-list").innerHTML = channels.filter(c => c.type === "voice").map(c =>
-    '<button class="channel voice-channel" data-id="' + c.id + '"><span class="voice-icon">◉</span><span class="channel-name-text">' +
-    escapeHtml(c.name) + '</span></button>'
+  $("#voice-channel-list").innerHTML = channels.filter(c => isRealtimeChannel(c.type)).map(c =>
+    '<button class="channel voice-channel" data-id="' + c.id + '"><span class="voice-icon">' + channelIcon(c.type) + '</span><span class="channel-name-text">' +
+    escapeHtml(c.name) + '</span><small class="channel-kind-label">'+escapeHtml(String(c.type).toUpperCase())+'</small></button>'
   ).join("");
   document.querySelectorAll(".channel").forEach(btn => {
     btn.onclick = () => {
@@ -675,15 +730,15 @@ function renderChannels() {
 }
 async function selectChannel(channel) {
   if (!channel) return;
-  if (channel.type === "voice") {
+  if (isRealtimeChannel(channel.type)) {
     if (callState.active && String(callState.roomId) === String(channel.id)) return;
     if (callState.active) leaveCall();
     currentChannel = channel;
     renderChannels();
     $("#channel-name").textContent = channel.name;
-    $("#channel-meta").textContent = "Voice room";
-    $("#message").placeholder = "Voice room";
-    await startCall("voice");
+    $("#channel-meta").textContent = channel.type === "stage" ? "Stage room" : channel.type === "stream" ? "Live stream room" : channel.type === "video" ? "Video room" : "Voice room";
+    $("#message").placeholder = "Live room";
+    await startCall(channel.type==="voice"||channel.type==="stage" ? "voice" : "video");
     return;
   }
   if (callState.active && String(callState.roomId) !== String(channel.id)) leaveCall();
@@ -692,13 +747,18 @@ async function selectChannel(channel) {
   localStorage.setItem("orbit_unread_channels", JSON.stringify(unreadChannels));
   renderChannels();
   $("#channel-name").textContent = channel.name;
-  $("#channel-meta").textContent = channel.type === "announcement" ? "Announcement channel" : "Realtime conversation";
-  $("#message").placeholder = "Message #" + channel.name;
-  $("#messages").innerHTML = "";
-  const data = await api("/api/channels/" + channel.id + "/messages");
-  data.messages.forEach(appendMessage);
-  if (socket) socket.emit("channel:join", channel.id);
-  $("#messages").scrollTop = $("#messages").scrollHeight;
+  $("#channel-meta").textContent = channel.type === "announcement" ? "Announcement channel" : channel.type === "forum" ? "Forum discussions" : channel.type === "media" ? "Media channel" : "Realtime conversation";
+  if(channel.type==="forum"){
+    await renderForumChannel(channel);
+  }else{
+    $("#composer")?.classList.remove("hidden");
+    $("#message").placeholder = "Message #" + channel.name;
+    $("#messages").innerHTML = "";
+    const data = await api("/api/channels/" + channel.id + "/messages");
+    data.messages.forEach(appendMessage);
+    if (socket) socket.emit("channel:join", channel.id);
+    $("#messages").scrollTop = $("#messages").scrollHeight;
+  }
 }
 function renderMessageAttachment(att){
   if(!att?.id) return "";
