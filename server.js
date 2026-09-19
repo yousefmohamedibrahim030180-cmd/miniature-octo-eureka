@@ -284,6 +284,7 @@ function serverSettings(server) {
   theme.description=String(theme.description||"").slice(0,500);
   theme.welcomeMessage=String(theme.welcomeMessage||"").slice(0,700);
   if (!server.settings.nexusWorld || typeof server.settings.nexusWorld !== "object") server.settings.nexusWorld = null;
+  if (!server.settings.nexusWorld || typeof server.settings.nexusWorld !== "object") server.settings.nexusWorld = null;
   if (!Array.isArray(server.bannedUserIds)) server.bannedUserIds = [];
   return server.settings;
 }
