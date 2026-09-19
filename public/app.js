@@ -3662,7 +3662,35 @@ function renderSettingsPage(section="appearance"){
   }else if(section==="privacy"){
     card.innerHTML=setting("Friend requests","Allow requests from guests.",true,"privacy-friends")+setting("Direct messages","Allow private messages from shared communities.",true,"privacy-dms")+setting("Read receipts","Show when messages are opened.",false,"privacy-receipts");
   }else if(section==="notifications"){
-    card.innerHTML=setting("Desktop alerts","Show important alerts.",true,"notify-desktop")+setting("Mentions","Notify on mentions.",true,"notify-mentions")+setting("Calls","Notify for incoming calls.",true,"notify-calls");
+    card.innerHTML='<h3>Notifications</h3><p>Choose what ORBIT should notify you about. Preferences are saved to your account.</p><div id="orbit-notification-preferences"><div class="content-card"><h4>Loading preferences…</h4></div></div>';
+    (async()=>{
+      const host=$("#orbit-notification-preferences");
+      try{
+        const data=await api("/api/v1/me/preferences");
+        const n=data.notifications||{};
+        const pref=[["mentions","Mentions","Notify when someone mentions you."],["directMessages","Direct messages","Notify when a new private message arrives."],["friendRequests","Friend requests","Notify when someone sends you a friend request."],["replies","Replies","Notify when someone replies to your message or forum post."],["events","Events","Notify about community events and RSVP activity."],["streams","Live streams","Notify when a creator or community goes live."],["security","Security","Keep account and security notifications enabled."]];
+        host.innerHTML=pref.map(x=>setting(x[1],x[2],n[x[0]]!==false,"server-notify-"+x[0])).join("");
+        document.querySelectorAll("[data-setting-toggle^='server-notify-']").forEach(btn=>btn.onclick=async()=>{
+          btn.classList.toggle("on");
+          const key=btn.dataset.settingToggle.replace("server-notify-","");
+          const payload={notifications:{}}; payload.notifications[key]=btn.classList.contains("on");
+          try{
+            const saved=await api("/api/v1/me/preferences",{method:"PATCH",body:JSON.stringify(payload)});
+            const state=saved.notifications||{};
+            document.querySelectorAll("[data-setting-toggle^='server-notify-']").forEach(other=>{
+              const otherKey=other.dataset.settingToggle.replace("server-notify-","");
+              other.classList.toggle("on",state[otherKey]!==false);
+            });
+            orbitToast("Notification preference saved","This preference follows your account.","success");
+          }catch(err){
+            btn.classList.toggle("on");
+            orbitToast("Could not save preference",err.message,"error");
+          }
+        });
+      }catch(err){
+        host.innerHTML='<div class="content-card"><h4>Notification preferences unavailable</h4><p>'+escapeHtml(err.message)+'</p></div>';
+      }
+    })();
   }else if(section==="accessibility"){
     card.innerHTML=setting("Reduced motion","Minimize animation.",false,"a11y-motion")+setting("High contrast","Increase contrast.",false,"a11y-contrast")+setting("Larger text","Scale the interface.",false,"a11y-large");
   }else if(section==="performance"){
