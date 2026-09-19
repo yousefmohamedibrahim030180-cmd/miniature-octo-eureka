@@ -61,8 +61,7 @@ const memory = {
   userSettings: new Map(),
   notificationPreferences: new Map(),
   apiKeys: new Map(),
-  developerApplications: new Map(),
-  analyticsEvents: []
+  developerApplications: new Map()
 };
 
 const CALL_EVENT_PREFIX = "call:";
@@ -86,19 +85,6 @@ let persistPending = false;
 let persistMode = "memory";
 
 function now() { return new Date().toISOString(); }
-function trackEvent(name,userId=null,properties={}){
-  const eventName=String(name||"").trim().slice(0,120);
-  if(!eventName)return;
-  const safe={};
-  for(const [key,value] of Object.entries(properties||{}).slice(0,30)){
-    if(["password","token","secret","authorization","content"].includes(String(key).toLowerCase()))continue;
-    const textValue=typeof value==="string"?value.slice(0,300):value;
-    safe[String(key).slice(0,80)]=textValue;
-  }
-  memory.analyticsEvents.push({id:id("ae"),name:eventName,userId:userId?String(userId):null,properties:safe,occurredAt:now()});
-  if(memory.analyticsEvents.length>10000)memory.analyticsEvents=memory.analyticsEvents.slice(-10000);
-  schedulePersist();
-}
 
 function serializeMemory() {
   return {
@@ -129,8 +115,7 @@ function serializeMemory() {
     posts: [...memory.posts.entries()],
     postComments: [...memory.postComments.entries()],
     apiKeys: [...memory.apiKeys.entries()],
-    developerApplications: [...memory.developerApplications.entries()],
-    analyticsEvents: memory.analyticsEvents
+    developerApplications: [...memory.developerApplications.entries()]
   };
 }
 
@@ -162,7 +147,6 @@ function hydrateMemory(data) {
   restoreMap("postComments");
   restoreMap("apiKeys");
   restoreMap("developerApplications");
-  memory.analyticsEvents = Array.isArray(data.analyticsEvents) ? data.analyticsEvents.slice(-10000) : [];
 }
 
 async function sidecarRequest(method, body) {
@@ -727,40 +711,6 @@ app.post("/api/v1/sdk/channels/:id/messages",authApiKey,requireApiScope("message
   res.status(201).json({message});
 });
 
-app.post("/api/v1/analytics/events",authV1,(req,res)=>{
-  const events=Array.isArray(req.body?.events)?req.body.events:[req.body];
-  let accepted=0;
-  for(const event of events.slice(0,50)){
-    const name=String(event?.name||"").trim();
-    if(!/^[a-zA-Z0-9_.:-]{2,120}$/.test(name))continue;
-    trackEvent(name,req.user.id,event?.properties||{});
-    accepted++;
-  }
-  res.status(202).json({accepted});
-});
-
-app.get("/api/v1/admin/analytics/overview",authV1,(req,res)=>{
-  if(!requireOwner(req,res))return;
-  const windowDays=Math.max(1,Math.min(90,Number(req.query.days||30)));
-  const since=Date.now()-windowDays*24*60*60*1000;
-  const recent=memory.analyticsEvents.filter(e=>new Date(e.occurredAt).getTime()>=since);
-  const counts={};
-  for(const event of recent)counts[event.name]=(counts[event.name]||0)+1;
-  const uniqueUsers=new Set(recent.map(e=>e.userId).filter(Boolean)).size;
-  const daily={};
-  for(const event of recent){
-    const day=String(event.occurredAt).slice(0,10);
-    daily[day]=(daily[day]||0)+1;
-  }
-  res.json({
-    windowDays,
-    totalEvents:recent.length,
-    uniqueUsers,
-    topEvents:Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,25).map(([name,count])=>({name,count})),
-    daily:Object.entries(daily).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count}))
-  });
-});
-
 app.get("/api/v1/platform/manifest", (req, res) => {
   res.json({
     ...platformManifest,
@@ -871,7 +821,6 @@ app.post("/api/v1/auth/register", async (req,res)=>{
   const user={id:id("user"),username,displayName,passwordHash,accountCreatedAt:now(),status:"online",activity:"Online",activityType:"custom",bio:"",createdAt:now(),avatarUrl:null,avatarDecoration:"none",avatarDecorationUrl:null,stats:{messages:0,voiceJoins:0,serversCreated:0,friends:0}};
   memory.users.set(user.id,user);
   ensureDefaultServer(user);
-  trackEvent("auth.register",user.id,{method:"password"});
   const issued=v1Sessions.issue(user,req);
   setRefreshCookie(res,issued.refreshToken,env.nodeEnv==="production");
   schedulePersist();
@@ -902,7 +851,6 @@ app.post("/api/v1/auth/login", async (req,res)=>{
   }
   accountLoginAttempts.delete(key);
   user.status="online";user.activity="Online";
-  trackEvent("auth.login",user.id,{method:"password",twoFactor:Boolean(user.twoFactor?.enabled)});
   const issued=v1Sessions.issue(user,req);
   setRefreshCookie(res,issued.refreshToken,env.nodeEnv==="production");
   schedulePersist();
