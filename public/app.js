@@ -2848,23 +2848,52 @@ async function renderAIPage(){
       }catch(err){orbitToast("ORBIT failed",err.message,"error")}finally{btn.disabled=false}
     };
   }catch(err){$("#page-body").innerHTML='<div class="os-empty"><strong>Could not load ORBIT</strong><span>'+escapeHtml(err.message)+'</span></div>'}
-}function renderDiscoverPage(){
-  $("#page-actions").innerHTML='<button id="discover-search-btn">Search</button>';
-  const cards=[
-    ["Nebula Arena","Gaming","12.4k members","1.2k online"],
-    ["Build in Public","Technology","7.8k members","620 online"],
-    ["Creative Lab","Art & Media","4.2k members","402 online"],
-    ["Code Foundry","Programming","9.1k members","880 online"],
-    ["Study Hall","Education","5.6k members","301 online"],
-    ["Night Shift","Community","3.3k members","288 online"]
-  ];
-  $("#page-body").innerHTML='<div class="card-grid">'+cards.map(c=>
-    '<div class="hero-card"><span class="eyebrow">'+c[1].toUpperCase()+'</span><h2>'+c[0]+'</h2><p>Public community preview. Connect it to a real server later from Control Center.</p><span class="chip">'+c[2]+'</span><span class="chip">'+c[3]+'</span><button class="hero-action discover-view" data-name="'+escapeHtml(c[0])+'">Open preview</button></div>'
-  ).join("")+'</div>';
-  $("#discover-search-btn").onclick=openCommandPalette;
-  document.querySelectorAll(".discover-view").forEach(b=>b.onclick=()=>orbitToast("Community preview",b.dataset.name));
+}async function renderDiscoverPage(query=""){
+  $("#page-actions").innerHTML='<label class="platform-inline-search"><span>⌕</span><input id="discover-query" value="'+escapeHtml(query)+'" placeholder="Search communities..."><button id="discover-search-btn">Search</button></label><button id="discover-refresh-btn">Refresh</button>';
+  $("#page-body").innerHTML='<div class="os-empty"><strong>Loading communities…</strong><span>Fetching live communities from ORBIT.</span></div>';
+  const search=async()=>{
+    const q=$("#discover-query")?.value.trim()||"";
+    renderDiscoverPage(q);
+  };
+  $("#discover-search-btn").onclick=search;
+  $("#discover-query").onkeydown=e=>{if(e.key==="Enter")search()};
+  $("#discover-refresh-btn").onclick=()=>renderDiscoverPage($("#discover-query")?.value.trim()||"");
+  try{
+    const data=await api("/api/discover/communities?limit=60"+(query?"&q="+encodeURIComponent(query):""));
+    const communities=data.communities||[];
+    const cards=communities.map(c=>{
+      const joined=Boolean(c.role);
+      return '<article class="platform-community-card">'+
+        '<div class="platform-community-orb">'+escapeHtml(String(c.name||"O").slice(0,2).toUpperCase())+'</div>'+
+        '<div class="platform-community-main"><div class="eyebrow">COMMUNITY</div><h3>'+escapeHtml(c.name)+'</h3>'+
+        '<p>'+Number(c.memberCount||0)+' members · '+Number(c.onlineCount||0)+' online · '+Number(c.channelCount||0)+' channels</p>'+
+        '<div class="platform-community-meta"><span>'+escapeHtml(joined?String(c.role).toUpperCase():"PUBLIC")+'</span><span>'+escapeHtml(c.type||"community")+'</span></div></div>'+
+        '<div class="platform-community-action">'+
+        '<button class="hero-action" data-community-open="'+escapeHtml(c.id)+'">'+(joined?"Open":"Join")+'</button>'+
+        '</div></article>';
+    }).join("");
+    $("#page-body").innerHTML=
+      '<div class="platform-discover-hero"><div><span class="eyebrow">DISCOVER ORBIT</span><h2>Real communities. Live data.</h2><p>Browse communities currently known to ORBIT. Joining changes your real membership and appears in your navigation immediately.</p></div><div class="os-stat"><strong>'+communities.length+'</strong><span>available</span></div></div>'+
+      '<div class="platform-community-grid">'+(cards||'<div class="os-empty"><strong>No communities found</strong><span>Try a different search or create a community of your own.</span></div>')+'</div>';
+    document.querySelectorAll("[data-community-open]").forEach(btn=>btn.onclick=async()=>{
+      const idValue=btn.dataset.communityOpen;
+      try{
+        const community=communities.find(c=>String(c.id)===String(idValue));
+        if(!community)return;
+        if(!community.role){
+          await api("/api/servers/"+encodeURIComponent(idValue)+"/join",{method:"POST",body:"{}"});
+          orbitToast("Community joined",community.name+" is now in your navigation.","success");
+          await loadServers();
+        }
+        const target=servers.find(s=>String(s.id)===String(idValue));
+        if(target){await selectServer(target);goChat();}
+        else renderDiscoverPage(query);
+      }catch(err){orbitToast("Community action failed",err.message,"error")}
+    });
+  }catch(err){
+    $("#page-body").innerHTML='<div class="os-empty"><strong>Could not load Discover</strong><span>'+escapeHtml(err.message)+'</span></div>';
+  }
 }
-
 function formatDMTime(ts){
   if(!ts)return "";
   const d=new Date(ts), nowDate=new Date();

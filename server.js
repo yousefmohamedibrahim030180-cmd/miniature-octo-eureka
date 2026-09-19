@@ -7,9 +7,14 @@ const { Server } = require("socket.io");
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
 const { pipeline, env: hfEnv } = require("@huggingface/transformers");
+const { applySecurity, createApiLimiter } = require("./platform/security");
+const { env, assertProductionBasics } = require("./platform/config");
+const platformManifest = require("./platform/manifest");
+const { migrate } = require("./db/migrate");
 
 const app = express();
 const server = http.createServer(app);
+app.set("trust proxy", 1);
 const io = new Server(server, {
   cors: { origin: true, credentials: true },
   transports: ["polling"],
@@ -468,6 +473,8 @@ function createGuest(username, existingId) {
   return user;
 }
 
+applySecurity(app);
+app.use("/api", createApiLimiter());
 app.use(express.json({ limit: "6mb" }));
 app.use(express.static(path.join(__dirname, "public"), {
   setHeaders(res) {
@@ -486,12 +493,36 @@ app.get("/health", (req, res) => {
   res.status(200).json({
     ok: true,
     service: "orbit-chat",
+    version: platformManifest.version,
     mode: persistMode,
     db: dbReady,
     users: memory.users.size,
     servers: memory.servers.size,
     calls: [...io.sockets.adapter.rooms.keys()].filter(k => k.startsWith(CALL_EVENT_PREFIX)).length,
-    time: now()
+    time: now(),
+    requestId: req.orbitRequestId || null
+  });
+});
+
+app.get("/readyz", (req, res) => {
+  const persistenceRequired = env.nodeEnv === "production";
+  const ready = !persistenceRequired || dbReady;
+  res.status(ready ? 200 : 503).json({
+    ok: ready,
+    persistence: persistMode,
+    databaseReady: dbReady,
+    requestId: req.orbitRequestId || null
+  });
+});
+
+app.get("/api/v1/platform/manifest", (req, res) => {
+  res.json({
+    ...platformManifest,
+    runtime: {
+      node: process.version,
+      uptime: Math.floor(process.uptime()),
+      persistence: persistMode
+    }
   });
 });
 
@@ -1670,6 +1701,59 @@ app.get("/api/servers", auth, (req, res) => {
   res.json({ servers });
 });
 
+app.get("/api/discover/communities", auth, (req,res)=>{
+  const q=String(req.query.q||"").trim().toLowerCase();
+  const limit=Math.max(1,Math.min(100,Number(req.query.limit||50)));
+  const communities=[...memory.servers.values()]
+    .filter(server=>!server.bannedUserIds?.includes(String(req.user.id)))
+    .filter(server=>!q||String(server.name||"").toLowerCase().includes(q))
+    .map(server=>{
+      const members=[...server.members.keys()].map(idValue=>memory.users.get(String(idValue))).filter(Boolean);
+      const online=members.filter(user=>String(user.status||"").toLowerCase()==="online").length;
+      const textChannels=server.channels.map(idValue=>memory.channels.get(idValue)).filter(c=>c&&c.type!=="voice").length;
+      return {
+        id:server.id,
+        name:server.name,
+        ownerId:server.ownerId,
+        memberCount:server.members.size,
+        onlineCount:online,
+        channelCount:server.channels.length,
+        textChannels,
+        role:server.members.get(String(req.user.id))||null,
+        discoverable:true,
+        type:"community",
+        createdAt:server.createdAt
+      };
+    })
+    .sort((a,b)=>b.onlineCount-a.onlineCount||b.memberCount-a.memberCount)
+    .slice(0,limit);
+  res.json({communities});
+});
+app.get("/api/v1/discover/communities", auth, (req,res)=>{
+  req.url="/api/discover/communities";
+  const q=String(req.query.q||"").trim().toLowerCase();
+  const limit=Math.max(1,Math.min(100,Number(req.query.limit||50)));
+  const communities=[...memory.servers.values()]
+    .filter(server=>!server.bannedUserIds?.includes(String(req.user.id)))
+    .filter(server=>!q||String(server.name||"").toLowerCase().includes(q))
+    .map(server=>({id:server.id,name:server.name,ownerId:server.ownerId,memberCount:server.members.size,onlineCount:[...server.members.keys()].map(idValue=>memory.users.get(String(idValue))).filter(Boolean).filter(u=>String(u.status||"").toLowerCase()==="online").length,role:server.members.get(String(req.user.id))||null,discoverable:true,type:"community",createdAt:server.createdAt}))
+    .sort((a,b)=>b.onlineCount-a.onlineCount||b.memberCount-a.memberCount)
+    .slice(0,limit);
+  res.json({communities});
+});
+app.post("/api/servers/:id/join", auth, (req,res)=>{
+  const server=memory.servers.get(String(req.params.id));
+  if(!server) return res.status(404).json({error:"Community not found"});
+  if(isServerBanned(server,req.user.id)) return res.status(403).json({error:"You are banned from this community"});
+  if(!server.members.has(String(req.user.id))){
+    server.members.set(String(req.user.id),"member");
+    audit(req.user.id,"COMMUNITY_JOIN",server.id,{serverId:server.id});
+    emitToServer(server.id,"member:joined",{user:publicUser(req.user),serverId:server.id});
+    schedulePersist();
+  }
+  res.json({ok:true,server:{id:server.id,name:server.name,role:server.members.get(String(req.user.id)),default_channel_id:server.channels[0]||null}});
+});
+
 app.post("/api/servers", auth, (req, res) => {
   const name = cleanName(req.body?.name, "").slice(0, 50);
   if (!name) return res.status(400).json({ error: "Server name is required" });
@@ -2592,6 +2676,11 @@ io.on("connection", socket => {
 });
 
 async function boot() {
+  assertProductionBasics();
+  if (env.autoMigrate) {
+    if (!env.databaseUrl) throw new Error("ORBIT_AUTO_MIGRATE=true requires DATABASE_URL.");
+    await migrate();
+  }
   await initPersistence();
   server.listen(PORT, "0.0.0.0", () => console.log("[orbit] guest mode listening on " + PORT + (dbReady ? " with PostgreSQL" : " in memory mode")));
 }
