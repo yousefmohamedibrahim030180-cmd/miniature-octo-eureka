@@ -2414,7 +2414,6 @@ io.on("connection", socket => {
     if (size > 5000) return;
     const event = { type: safeType, payload: safePayload, user: publicUser(socket.user), serverId: access.server.id, createdAt: now() };
     emitToServer(access.server.id, "nexus:event", event);
-    emitPulse("nexus", event);
   });
 
   socket.on("dm:join", dmId => {
