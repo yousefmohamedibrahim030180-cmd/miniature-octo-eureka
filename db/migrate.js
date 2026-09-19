@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { Pool } = require("pg");
 
-async function main() {
+async function migrate() {
   const url = String(process.env.DATABASE_URL || "").trim();
   if (!url) throw new Error("DATABASE_URL is required to run ORBIT migrations.");
   const pool = new Pool({connectionString:url,max:3,connectionTimeoutMillis:10000,ssl:process.env.DATABASE_SSL === "disable" ? false : {rejectUnauthorized:false}});
@@ -17,4 +17,4 @@ async function main() {
   } catch (error) { await client.query("ROLLBACK"); throw error; }
   finally { client.release(); await pool.end(); }
 }
-main().catch(error=>{console.error("[orbit] migration failed:",error.message);process.exit(1)});
+module.exports = { migrate };\n\nif (require.main === module) migrate().catch(error=>{console.error("[orbit] migration failed:",error.message);process.exit(1)});
