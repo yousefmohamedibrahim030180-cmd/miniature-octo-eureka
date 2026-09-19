@@ -65,17 +65,36 @@ const QUALITY_PRESETS = {
   "1080p60": { width: 1920, height: 1080, frameRate: 60 }
 };
 
-function api(url, opts = {}) {
-  opts.headers = {
+let refreshInFlight=null;
+async function refreshAccountSession(){
+  if(!token||refreshInFlight)return refreshInFlight||false;
+  refreshInFlight=(async()=>{
+    try{
+      const r=await fetch("/api/v1/auth/refresh",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"}});
+      if(!r.ok)return false;
+      const data=await r.json().catch(()=>({}));
+      if(!data.token)return false;
+      saveAccountSession(data);
+      return true;
+    }catch{return false}
+    finally{refreshInFlight=null}
+  })();
+  return refreshInFlight;
+}
+async function api(url, opts = {}, allowRefresh = true) {
+  const headers={
     ...(opts.headers || {}),
     ...(token ? { Authorization: "Bearer " + token } : {})
   };
-  if (opts.body && !opts.headers["Content-Type"]) opts.headers["Content-Type"] = "application/json";
-  return fetch(url, opts).then(async r => {
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || "Request failed");
-    return data;
-  });
+  if (opts.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+  const request={...opts,headers,credentials:"same-origin"};
+  const response=await fetch(url,request);
+  if(response.status===401 && allowRefresh && token && !String(url).includes("/api/v1/auth/refresh")){
+    if(await refreshAccountSession()) return api(url,opts,false);
+  }
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(data.error || "Request failed");
+  return data;
 }
 function fmt(ts) { return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
 function avatar(name) { return (name || "G").slice(0, 1).toUpperCase(); }
@@ -196,7 +215,7 @@ function showAuthScreen(mode="signin", legacy=false){
     if(submit){submit.disabled=true;submit.classList.add("loading");submit.querySelector("span").textContent=convertMode?"Securing…":mode==="signin"?"Signing in…":"Creating…";}
     if(error)error.textContent="";
     try{
-      const endpoint=convertMode?"/api/auth/convert-legacy":mode==="signin"?"/api/auth/login":"/api/auth/register";
+      const endpoint=convertMode?"/api/auth/convert-legacy":mode==="signin"?"/api/v1/auth/login":"/api/v1/auth/register";
       const body=convertMode?{username,password}:{username,password,...(mode==="register"?{displayName}:{})};
       const data=await api(endpoint,{method:"POST",body:JSON.stringify(body)});
       saveAccountSession(data);
