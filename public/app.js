@@ -3427,7 +3427,7 @@ function renderSpacePage(){
 }
 
 function renderSettingsPage(section="appearance"){
-  const sections=[["appearance","Appearance"],["profile","Profile"],["privacy","Privacy"],["voice","Voice & Video"],["sound","Sounds"],["notifications","Notifications"],["accessibility","Accessibility"],["performance","Performance"],["files","Files & Sharing"],["security","Security"],["language","Language"],["advanced","Advanced"]];
+  const sections=[["appearance","Appearance"],["profile","Profile"],["privacy","Privacy"],["voice","Voice & Video"],["sound","Sounds"],["notifications","Notifications"],["accessibility","Accessibility"],["performance","Performance"],["files","Files & Sharing"],["security","Security"],["developer","Developer"],["language","Language"],["advanced","Advanced"]];
   $("#page-actions").innerHTML="";
   $("#page-body").innerHTML='<div class="settings-layout"><nav class="settings-nav">'+sections.map(s=>'<button class="'+(s[0]===section?"active":"")+'" data-settings-section="'+s[0]+'">'+s[1]+'</button>').join("")+'</nav><div id="settings-card" class="settings-card"></div></div>';
   document.querySelectorAll("[data-settings-section]").forEach(b=>b.onclick=()=>renderSettingsPage(b.dataset.settingsSection));
@@ -3768,6 +3768,60 @@ function renderSettingsPage(section="appearance"){
       }catch(err){
         panel.innerHTML='<div class="content-card"><h4>2FA unavailable</h4><p>'+escapeHtml(err.message)+'</p></div>';
       }
+    })();
+  }else if(section==="developer"){
+    card.innerHTML='<div class="developer-head"><div><span class="eyebrow">DEVELOPER PLATFORM</span><h3>Build with ORBIT</h3><p>Create scoped API keys and developer applications. Secrets are shown once and are never displayed again.</p></div><span class="setting-status-badge">API v1</span></div><div id="orbit-developer-panel"><div class="content-card"><h4>Loading developer tools…</h4></div></div>';
+    (async()=>{
+      const root=$("#orbit-developer-panel");
+      const render=async()=>{
+        try{
+          const [keysData,appsData]=await Promise.all([api("/api/v1/developer/api-keys"),api("/api/v1/developer/applications")]);
+          const scopes=keysData.scopes||[];
+          const keys=keysData.keys||[],apps=appsData.applications||[];
+          root.innerHTML=
+            '<div class="developer-section"><div class="developer-section-head"><div><h4>API keys</h4><p>Use scoped keys for server-to-server integrations.</p></div><button class="primary" id="orbit-dev-new-key">Create key</button></div>'+
+            '<div class="developer-list">'+(keys.length?keys.map(k=>'<div class="developer-row"><div><strong>'+escapeHtml(k.name)+'</strong><span>'+escapeHtml((k.scopes||[]).join(" · "))+'</span></div><div><small>'+escapeHtml(k.lastUsedAt?"Last used "+new Date(k.lastUsedAt).toLocaleString():"Never used")+'</small><button class="danger developer-revoke-key" data-key-id="'+escapeHtml(k.id)+'">Revoke</button></div></div>').join(""):'<div class="content-card"><h4>No API keys</h4><p>Create a key only when an integration actually needs API access.</p></div>')+'</div></div>'+
+            '<div class="developer-section"><div class="developer-section-head"><div><h4>Developer applications</h4><p>Client IDs and redirect URIs for future OAuth integrations.</p></div><button class="primary" id="orbit-dev-new-app">Create app</button></div>'+
+            '<div class="developer-list">'+(apps.length?apps.map(app=>'<div class="developer-row"><div><strong>'+escapeHtml(app.name)+'</strong><span>Client ID · '+escapeHtml(app.clientId)+'<br>'+escapeHtml((app.redirectUris||[]).join(" · ")||"No redirect URIs")+'</span></div><div><small>'+escapeHtml(new Date(app.createdAt).toLocaleString())+'</small><button class="danger developer-revoke-app" data-app-id="'+escapeHtml(app.id)+'">Revoke</button></div></div>').join(""):'<div class="content-card"><h4>No applications</h4><p>Create an application when you need OAuth-style integration credentials.</p></div>')+'</div></div>';
+          
+          $("#orbit-dev-new-key").onclick=()=>{
+            openModal("Create API key",'<div class="orbit-form-stack"><input id="orbit-dev-key-name" maxlength="100" placeholder="Key name"><div class="developer-scope-grid">'+scopes.map(scope=>'<label><input type="checkbox" class="orbit-scope" value="'+escapeHtml(scope)+'"> '+escapeHtml(scope)+'</label>').join("")+'</div><button class="primary" id="orbit-dev-key-submit">Create key</button></div>');
+            $("#orbit-dev-key-submit").onclick=async()=>{
+              const name=$("#orbit-dev-key-name").value.trim()||"Integration key";
+              const selected=[...document.querySelectorAll(".orbit-scope:checked")].map(x=>x.value);
+              try{
+                const out=await api("/api/v1/developer/api-keys",{method:"POST",body:JSON.stringify({name,scopes:selected})});
+                closeModal();
+                openModal("Store your API key",'<p>This secret is displayed once. Store it in a secrets manager and never commit it to source control.</p><code class="orbit-secret-code">'+escapeHtml(out.key.secret)+'</code><button class="primary" id="orbit-dev-key-done">I saved it</button>');
+                $("#orbit-dev-key-done").onclick=()=>{closeModal();render()};
+              }catch(err){orbitToast("API key failed",err.message,"error")}
+            };
+          };
+          $("#orbit-dev-new-app").onclick=()=>{
+            openModal("Create developer application",'<div class="orbit-form-stack"><input id="orbit-dev-app-name" maxlength="120" placeholder="Application name"><textarea id="orbit-dev-app-desc" maxlength="500" placeholder="What does your app do?"></textarea><input id="orbit-dev-app-redirects" maxlength="800" placeholder="Redirect URLs, one per line"><button class="primary" id="orbit-dev-app-submit">Create application</button></div>');
+            $("#orbit-dev-app-submit").onclick=async()=>{
+              const name=$("#orbit-dev-app-name").value.trim()||"ORBIT App";
+              const description=$("#orbit-dev-app-desc").value.trim();
+              const redirectUris=$("#orbit-dev-app-redirects").value.split("\n").map(x=>x.trim()).filter(Boolean);
+              try{
+                const out=await api("/api/v1/developer/applications",{method:"POST",body:JSON.stringify({name,description,redirectUris})});
+                closeModal();
+                openModal("Application created",'<p>Save the client secret now. It will not be shown again.</p><div class="developer-credential-card"><strong>Client ID</strong><code>'+escapeHtml(out.application.clientId)+'</code><strong>Client secret</strong><code>'+escapeHtml(out.clientSecret)+'</code></div><button class="primary" id="orbit-dev-app-done">I saved it</button>');
+                $("#orbit-dev-app-done").onclick=()=>{closeModal();render()};
+              }catch(err){orbitToast("Application failed",err.message,"error")}
+            };
+          };
+          document.querySelectorAll(".developer-revoke-key").forEach(btn=>btn.onclick=async()=>{
+            try{await api("/api/v1/developer/api-keys/"+encodeURIComponent(btn.dataset.keyId)+"/revoke",{method:"POST",body:"{}"});orbitToast("API key revoked","The key can no longer authenticate.","success");render()}catch(err){orbitToast("Could not revoke key",err.message,"error")}
+          });
+          document.querySelectorAll(".developer-revoke-app").forEach(btn=>btn.onclick=async()=>{
+            try{await api("/api/v1/developer/applications/"+encodeURIComponent(btn.dataset.appId)+"/revoke",{method:"POST",body:"{}"});orbitToast("Application revoked","The application credentials are now disabled.","success");render()}catch(err){orbitToast("Could not revoke app",err.message,"error")}
+          });
+        }catch(err){
+          root.innerHTML='<div class="content-card"><h4>Developer platform unavailable</h4><p>'+escapeHtml(err.message)+'</p></div>';
+        }
+      };
+      await render();
     })();
   }else if(section==="language"){
     const active=localStorage.getItem("orbit_locale")||"en";
