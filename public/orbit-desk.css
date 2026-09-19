@@ -1666,3 +1666,14 @@ body.orbit-discord-home .od-presence{
   border:2px solid #0b1018!important;
   box-shadow:0 0 8px rgba(32,190,112,.16);
 }
+
+
+/* Click avatar in Friends to open the DM directly */
+body.orbit-discord-home .od-friend-avatar{
+  cursor:pointer!important;
+  transition:transform .14s ease,filter .14s ease!important;
+}
+body.orbit-discord-home .od-friend-avatar:hover{
+  transform:scale(1.06);
+  filter:brightness(1.08);
+}
