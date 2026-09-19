@@ -244,7 +244,7 @@ function connectRealtime() {
   socket = io({
     auth: { token },
     path: "/socket.io",
-    transports: ["polling", "websocket"],
+    transports: ["websocket", "polling"],
     timeout: 10000,
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -253,7 +253,7 @@ function connectRealtime() {
     withCredentials: true
   });
 
-  socket.on("message:new", m => {
+  socket.on("connect_error", err => {\n    console.error("[orbit] realtime connection error:", err?.message || err);\n    const status = document.querySelector("#connection-status");\n    if (status) status.textContent = "RECONNECTING";\n  });\n  socket.on("connect", () => {\n    const status = document.querySelector("#connection-status");\n    if (status) status.textContent = "ONLINE";\n  });\n\n  socket.on("message:new", m => {
     const active = currentChannel && String(m.channel_id) === String(currentChannel.id);
     if (active) {
       if(String(m.user_id||"")!==String(me?.id||"")) playUiTone("message");
