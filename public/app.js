@@ -1,5 +1,33 @@
 const $ = s => document.querySelector(s);
 
+const ORBIT_LOCALES={
+  en:{dir:"ltr",name:"English",search:"Search",channels:"CHANNELS",voice:"VOICE",write:"Write a message...",send:"Send",chat:"Chat",more:"More",discover:"Discover",friends:"Friends",notifications:"Notifications",settings:"Settings",home:"Home",security:"Security",language:"Language"},
+  ar:{dir:"rtl",name:"العربية",search:"بحث",channels:"القنوات",voice:"الصوت",write:"اكتب رسالة...",send:"إرسال",chat:"الدردشة",more:"المزيد",discover:"استكشاف",friends:"الأصدقاء",notifications:"الإشعارات",settings:"الإعدادات",home:"الرئيسية",security:"الأمان",language:"اللغة"}
+};
+function applyOrbitLocale(locale){
+  const key=ORBIT_LOCALES[locale]?locale:"en";
+  const t=ORBIT_LOCALES[key];
+  document.documentElement.lang=key;
+  document.documentElement.dir=t.dir;
+  document.body.classList.toggle("orbit-rtl",t.dir==="rtl");
+  localStorage.setItem("orbit_locale",key);
+  const search=$("#quick-search"); if(search)search.placeholder=t.search;
+  const message=$("#message"); if(message)message.placeholder=t.write;
+  const send=document.querySelector(".composer .send"); if(send)send.textContent=t.send;
+  const channelMeta=$("#channel-meta"); if(channelMeta && (!channelMeta.dataset.dynamic || channelMeta.dataset.dynamic!=="voice"))channelMeta.textContent=t.chat;
+  const more=$("#channel-more-btn"); if(more){const span=more.querySelector("span");more.childNodes[0].nodeValue=t.more+" "; if(span)span.textContent="⋯";}
+  const sectionTitles=document.querySelectorAll(".section-title span");
+  if(sectionTitles[0])sectionTitles[0].textContent=t.channels;
+  if(sectionTitles[1])sectionTitles[1].textContent=t.voice;
+  const navMap={home:t.home,discover:t.discover,friends:t.friends,notifications:t.notifications,settings:t.settings};
+  document.querySelectorAll(".global-nav .rail-nav").forEach(btn=>{if(navMap[btn.dataset.view])btn.title=navMap[btn.dataset.view]});
+  return key;
+}
+function applySavedOrbitLocale(){
+  applyOrbitLocale(localStorage.getItem("orbit_locale")||"en");
+}
+applySavedOrbitLocale();
+
 let token = localStorage.getItem("orbit_guest_token") || "";
 let guestId = localStorage.getItem("orbit_guest_id") || "";
 let guestName = localStorage.getItem("orbit_guest_name") || "";
@@ -3300,7 +3328,7 @@ function renderSpacePage(){
 }
 
 function renderSettingsPage(section="appearance"){
-  const sections=[["appearance","Appearance"],["profile","Profile"],["privacy","Privacy"],["voice","Voice & Video"],["sound","Sounds"],["notifications","Notifications"],["accessibility","Accessibility"],["performance","Performance"],["files","Files & Sharing"],["security","Security"],["advanced","Advanced"]];
+  const sections=[["appearance","Appearance"],["profile","Profile"],["privacy","Privacy"],["voice","Voice & Video"],["sound","Sounds"],["notifications","Notifications"],["accessibility","Accessibility"],["performance","Performance"],["files","Files & Sharing"],["security","Security"],["language","Language"],["advanced","Advanced"]];
   $("#page-actions").innerHTML="";
   $("#page-body").innerHTML='<div class="settings-layout"><nav class="settings-nav">'+sections.map(s=>'<button class="'+(s[0]===section?"active":"")+'" data-settings-section="'+s[0]+'">'+s[1]+'</button>').join("")+'</nav><div id="settings-card" class="settings-card"></div></div>';
   document.querySelectorAll("[data-settings-section]").forEach(b=>b.onclick=()=>renderSettingsPage(b.dataset.settingsSection));
@@ -3577,6 +3605,19 @@ function renderSettingsPage(section="appearance"){
         $("#revoke-other-sessions")?.setAttribute("disabled","disabled");
       }
     })();
+  }else if(section==="language"){
+    const active=localStorage.getItem("orbit_locale")||"en";
+    card.innerHTML='<h3>Language & Region</h3><p>ORBIT is prepared for English and Arabic, including RTL layout support.</p><div class="setting-row"><div><strong>Interface language</strong><span>Choose the language used by the core navigation and controls.</span></div><select id="orbit-language-select"><option value="en">English</option><option value="ar">العربية</option></select></div><div class="setting-row"><div><strong>Layout direction</strong><span>Arabic automatically mirrors the main navigation.</span></div><span class="setting-status-badge" id="orbit-direction-badge">'+(active==="ar"?"RTL":"LTR")+'</span></div><button class="primary" id="save-orbit-language">Save language</button>';
+    $("#orbit-language-select").value=active;
+    $("#save-orbit-language").onclick=async()=>{
+      const locale=$("#orbit-language-select").value;
+      applyOrbitLocale(locale);
+      try{
+        await api("/api/v1/me/preferences",{method:"PATCH",body:JSON.stringify({locale})});
+        orbitToast("Language saved",locale==="ar"?"تم حفظ العربية وتفعيل RTL.":"English is now active.","success");
+      }catch(err){orbitToast("Language saved locally",err.message,"error")}
+      renderSettingsPage("language");
+    };
   }else if(section==="advanced"){
     card.innerHTML='<h3>Advanced</h3><p>Platform owner tools and advanced Orbit controls.</p>'+setting("Command palette","Enable Ctrl+K.",true,"advanced-palette")+setting("Developer diagnostics","Expose realtime diagnostics.",false,"advanced-dev")+'<div class="setting-row owner-console-row"><div><strong>ORBIT Owner Command</strong><span>Platform-level control for users, messages, calls, communities and security. Protected by a separate owner key.</span></div><button type="button" class="primary" id="open-owner-console">Open Owner Command</button></div>';
     $("#open-owner-console").onclick=()=>{location.href="/owner.html"};
