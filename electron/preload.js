@@ -58,5 +58,5 @@ setTimeout(installDesktopChrome,1200);
 contextBridge.exposeInMainWorld("orbitDesktop",{
   isDesktop:true,
   platform:process.platform,
-  version:"1.2.0"
+  version:"1.3.0"
 });
