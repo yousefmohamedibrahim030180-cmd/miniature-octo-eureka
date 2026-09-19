@@ -283,6 +283,7 @@ function serverSettings(server) {
   if (theme.banner_url && !/^\/api\/avatar\/[A-Za-z0-9_-]+$/.test(String(theme.banner_url))) theme.banner_url=null;
   theme.description=String(theme.description||"").slice(0,500);
   theme.welcomeMessage=String(theme.welcomeMessage||"").slice(0,700);
+  if (!server.settings.nexusWorld || typeof server.settings.nexusWorld !== "object") server.settings.nexusWorld = null;
   if (!Array.isArray(server.bannedUserIds)) server.bannedUserIds = [];
   return server.settings;
 }
@@ -768,6 +769,35 @@ async function requestOrbitModel(messages) {
   return typeof content==="string"&&content.trim()?content.trim():null;
 }
 
+app.get("/api/servers/:id/nexus/world", auth, (req, res) => {
+  const access = member(req.params.id, req.user.id);
+  if (!access) return res.status(403).json({ error: "Not a member" });
+  const settings = serverSettings(access.server);
+  res.json({ world: settings.nexusWorld || null });
+});
+app.put("/api/servers/:id/nexus/world", auth, (req, res) => {
+  const access = member(req.params.id, req.user.id);
+  if (!access || !canManage(access.role)) return res.status(403).json({ error: "Owner/admin/moderator permission required" });
+  const raw = req.body?.world && typeof req.body.world === "object" ? req.body.world : null;
+  if (!raw) return res.status(400).json({ error: "World blueprint is required" });
+  const world = {
+    id: String(raw.id || id("world")).slice(0, 80),
+    name: String(raw.name || "NEXUS WORLD").trim().slice(0, 120),
+    type: String(raw.type || "custom").trim().slice(0, 40),
+    prompt: String(raw.prompt || "").trim().slice(0, 400),
+    atmosphere: String(raw.atmosphere || "aether").trim().slice(0, 30),
+    surface: String(raw.surface || "night").trim().slice(0, 30),
+    intensity: Math.max(20, Math.min(100, Number(raw.intensity || 70))),
+    glass: Math.max(20, Math.min(92, Number(raw.glass || 62))),
+    zones: Array.isArray(raw.zones) ? raw.zones.map(x => String(x || "").trim().slice(0, 70)).filter(Boolean).slice(0, 12) : [],
+    updatedAt: now(),
+    updatedBy: req.user.id
+  };
+  serverSettings(access.server).nexusWorld = world;
+  schedulePersist();
+  emitToServer(access.server.id, "nexus:world-updated", { world });
+  res.json({ world });
+});
 app.get("/api/friends", auth, (req, res) => {
   const userId = String(req.user.id);
   const friends = [];
