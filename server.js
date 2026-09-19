@@ -14,6 +14,7 @@ const { migrate } = require("./db/migrate");
 const { createSessionManager, cookieMap, setRefreshCookie, clearRefreshCookie } = require("./platform/session");
 const { configureRedisAdapter, closeRedisAdapter } = require("./platform/realtime");
 const { createStorage } = require("./platform/storage");
+const { PERMISSIONS, CHANNEL_TYPES, canManage: canManageRole, hasPermission, canManageMembers, canManageCommunity, canCreateChannel, channelAllowsText, channelAllowsRealtime } = require("./platform/permissions");
 
 const app = express();
 const server = http.createServer(app);
@@ -106,7 +107,9 @@ function serializeMemory() {
     blocks: [...memory.blocks],
     mutes: [...memory.mutes],
     userSettings: [...memory.userSettings.entries()],
-    notificationPreferences: [...memory.notificationPreferences.entries()]
+    notificationPreferences: [...memory.notificationPreferences.entries()],
+    posts: [...memory.posts.entries()],
+    postComments: [...memory.postComments.entries()]
   };
 }
 
@@ -134,6 +137,8 @@ function hydrateMemory(data) {
   memory.mutes.clear(); for(const value of (data.mutes||[])) memory.mutes.add(String(value));
   restoreMap("userSettings");
   restoreMap("notificationPreferences");
+  restoreMap("posts");
+  restoreMap("postComments");
 }
 
 async function sidecarRequest(method, body) {
@@ -407,7 +412,38 @@ function member(serverId, userId) {
   return role ? { role, server: s } : null;
 }
 function canManage(role) {
-  return ["owner", "admin", "moderator"].includes(role);
+  return canManageRole(role);
+}
+function can(role, permission) {
+  return hasPermission(role, permission);
+}
+function ROLE_BITS_FOR_ROLE(role){
+  const checks=[
+    ["VIEW_CHANNEL",PERMISSIONS.VIEW_CHANNEL],
+    ["SEND_MESSAGES",PERMISSIONS.SEND_MESSAGES],
+    ["MANAGE_MESSAGES",PERMISSIONS.MANAGE_MESSAGES],
+    ["CREATE_THREADS",PERMISSIONS.CREATE_THREADS],
+    ["ATTACH_FILES",PERMISSIONS.ATTACH_FILES],
+    ["ADD_REACTIONS",PERMISSIONS.ADD_REACTIONS],
+    ["MENTION_EVERYONE",PERMISSIONS.MENTION_EVERYONE],
+    ["CONNECT_VOICE",PERMISSIONS.CONNECT_VOICE],
+    ["SPEAK",PERMISSIONS.SPEAK],
+    ["USE_VIDEO",PERMISSIONS.USE_VIDEO],
+    ["STREAM",PERMISSIONS.STREAM],
+    ["MANAGE_CHANNELS",PERMISSIONS.MANAGE_CHANNELS],
+    ["MANAGE_ROLES",PERMISSIONS.MANAGE_ROLES],
+    ["MANAGE_MEMBERS",PERMISSIONS.MANAGE_MEMBERS],
+    ["MANAGE_COMMUNITY",PERMISSIONS.MANAGE_COMMUNITY],
+    ["MANAGE_EVENTS",PERMISSIONS.MANAGE_EVENTS],
+    ["MANAGE_WEBHOOKS",PERMISSIONS.MANAGE_WEBHOOKS],
+    ["MANAGE_BOTS",PERMISSIONS.MANAGE_BOTS],
+    ["VIEW_AUDIT_LOG",PERMISSIONS.VIEW_AUDIT_LOG],
+    ["BAN_MEMBERS",PERMISSIONS.BAN_MEMBERS]
+  ];
+  return checks.map(([key,permission])=>({key,label:hasPermission(role,permission)?"granted":"denied",value:hasPermission(role,permission)}));
+}
+function requirePermission(access, permission, message="Permission denied") {
+  return access && hasPermission(access.role, permission) ? null : message;
 }
 function adminTokenFor(user, serverId, role) {
   return jwt.sign(
@@ -1272,6 +1308,95 @@ app.post("/api/dms/:id/read", auth, (req, res) => {
   res.json({ ok: true, readAt });
 });
 
+app.get("/api/v1/channels/:id/posts",auth,(req,res)=>{
+  const channel=memory.channels.get(String(req.params.id));
+  if(!channel || channel.type!=="forum")return res.status(400).json({error:"This channel is not a forum"});
+  const access=member(channel.serverId,req.user.id);
+  if(!access)return res.status(403).json({error:"Not a member"});
+  const limit=Math.max(1,Math.min(50,Number(req.query.limit||25)));
+  const before=req.query.before?String(req.query.before):null;
+  let rows=[...memory.posts.values()].filter(p=>String(p.channelId)===String(channel.id)&&!p.deletedAt).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  if(before)rows=rows.filter(p=>String(p.createdAt)<before);
+  rows=rows.slice(0,limit).map(post=>({...post,author:publicUser(memory.users.get(post.authorId)||{}),commentCount:(memory.postComments.get(post.id)||[]).length}));
+  res.json({posts:rows,nextBefore:rows.length===limit?rows[rows.length-1].createdAt:null});
+});
+
+app.post("/api/v1/channels/:id/posts",auth,(req,res)=>{
+  const channel=memory.channels.get(String(req.params.id));
+  if(!channel || channel.type!=="forum")return res.status(400).json({error:"This channel is not a forum"});
+  const access=member(channel.serverId,req.user.id);
+  if(!access || !can(access.role,PERMISSIONS.SEND_MESSAGES))return res.status(403).json({error:"Send Messages permission required"});
+  if(channel.archived || channel.locked)return res.status(423).json({error:"This forum is locked"});
+  const title=String(req.body?.title||"").trim().slice(0,180);
+  const body=String(req.body?.body||"").trim().slice(0,10000);
+  if(!title||!body)return res.status(400).json({error:"Post title and body are required"});
+  const post={id:id("post"),channelId:channel.id,serverId:channel.serverId,authorId:req.user.id,title,body,tags:Array.isArray(req.body?.tags)?req.body.tags.map(x=>String(x).trim().slice(0,32)).filter(Boolean).slice(0,8):[],createdAt:now(),updatedAt:now(),deletedAt:null,pinned:false,solved:false,reactions:{}};
+  memory.posts.set(post.id,post);
+  memory.postComments.set(post.id,[]);
+  emitToServer(channel.serverId,"forum:post-created",{post:{...post,author:publicUser(req.user),commentCount:0}});
+  audit(req.user.id,"FORUM_POST_CREATE",post.id,{serverId:channel.serverId,channelId:channel.id});
+  schedulePersist();
+  res.status(201).json({post:{...post,author:publicUser(req.user),commentCount:0}});
+});
+
+app.get("/api/v1/posts/:id/comments",auth,(req,res)=>{
+  const post=memory.posts.get(String(req.params.id));
+  if(!post)return res.status(404).json({error:"Post not found"});
+  const access=member(post.serverId,req.user.id);
+  if(!access)return res.status(403).json({error:"Not a member"});
+  const comments=(memory.postComments.get(post.id)||[]).map(c=>({...c,author:publicUser(memory.users.get(c.authorId)||{})}));
+  res.json({comments});
+});
+
+app.post("/api/v1/posts/:id/comments",auth,(req,res)=>{
+  const post=memory.posts.get(String(req.params.id));
+  if(!post)return res.status(404).json({error:"Post not found"});
+  const access=member(post.serverId,req.user.id);
+  if(!access || !can(access.role,PERMISSIONS.SEND_MESSAGES))return res.status(403).json({error:"Send Messages permission required"});
+  const body=String(req.body?.body||"").trim().slice(0,4000);
+  if(!body)return res.status(400).json({error:"Comment is required"});
+  const comment={id:id("comment"),postId:post.id,authorId:req.user.id,body,createdAt:now()};
+  const list=memory.postComments.get(post.id)||[];
+  list.push(comment);
+  memory.postComments.set(post.id,list.slice(-500));
+  notify(post.authorId,{type:"reply",title:"New forum reply",body:req.user.username+" replied to your post",actorId:req.user.id,postId:post.id});
+  emitToServer(post.serverId,"forum:comment-created",{postId:post.id,comment:{...comment,author:publicUser(req.user)}});
+  schedulePersist();
+  res.status(201).json({comment:{...comment,author:publicUser(req.user)}});
+});
+
+app.post("/api/v1/posts/:id/reaction",auth,(req,res)=>{
+  const post=memory.posts.get(String(req.params.id));
+  if(!post)return res.status(404).json({error:"Post not found"});
+  const access=member(post.serverId,req.user.id);
+  if(!access || !can(access.role,PERMISSIONS.ADD_REACTIONS))return res.status(403).json({error:"Add Reactions permission required"});
+  const emoji=String(req.body?.emoji||"👍").slice(0,8);
+  post.reactions=post.reactions||{};
+  const users=post.reactions[emoji]||[];
+  const index=users.indexOf(String(req.user.id));
+  if(index===-1)users.push(String(req.user.id));else users.splice(index,1);
+  post.reactions[emoji]=users;
+  emitToServer(post.serverId,"forum:post-reaction",{postId:post.id,reactions:post.reactions});
+  schedulePersist();
+  res.json({reactions:post.reactions});
+});
+
+app.patch("/api/v1/posts/:id",auth,(req,res)=>{
+  const post=memory.posts.get(String(req.params.id));
+  if(!post)return res.status(404).json({error:"Post not found"});
+  const access=member(post.serverId,req.user.id);
+  if(!access)return res.status(403).json({error:"Not a member"});
+  if(String(post.authorId)!==String(req.user.id)&&!can(access.role,PERMISSIONS.MANAGE_MESSAGES))return res.status(403).json({error:"Permission denied"});
+  if(req.body?.title!==undefined)post.title=String(req.body.title||"").trim().slice(0,180);
+  if(req.body?.body!==undefined)post.body=String(req.body.body||"").trim().slice(0,10000);
+  if(req.body?.pinned!==undefined&&can(access.role,PERMISSIONS.MANAGE_MESSAGES))post.pinned=Boolean(req.body.pinned);
+  if(req.body?.solved!==undefined)post.solved=Boolean(req.body.solved);
+  post.updatedAt=now();
+  emitToServer(post.serverId,"forum:post-updated",{post});
+  schedulePersist();
+  res.json({post:{...post,author:publicUser(memory.users.get(post.authorId)||{}),commentCount:(memory.postComments.get(post.id)||[]).length}});
+});
+
 app.get("/api/notifications", auth, (req, res) => {
   res.json({ notifications: memory.notifications.get(String(req.user.id)) || [] });
 });
@@ -1907,6 +2032,104 @@ app.patch("/api/me", auth, (req, res) => {
     req.user.avatarDecorationUrl = decorationUrl || null;
   }
   res.json({ user: publicUser(req.user) });
+});
+
+app.get("/api/v1/servers/:id/permissions",auth,(req,res)=>{
+  const access=member(req.params.id,req.user.id);
+  if(!access)return res.status(403).json({error:"Not a member"});
+  const bits=ROLE_BITS_FOR_ROLE(access.role);
+  res.json({role:access.role,permissions:bits.map(x=>x.label),bits:bits.reduce((out,x)=>{out[x.key]=x.value;return out},{})});
+});
+
+app.get("/api/v1/servers/:id/channels",auth,(req,res)=>{
+  const access=member(req.params.id,req.user.id);
+  if(!access)return res.status(403).json({error:"Not a member"});
+  const channels=access.server.channels.map(idValue=>memory.channels.get(idValue)).filter(Boolean).sort((a,b)=>Number(a.position||0)-Number(b.position||0)).map(channel=>({
+    ...channel,
+    canView:true,
+    canSend:can(access.role,PERMISSIONS.SEND_MESSAGES),
+    canManage:can(access.role,PERMISSIONS.MANAGE_CHANNELS)
+  }));
+  res.json({channels});
+});
+
+app.post("/api/v1/servers/:id/channels",auth,(req,res)=>{
+  const access=member(req.params.id,req.user.id);
+  if(!access || !canCreateChannel(access.role))return res.status(403).json({error:"Manage Channels permission required"});
+  const name=cleanName(req.body?.name,"channel").toLowerCase().replace(/[^a-z0-9\u0600-\u06ff _-]/g,"-").replace(/-+/g,"-").slice(0,80);
+  const type=String(req.body?.type||"text").toLowerCase();
+  if(!name)return res.status(400).json({error:"Channel name is required"});
+  if(!CHANNEL_TYPES.includes(type))return res.status(400).json({error:"Unsupported channel type"});
+  const channelId=id("channel");
+  const position=access.server.channels.length;
+  const channel={
+    id:channelId,
+    serverId:access.server.id,
+    name,
+    type,
+    topic:String(req.body?.topic||"").trim().slice(0,255),
+    position,
+    categoryId:req.body?.categoryId?String(req.body.categoryId):null,
+    slowmode:Math.max(0,Math.min(120,Number(req.body?.slowmode||0))),
+    archived:Boolean(req.body?.archived),
+    locked:Boolean(req.body?.locked),
+    nsfw:Boolean(req.body?.nsfw),
+    createdAt:now(),
+    permissionOverrides:{}
+  };
+  access.server.channels.push(channelId);
+  memory.channels.set(channelId,channel);
+  memory.messages.set(channelId,[]);
+  if(channel.type==="forum") channel.postsEnabled=true;
+  if(channelAllowsRealtime(type)) channel.realtimeMode=type;
+  if(channelAllowsText(type)===false) channel.messageMode="realtime";
+  audit(req.user.id,"CHANNEL_CREATE",channelId,{serverId:access.server.id,type,name});
+  emitToServer(access.server.id,"channel:created",{channel});
+  schedulePersist();
+  res.status(201).json({channel});
+});
+
+app.patch("/api/v1/channels/:id",auth,(req,res)=>{
+  const channel=memory.channels.get(String(req.params.id));
+  if(!channel)return res.status(404).json({error:"Channel not found"});
+  const access=member(channel.serverId,req.user.id);
+  if(!access || !canCreateChannel(access.role))return res.status(403).json({error:"Manage Channels permission required"});
+  if(req.body?.name!==undefined){
+    const name=cleanName(req.body.name,"channel").toLowerCase().replace(/[^a-z0-9\u0600-\u06ff _-]/g,"-").replace(/-+/g,"-").slice(0,80);
+    if(!name)return res.status(400).json({error:"Channel name is required"});
+    channel.name=name;
+  }
+  if(req.body?.topic!==undefined)channel.topic=String(req.body.topic||"").trim().slice(0,255);
+  if(req.body?.categoryId!==undefined)channel.categoryId=req.body.categoryId?String(req.body.categoryId):null;
+  if(req.body?.archived!==undefined)channel.archived=Boolean(req.body.archived);
+  if(req.body?.locked!==undefined)channel.locked=Boolean(req.body.locked);
+  if(req.body?.nsfw!==undefined)channel.nsfw=Boolean(req.body.nsfw);
+  if(req.body?.slowmode!==undefined){
+    const value=Number(req.body.slowmode);
+    if(!Number.isFinite(value)||value<0||value>120)return res.status(400).json({error:"Slowmode must be between 0 and 120 seconds"});
+    channel.slowmode=Math.round(value);
+  }
+  channel.updatedAt=now();
+  audit(req.user.id,"CHANNEL_UPDATE",channel.id,{serverId:channel.serverId});
+  emitToServer(channel.serverId,"channel:updated",{channel});
+  schedulePersist();
+  res.json({channel});
+});
+
+app.delete("/api/v1/channels/:id",auth,(req,res)=>{
+  const channel=memory.channels.get(String(req.params.id));
+  if(!channel)return res.status(404).json({error:"Channel not found"});
+  const access=member(channel.serverId,req.user.id);
+  if(!access || !canCreateChannel(access.role))return res.status(403).json({error:"Manage Channels permission required"});
+  if(access.server.channels.length<=1)return res.status(400).json({error:"A community must keep at least one channel"});
+  access.server.channels=access.server.channels.filter(idValue=>String(idValue)!==String(channel.id));
+  memory.channels.delete(channel.id);
+  memory.messages.delete(channel.id);
+  for(const [postId,post] of [...memory.posts.entries()])if(String(post.channelId)===String(channel.id)){memory.posts.delete(postId);memory.postComments.delete(postId)}
+  audit(req.user.id,"CHANNEL_DELETE",channel.id,{serverId:channel.serverId});
+  emitToServer(channel.serverId,"channel:deleted",{channelId:channel.id});
+  schedulePersist();
+  res.json({ok:true});
 });
 
 app.get("/api/servers", auth, (req, res) => {
