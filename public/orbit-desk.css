@@ -302,3 +302,10 @@ body.orbit-discord-home .global-page.discord-home-active{min-height:0}
 @media(max-width:1250px){.orbit-discord-home .orbit-discord-home{grid-template-columns:225px minmax(0,1fr) 270px}}
 @media(max-width:1050px){.orbit-discord-home .orbit-discord-home{grid-template-columns:215px minmax(0,1fr)}.od-profile-active{display:none!important}}
 @media(max-width:760px){.orbit-discord-home .orbit-discord-home{grid-template-columns:minmax(0,1fr)}.od-social-sidebar{display:none}.od-home-chat-active .od-home-dm-messages{padding:14px 6px 10px}.od-home-chat-active .od-home-dm-composer{margin:0 7px 7px}}
+
+
+/* DM list click reliability */
+.od-dm-list{position:relative;z-index:5;pointer-events:auto}
+.od-dm-row{position:relative;z-index:6;pointer-events:auto!important;cursor:pointer!important;user-select:none;-webkit-user-select:none}
+.od-dm-row *{pointer-events:none}
+.od-dm-row.active{background:#404249!important}
