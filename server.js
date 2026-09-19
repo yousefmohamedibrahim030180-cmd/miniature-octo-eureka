@@ -2656,7 +2656,8 @@ io.on("connection", socket => {
 
   socket.on("channel:join", channelId => {
     const channel = memory.channels.get(String(channelId));
-    if (!channel || !member(channel.serverId, socket.user.id)) return;
+    const access = channel ? member(channel.serverId, socket.user.id) : null;
+    if (!channel || !access || !can(access.role, PERMISSIONS.VIEW_CHANNEL)) return;
     for (const room of socket.rooms) {
       if (room.startsWith("channel:")) socket.leave(room);
     }
@@ -2681,14 +2682,16 @@ io.on("connection", socket => {
     const server = memory.servers.get(channel.serverId);
     const role = server?.members.get(socket.user.id);
     const settings = server ? serverSettings(server) : { locked:false, slowmode:0 };
+    const channelSlowmode = Math.max(0, Number(channel.slowmode || 0));
+    const effectiveSlowmode = Math.max(Number(settings.slowmode || 0), channelSlowmode);
     if (settings.locked && !canManage(role)) {
       socket.emit("error:toast", { message: "This server is currently locked by an administrator." });
       return;
     }
     const rateKey = channel.serverId + ":" + socket.user.id;
     const lastMessageAt = serverMessageRate.get(rateKey) || 0;
-    if (settings.slowmode > 0 && !canManage(role)) {
-      const wait = (settings.slowmode * 1000) - (Date.now() - lastMessageAt);
+    if (effectiveSlowmode > 0 && !canManage(role)) {
+      const wait = (effectiveSlowmode * 1000) - (Date.now() - lastMessageAt);
       if (wait > 0) {
         socket.emit("error:toast", { message: "Slowmode is enabled. Try again in " + Math.ceil(wait / 1000) + "s." });
         return;
@@ -2725,7 +2728,8 @@ io.on("connection", socket => {
     const channelId = typeof payload === "object" ? payload.channelId : payload;
     const mode = typeof payload === "object" && payload.mode ? payload.mode : "video";
     const channel = memory.channels.get(String(channelId));
-    if (!channel || !member(channel.serverId, socket.user.id)) return;
+    const access = channel ? member(channel.serverId, socket.user.id) : null;
+    if (!channel || !access || !can(access.role, PERMISSIONS.CONNECT_VOICE) || !channelAllowsRealtime(channel.type)) return;
 
     const room = callRoomFor(channel.id);
     for (const existingRoom of socket.rooms) {
