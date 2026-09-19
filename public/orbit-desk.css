@@ -263,3 +263,42 @@ body.orbit-discord-home .sidebar{display:none}
 .od-home-chat-active .od-home-dm-composer{margin-left:14px;margin-right:14px;margin-bottom:14px}
 @media(max-width:1100px){.od-profile-active{display:none}}
 @media(max-width:760px){.od-home-chat-active .od-home-dm-messages{padding-left:6px;padding-right:6px}.od-home-chat-active .od-home-dm-composer{margin-left:7px;margin-right:7px;margin-bottom:7px}}
+
+
+/* ===== Home DM final polish ===== */
+body.orbit-discord-home .global-page.discord-home-active{min-height:0}
+.orbit-discord-home .orbit-discord-home{grid-template-columns:236px minmax(0,1fr) 286px}
+.od-home-main{min-width:0;min-height:0;overflow:hidden}
+.od-home-chat-active{display:flex!important;flex-direction:column;min-width:0;height:100%;background:#313338!important}
+.od-home-chat-active .od-home-dm-head{flex:0 0 57px;min-height:57px}
+.od-home-chat-active .od-home-dm-messages{flex:1;min-height:0;padding:20px 24px 12px;overflow:auto;background:#313338}
+.od-home-chat-active .od-home-dm-message{max-width:100%;grid-template-columns:38px minmax(0,1fr);padding:5px 10px}
+.od-home-chat-active .od-home-dm-msg-avatar{width:36px;height:36px;font-size:10px}
+.od-home-chat-active .od-home-dm-meta strong{font-size:11px}
+.od-home-chat-active .od-home-dm-meta time{font-size:8px}
+.od-home-chat-active .od-home-dm-text{font-size:12px;line-height:1.55}
+.od-home-chat-active .od-home-dm-welcome{padding:54px 24px 32px;margin-bottom:10px}
+.od-home-chat-active .od-home-dm-big-avatar{width:78px;height:78px;font-size:24px}
+.od-home-chat-active .od-home-dm-welcome strong{font-size:21px}
+.od-home-chat-active .od-home-dm-welcome span{font-size:10px}
+.od-home-chat-active .od-home-dm-typing{flex:0 0 20px;height:20px;padding:0 28px;font-size:9px}
+.od-home-chat-active .od-home-dm-composer{flex:0 0 auto;margin:0 16px 16px;grid-template-columns:34px minmax(0,1fr) 34px 40px;gap:5px}
+.od-home-chat-active .od-home-dm-composer textarea{min-height:48px;padding:13px 14px;font-size:11px;background:#383a40;border:1px solid #3d3f45}
+.od-home-chat-active .od-home-dm-composer button{width:32px;height:36px;font-size:15px}
+.od-home-chat-active .od-home-dm-send{width:40px!important;height:40px!important}
+.od-home-dm-user strong{font-size:12px}
+.od-home-dm-user span{font-size:9px}
+.od-home-dm-actions button{width:32px;height:32px;font-size:15px}
+.od-home-chat-active+.od-active-sidebar{}
+.od-profile-active{min-width:0;display:block!important;overflow:auto}
+.od-profile-head{height:57px;flex:0 0 57px}
+.od-profile-head>div:last-child{display:flex;flex-direction:column}
+.od-profile-sub{display:block;color:#72767d;font-size:7px;margin-top:2px}
+.od-profile-action-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:13px}
+.od-profile-soft{height:32px;border:0;border-radius:6px;background:#404249;color:#fff;font-size:8px;font-weight:700;cursor:pointer}
+.od-profile-soft:hover{background:#4a4c55}
+.od-profile-card{padding:0 14px 20px}
+.od-profile-cover{height:92px}
+@media(max-width:1250px){.orbit-discord-home .orbit-discord-home{grid-template-columns:225px minmax(0,1fr) 270px}}
+@media(max-width:1050px){.orbit-discord-home .orbit-discord-home{grid-template-columns:215px minmax(0,1fr)}.od-profile-active{display:none!important}}
+@media(max-width:760px){.orbit-discord-home .orbit-discord-home{grid-template-columns:minmax(0,1fr)}.od-social-sidebar{display:none}.od-home-chat-active .od-home-dm-messages{padding:14px 6px 10px}.od-home-chat-active .od-home-dm-composer{margin:0 7px 7px}}
