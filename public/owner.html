@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ORBIT — Owner Command</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/owner.css?v=orbit-owner-v1-20260919">
+</head>
+<body>
+<section id="owner-gate" class="gate"><div class="gate-glow a"></div><div class="gate-glow b"></div><div class="gate-card">
+<div class="brand"><span>◈</span><div><b>ORBIT</b><small>OWNER COMMAND</small></div></div>
+<div class="lock-icon">⌑</div><small class="eyebrow">PLATFORM-LEVEL CONTROL</small><h1>Owner access required.</h1><p>This console can inspect platform activity and manage accounts. Access is protected by a separate owner key.</p>
+<form id="owner-form"><div class="key-wrap"><span>KEY</span><input id="owner-key" type="password" placeholder="Enter owner key" autocomplete="one-time-code"><button type="button" id="show-key">Show</button></div><button class="unlock">Unlock ORBIT Command <b>↗</b></button></form><div id="gate-error"></div></div></section>
+
+<div id="app" class="hidden">
+<header class="top"><div class="brand"><span>◈</span><div><b>ORBIT</b><small>OWNER COMMAND</small></div></div><div class="owner-chip"><i></i><span id="owner-name">Owner</span></div><div class="actions"><span id="sync-state">SYNC</span><button id="refresh">↻</button><button id="lock">Lock</button><button id="back">Back to ORBIT</button></div></header>
+<main class="shell"><aside class="nav">
+<button class="tab active" data-tab="overview">Overview<small>Platform pulse</small></button>
+<button class="tab" data-tab="users">Users<small>Accounts & actions</small></button>
+<button class="tab" data-tab="calls">Calls<small>Live network</small></button>
+<button class="tab" data-tab="audit">Audit<small>Owner actions</small></button>
+</aside><section class="main">
+<div id="overview" class="panel active"></div><div id="users" class="panel"></div><div id="calls" class="panel"></div><div id="audit" class="panel"></div>
+</section></main></div>
+<div id="drawer" class="drawer hidden"><div class="drawer-backdrop"></div><aside class="drawer-card"><header><div><small>USER COMMAND</small><h2 id="drawer-title">User</h2><span id="drawer-subtitle"></span></div><button id="drawer-close">×</button></header><div id="drawer-body"></div></aside></div>
+<div id="toast"></div>
+<script src="/owner.js?v=orbit-owner-v1-20260919"></script>
+</body></html>
