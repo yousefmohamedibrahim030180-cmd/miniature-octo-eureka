@@ -244,7 +244,8 @@ function connectRealtime() {
   socket = io({
     auth: { token },
     path: "/socket.io",
-    transports: ["polling", "websocket"],
+    transports: ["polling"],
+    upgrade: false,
     timeout: 10000,
     reconnection: true,
     reconnectionAttempts: Infinity,
