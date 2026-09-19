@@ -1712,7 +1712,7 @@ function renderHomePage(){
         const onlineNow=dmUserStatus(u)==="Online";
         return '<button type="button" class="od-dm-row '+(String(dm.id)===String(dmState.activeId)?"active":"")+'" data-od-dm="'+escapeHtml(dm.id)+'">'+
           avatarMarkup({...u,status:onlineNow?"online":"offline"})+
-          '<span><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><em>'+escapeHtml(dm.lastMessage?.content||"Start a conversation")+'</em></span>'+
+          '<span><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><em>'+escapeHtml(dm.lastMessage?.content||(dm.lastMessage?.attachment?"📎 "+(dm.lastMessage.attachment.name||"Attachment"):"Start a conversation"))+'</em></span>'+
           (dm.unreadCount?'<b>'+escapeHtml(dm.unreadCount)+'</b>':"")+
         '</button>';
       }).join(""):'<div class="od-dm-empty">No direct messages yet.</div>';
@@ -1911,6 +1911,7 @@ async function openHomeDirectMessage(dmId){
         '<div class="od-home-dm-actions">'+
           '<button id="od-home-dm-call" title="Voice call">☎</button>'+
           '<button id="od-home-dm-video" title="Video call">▣</button>'+
+          '<button id="od-home-dm-media" title="Shared media">▧</button>'+
           '<button id="od-home-dm-pin" title="Pinned messages">⌖</button>'+
           '<button id="od-home-dm-add-user" title="Add friend">♙</button>'+
           '<button id="od-home-dm-search" title="Search messages">⌕</button>'+
@@ -1928,11 +1929,12 @@ async function openHomeDirectMessage(dmId){
       '</div>'+
       '<div id="od-home-dm-typing" class="od-home-dm-typing"></div>'+
       '<form id="od-home-dm-form" class="od-home-dm-composer">'+
-        '<div class="od-home-dm-compose-left"><button type="button" id="od-home-dm-add" title="Add attachment">＋</button></div>'+
+        '<div class="od-home-dm-compose-left"><button type="button" id="od-home-dm-add" title="Add attachment">＋</button><button type="button" id="od-home-dm-more" title="Conversation tools">⌘</button></div>'+
         '<textarea id="od-home-dm-input" rows="1" maxlength="4000" placeholder="Message @'+escapeHtml(username)+'"></textarea>'+
         '<button type="button" id="od-home-dm-emoji" title="Add emoji">☺</button>'+
         '<button type="submit" class="od-home-dm-send" title="Send message">➤</button>'+
       '</form>';
+      '<aside id="od-home-dm-drawer" class="od-home-dm-drawer hidden"></aside>'+
 
     renderHomeDirectMessageFeed(true);
 
@@ -1950,6 +1952,46 @@ async function openHomeDirectMessage(dmId){
     }
 
     const input=$("#od-home-dm-input");
+    const oldDmPicker=$("#orbit-dm-file-picker");
+    oldDmPicker?.remove();
+    const dmFileInput=document.createElement("input");
+    dmFileInput.type="file";
+    dmFileInput.id="orbit-dm-file-picker";
+    dmFileInput.accept="image/*,video/*,audio/*,.pdf,.zip,.txt,.doc,.docx,.ppt,.pptx,.xls,.xlsx";
+    dmFileInput.hidden=true;
+    document.body.appendChild(dmFileInput);
+    dmFileInput.onchange=async()=>{
+      const file=dmFileInput.files?.[0];
+      dmFileInput.value="";
+      if(!file)return;
+      if(file.size>4_500_000){
+        orbitToast("File too large","Direct-message files are limited to 4.5 MB.","error");
+        return;
+      }
+      try{
+        orbitToast("Uploading",file.name);
+        const fr=new FileReader();
+        const data=await new Promise((resolve,reject)=>{
+          fr.onload=()=>resolve(String(fr.result));
+          fr.onerror=()=>reject(new Error("Could not read this file."));
+          fr.readAsDataURL(file);
+        });
+        const uploaded=await api("/api/uploads",{method:"POST",body:JSON.stringify({
+          name:file.name,type:file.type||"application/octet-stream",size:file.size,data,purpose:"dm-file"
+        })});
+        const sent=await api("/api/dms/"+encodeURIComponent(dmId)+"/messages",{method:"POST",body:JSON.stringify({
+          content:"",attachment:uploaded.file
+        })});
+        if(sent?.message&&!dmState.messages.some(m=>String(m.id)===String(sent.message.id))){
+          dmState.messages.push(sent.message);
+        }
+        renderHomeDirectMessageFeed(true);
+        orbitToast("File sent",file.name,"success");
+      }catch(err){orbitToast("Upload failed",err.message||"Could not send file.","error")}
+    };
+    $("#od-home-dm-add").onclick=()=>dmFileInput.click();
+    $("#od-home-dm-more").onclick=()=>renderHomeDMDashboard("media","");
+    $("#od-home-dm-media").onclick=()=>renderHomeDMDashboard("media","");
     $("#od-home-dm-form").onsubmit=async e=>{
       e.preventDefault();
       const value=input?.value.trim();
@@ -1981,15 +2023,8 @@ async function openHomeDirectMessage(dmId){
       el.selectionStart=el.selectionEnd=start+2;
     };
     $("#od-home-dm-add").onclick=()=>orbitToast("Attachments","Attachment upload is available in community channels.");
-    $("#od-home-dm-search").onclick=()=>{
-      const q=prompt("Search messages");
-      if(q===null)return;
-      const term=q.trim().toLowerCase();
-      document.querySelectorAll("#od-home-dm-messages .od-home-dm-message").forEach(row=>{
-        row.style.display=!term||row.innerText.toLowerCase().includes(term)?"grid":"none";
-      });
-    };
-    $("#od-home-dm-pin").onclick=()=>orbitToast("Pinned messages","Pinned message view is ready for this conversation.");
+    $("#od-home-dm-search").onclick=()=>renderHomeDMDashboard("search","");
+    $("#od-home-dm-pin").onclick=()=>renderHomeDMDashboard("pinned","");
     $("#od-home-dm-add-user").onclick=async()=>{
       try{
         await api("/api/friends/request",{method:"POST",body:JSON.stringify({username})});
@@ -2032,64 +2067,161 @@ window.__orbitDMClick=async function(id){
   return false;
 };
 
+function dmAttachmentMarkup(m){
+  const a=m?.attachment;
+  if(!a?.id)return "";
+  const url="/api/uploads/"+encodeURIComponent(a.id);
+  const name=escapeHtml(a.name||"Attachment");
+  const type=String(a.type||"").toLowerCase();
+  if(type.startsWith("image/")){
+    return '<div class="od-home-dm-attachment od-home-dm-image"><img src="'+url+'" alt="'+name+'" loading="lazy"><div class="od-home-dm-attachment-meta"><span>'+name+'</span><a href="'+url+'" target="_blank" rel="noopener">Open</a></div></div>';
+  }
+  if(type.startsWith("video/")){
+    return '<div class="od-home-dm-attachment od-home-dm-video"><video controls preload="metadata" src="'+url+'"></video><div class="od-home-dm-attachment-meta"><span>'+name+'</span><a href="'+url+'" target="_blank" rel="noopener">Open</a></div></div>';
+  }
+  if(type.startsWith("audio/")){
+    return '<div class="od-home-dm-attachment od-home-dm-audio"><div class="od-home-dm-file-icon">♫</div><div><strong>'+name+'</strong><small>Audio · '+formatFileSize(a.size)+'</small></div><audio controls preload="metadata" src="'+url+'"></audio></div>';
+  }
+  return '<a class="od-home-dm-attachment od-home-dm-file" href="'+url+'" target="_blank" rel="noopener"><span class="od-home-dm-file-icon">↗</span><span><strong>'+name+'</strong><small>'+formatFileSize(a.size)+' · '+escapeHtml(a.type||"File")+'</small></span><b>Download</b></a>';
+}
+
+function formatFileSize(size){
+  const n=Number(size||0);
+  if(!n)return "File";
+  if(n<1024)return n+" B";
+  if(n<1024*1024)return (n/1024).toFixed(1)+" KB";
+  return (n/1024/1024).toFixed(1)+" MB";
+}
+
+function dmReactionMarkup(m){
+  const reactions=m?.reactions||{};
+  return Object.entries(reactions).filter(([,users])=>Array.isArray(users)&&users.length).map(([emoji,users])=>{
+    const mine=users.map(String).includes(String(me?.id));
+    return '<button class="od-home-dm-reaction '+(mine?"mine":"")+'" data-dm-react="'+escapeHtml(emoji)+'" title="React with '+escapeHtml(emoji)+'"><span>'+escapeHtml(emoji)+'</span><b>'+users.length+'</b></button>';
+  }).join("");
+}
+
+function bindHomeDMFeedActions(){
+  document.querySelectorAll("#od-home-dm-messages [data-dm-react],#od-home-dm-messages [data-dm-quick-react]").forEach(btn=>btn.onclick=async e=>{
+    e.preventDefault();e.stopPropagation();
+    const article=btn.closest("[data-dm-message]");
+    if(!article)return;
+    const messageId=article.dataset.dmMessage;
+    const dmId=article.dataset.dmMessageDm;
+    const emoji=btn.dataset.dmReact||btn.dataset.dmQuickReact||"👍";
+    try{
+      const out=await api("/api/dms/"+encodeURIComponent(dmId)+"/messages/"+encodeURIComponent(messageId)+"/reaction",{method:"POST",body:JSON.stringify({emoji})});
+      const found=dmState.messages.find(m=>String(m.id)===String(messageId));
+      if(found)found.reactions=out.reactions||{};
+      renderHomeDirectMessageFeed(false);
+    }catch(err){orbitToast("Reaction failed",err.message||"Could not react.","error")}
+  });
+  document.querySelectorAll("#od-home-dm-messages [data-dm-reply]").forEach(btn=>btn.onclick=e=>{
+    e.preventDefault();e.stopPropagation();
+    const article=btn.closest("[data-dm-message]"),input=$("#od-home-dm-input");
+    const message=dmState.messages.find(m=>String(m.id)===String(article?.dataset.dmMessage));
+    if(!input||!message)return;
+    const prefix="↪ @"+(message.username||"user")+": ";
+    input.value=prefix+(message.content||"").slice(0,240)+" ";
+    input.focus();
+    input.setSelectionRange(input.value.length,input.value.length);
+    input.dispatchEvent(new Event("input",{bubbles:true}));
+  });
+  document.querySelectorAll("#od-home-dm-messages [data-dm-more]").forEach(btn=>btn.onclick=e=>{
+    e.preventDefault();e.stopPropagation();
+    const article=btn.closest("[data-dm-message]");
+    const message=dmState.messages.find(m=>String(m.id)===String(article?.dataset.dmMessage));
+    if(!message)return;
+    const pinned=JSON.parse(localStorage.getItem("orbit_dm_pins")||"[]");
+    const idValue=String(message.id);
+    const isPinned=pinned.includes(idValue);
+    localStorage.setItem("orbit_dm_pins",JSON.stringify(isPinned?pinned.filter(x=>x!==idValue):[...pinned,idValue]));
+    orbitToast(isPinned?"Unpinned":"Pinned",isPinned?"Message removed from pins.":"Message pinned in this browser.","success");
+    renderHomeDirectMessageFeed(false);
+  });
+}
+
 function renderHomeDirectMessageFeed(scrollBottom){
   const feed=$("#od-home-dm-messages");
   if(!feed)return;
   const other=dmState.active?.otherUser||{};
   if(!dmState.messages.length){
-    feed.innerHTML='<div class="od-home-dm-welcome"><div class="od-home-dm-big-avatar">'+escapeHtml(avatar(other.username||"G"))+'</div><div class="od-home-dm-welcome-kicker">DIRECT MESSAGE</div><strong>'+escapeHtml(other.display_name||other.username||"Guest")+'</strong><span>Start the conversation by sending the first message.</span></div>';
+    const otherAvatar=avatarImageUrl(other);
+    feed.innerHTML='<div class="od-home-dm-welcome"><div class="od-home-dm-big-avatar">'+(otherAvatar?'<img src="'+escapeHtml(otherAvatar)+'" alt="">':escapeHtml(avatar(other.username||"G")))+'</div><div class="od-home-dm-welcome-kicker">DIRECT MESSAGE</div><strong>'+escapeHtml(other.display_name||other.username||"Guest")+'</strong><span>Start the conversation by sending the first message.</span></div>';
     return;
   }
-
-  const rows=[];
-  let lastDay="";
-  let lastUser="";
-  let lastTime=0;
-
+  const rows=[];let lastDay="",lastUser="",lastTime=0;
+  const pinnedIds=JSON.parse(localStorage.getItem("orbit_dm_pins")||"[]");
   for(const m of dmState.messages){
     const ts=Date.parse(m.created_at||"")||Date.now();
     const day=new Date(ts).toLocaleDateString([], {year:"numeric",month:"short",day:"numeric"});
     const own=String(m.user_id)===String(me?.id);
     const userName=m.username||"Guest";
-    const grouped=lastUser===userName && (ts-lastTime)<300000 && lastDay===day;
-
+    const grouped=lastUser===userName&&(ts-lastTime)<300000&&lastDay===day;
     if(day!==lastDay){
       rows.push('<div class="od-home-dm-day"><span>'+escapeHtml(day)+'</span></div>');
-      lastDay=day;
-      lastUser="";
+      lastDay=day;lastUser="";
     }
-
     const stamp=escapeHtml(formatDMTime(m.created_at));
     const av=escapeHtml(m.username===me?.username&&me?avatar(me.username):avatar(userName));
     const body=escapeHtml(m.content||"");
-
+    const attachment=dmAttachmentMarkup(m);
+    const reactions=dmReactionMarkup(m);
+    const pinned=pinnedIds.includes(String(m.id));
+    const attrs=' data-dm-message="'+escapeHtml(m.id)+'" data-dm-message-dm="'+escapeHtml(m.dm_id||dmState.activeId||"")+'"';
+    const controls='<div class="od-home-dm-hover-actions"><button type="button" data-dm-quick-react="👍" title="React">☺</button><button type="button" data-dm-reply title="Reply">↩</button><button type="button" data-dm-more title="'+(pinned?"Unpin":"Pin")+'">'+(pinned?"▣":"⋯")+'</button></div>';
+    const reactionRow=reactions?'<div class="od-home-dm-reactions">'+reactions+'</div>':"";
     if(grouped){
-      rows.push(
-        '<article class="od-home-dm-message od-home-dm-message-grouped '+(own?"own":"")+'">'+
-          '<div class="od-home-dm-msg-spacer"></div>'+
-          '<div class="od-home-dm-msg-stack">'+
-            '<div class="od-home-dm-text">'+body+'</div>'+
-          '</div>'+
-        '</article>'
-      );
+      rows.push('<article class="od-home-dm-message od-home-dm-message-grouped '+(own?"own":"")+'"'+attrs+'><div class="od-home-dm-msg-spacer"></div><div class="od-home-dm-msg-stack"><div class="od-home-dm-text">'+body+'</div>'+attachment+reactionRow+controls+'</div></article>');
     }else{
-      rows.push(
-        '<article class="od-home-dm-message '+(own?"own":"")+'">'+
-          '<div class="od-home-dm-msg-avatar">'+av+'</div>'+
-          '<div class="od-home-dm-msg-stack">'+
-            '<div class="od-home-dm-meta"><strong>'+escapeHtml(userName)+'</strong><time>'+stamp+'</time></div>'+
-            '<div class="od-home-dm-text">'+body+'</div>'+
-          '</div>'+
-        '</article>'
-      );
+      rows.push('<article class="od-home-dm-message '+(own?"own":"")+'"'+attrs+'><div class="od-home-dm-msg-avatar">'+av+'</div><div class="od-home-dm-msg-stack"><div class="od-home-dm-meta"><strong>'+escapeHtml(userName)+'</strong><time>'+stamp+'</time>'+(pinned?'<span class="od-home-dm-pin-mark">Pinned</span>':"")+'</div><div class="od-home-dm-text">'+body+'</div>'+attachment+reactionRow+controls+'</div></article>');
     }
-    lastUser=userName;
-    lastTime=ts;
+    lastUser=userName;lastTime=ts;
   }
-
   feed.innerHTML=rows.join("");
+  bindHomeDMFeedActions();
   if(scrollBottom)requestAnimationFrame(()=>{feed.scrollTop=feed.scrollHeight});
 }
+
+function renderHomeDMDashboard(mode="media",term=""){
+  const drawer=$("#od-home-dm-drawer"),active=dmState.active;
+  if(!drawer||!active)return;
+  drawer.classList.remove("hidden");
+  const messages=dmState.messages||[];
+  const attachments=messages.filter(m=>m.attachment?.id);
+  const links=messages.filter(m=>/(https?:\/\/[^\s]+)/i.test(String(m.content||"")));
+  const pinnedIds=JSON.parse(localStorage.getItem("orbit_dm_pins")||"[]");
+  const pinned=messages.filter(m=>pinnedIds.includes(String(m.id)));
+  let body="";
+  if(mode==="search"){
+    const q=String(term||"").trim().toLowerCase();
+    const matches=messages.filter(m=>String(m.content||"").toLowerCase().includes(q));
+    body='<div class="od-home-dm-drawer-tools"><label>Search conversation<input id="od-home-dm-drawer-search" value="'+escapeHtml(term||"")+'" placeholder="Search messages..."></label><span>'+matches.length+' results</span></div><div class="od-home-dm-drawer-list">'+(matches.length?matches.slice().reverse().map(m=>'<button class="od-home-dm-result" data-dm-result="'+escapeHtml(m.id)+'"><strong>'+escapeHtml(m.username||"Guest")+'</strong><span>'+escapeHtml(String(m.content||"").slice(0,160))+'</span><time>'+escapeHtml(formatDMTime(m.created_at))+'</time></button>').join(""):'<div class="od-home-dm-drawer-empty">No matching messages.</div>')+'</div>';
+  }else{
+    const list=mode==="files"?attachments:mode==="links"?links:mode==="pinned"?pinned:attachments;
+    body='<div class="od-home-dm-drawer-tools"><strong>'+escapeHtml(mode==="files"?"Files":mode==="links"?"Links":mode==="pinned"?"Pinned":"Shared media")+'</strong><span>'+list.length+' items</span></div><div class="od-home-dm-drawer-list">'+(list.length?list.slice().reverse().map(m=>{
+      if(mode==="links"){
+        const match=String(m.content||"").match(/https?:\/\/[^\s]+/i)?.[0]||"";
+        return '<a class="od-home-dm-result link" href="'+escapeHtml(match)+'" target="_blank" rel="noopener"><strong>Link</strong><span>'+escapeHtml(match)+'</span><time>'+escapeHtml(formatDMTime(m.created_at))+'</time></a>';
+      }
+      if(m.attachment?.id){
+        const a=m.attachment;
+        return '<button class="od-home-dm-result" data-dm-result="'+escapeHtml(m.id)+'"><span class="od-home-dm-drawer-file-icon">'+(String(a.type||"").startsWith("image/")?"▧":"↗")+'</span><span><strong>'+escapeHtml(a.name||"File")+'</strong><small>'+formatFileSize(a.size)+' · '+escapeHtml(a.type||"File")+'</small></span><time>'+escapeHtml(formatDMTime(m.created_at))+'</time></button>';
+      }
+      return '<button class="od-home-dm-result" data-dm-result="'+escapeHtml(m.id)+'"><strong>'+escapeHtml(m.username||"Guest")+'</strong><span>'+escapeHtml(String(m.content||"").slice(0,160))+'</span><time>'+escapeHtml(formatDMTime(m.created_at))+'</time></button>';
+    }).join(""):'<div class="od-home-dm-drawer-empty">Nothing here yet.</div>')+'</div>';
+  }
+  drawer.innerHTML='<div class="od-home-dm-drawer-head"><div><strong>Conversation tools</strong><span>@'+escapeHtml(active.otherUser?.username||"user")+'</span></div><button id="od-home-dm-drawer-close">×</button></div><div class="od-home-dm-drawer-tabs"><button data-dm-drawer-tab="media" class="'+(mode==="media"?"active":"")+'">Media</button><button data-dm-drawer-tab="files" class="'+(mode==="files"?"active":"")+'">Files</button><button data-dm-drawer-tab="links" class="'+(mode==="links"?"active":"")+'">Links</button><button data-dm-drawer-tab="pinned" class="'+(mode==="pinned"?"active":"")+'">Pinned</button></div>'+body;
+  $("#od-home-dm-drawer-close").onclick=()=>drawer.classList.add("hidden");
+  document.querySelectorAll("[data-dm-drawer-tab]").forEach(btn=>btn.onclick=()=>renderHomeDMDashboard(btn.dataset.dmDrawerTab,""));
+  $("#od-home-dm-drawer-search")?.addEventListener("input",e=>renderHomeDMDashboard("search",e.target.value));
+  document.querySelectorAll("[data-dm-result]").forEach(btn=>btn.onclick=()=>{
+    const msg=document.querySelector('[data-dm-message="'+CSS.escape(String(btn.dataset.dmResult))+'"]');
+    if(msg){msg.scrollIntoView({behavior:"smooth",block:"center"});msg.classList.add("dm-highlight");setTimeout(()=>msg.classList.remove("dm-highlight"),1400);}
+    drawer.classList.add("hidden");
+  });
+}
+
 
 
 /* ===== ORBIT PRODUCT EXPANSION / SOCIAL OS MODULES ===== */
@@ -3220,23 +3352,25 @@ connectRealtime=function(){
     const homeTyping=$("#od-home-dm-typing");if(homeTyping)homeTyping.textContent=x.isTyping?(x.username||"Your friend")+" is typing…":"";
   });
   socket.on("dm:message",m=>{
-    const existing=dmState.list.find(d=>String(d.id)===String(m.dm_id));
-    if(existing){existing.lastMessage=m;if(String(m.user_id)!==String(me?.id)&&String(dmState.activeId)!==String(m.dm_id))existing.unreadCount=Number(existing.unreadCount||0)+1;}
-    if(String(dmState.activeId)===String(m.dm_id)){
-      if(!dmState.messages.some(x=>String(x.id)===String(m.id))){
-        dmState.messages.push(m);
-        renderDMMessageFeed(true);
-        renderHomeDirectMessageFeed(true);
-      }
-      if(String(m.user_id)!==String(me?.id)){
-        socket?.emit("dm:read",m.dm_id);
-        api("/api/dms/"+encodeURIComponent(m.dm_id)+"/read",{method:"POST",body:"{}"}).catch(()=>{});
-      }
-    }else if(String(m.user_id)!==String(me?.id)){
-      orbitToast("New message",(m.username||"Your friend")+": "+String(m.content||"").slice(0,90),"success");
+    if(!m||!m.dm_id)return;
+    const exists=dmState.messages.some(x=>String(x.id)===String(m.id));
+    if(String(m.dm_id)===String(dmState.activeId)){
+      if(!exists)dmState.messages.push(m);
+      renderDMMessageFeed(false);
+      renderHomeDirectMessageFeed(true);
+      socket?.emit("dm:read",m.dm_id);
+      api("/api/dms/"+encodeURIComponent(m.dm_id)+"/read",{method:"POST",body:"{}"}).catch(()=>{});
     }
     if(orbitUI.view==="dms")renderDMList();
     if(orbitUI.view==="home")document.querySelectorAll("[data-od-dm]").forEach(btn=>btn.classList.toggle("active",String(btn.dataset.odDm)===String(m.dm_id)));
+  });
+  socket.on("dm:reaction",event=>{
+    if(!event?.dmId||String(event.dmId)!==String(dmState.activeId))return;
+    const found=dmState.messages.find(x=>String(x.id)===String(event.messageId));
+    if(!found)return;
+    found.reactions=event.reactions||{};
+    renderHomeDirectMessageFeed(false);
+    renderDMMessageFeed(false);
   });
   socket.on("dm:read",event=>{
     if(!event||String(event.dmId)!==String(dmState.activeId))return;
