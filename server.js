@@ -673,6 +673,44 @@ app.get("/api/v1/developer/me",authApiKey,requireApiScope("profile.read"),(req,r
   res.json({user:publicUser(req.user),apiKey:{id:req.apiKey.id,name:req.apiKey.name,scopes:req.apiKey.scopes}});
 });
 
+app.get("/api/v1/sdk/me",authApiKey,requireApiScope("profile.read"),(req,res)=>{
+  res.json({user:publicUser(req.user)});
+});
+
+app.get("/api/v1/sdk/communities",authApiKey,requireApiScope("communities.read"),(req,res)=>{
+  const rows=[...memory.servers.values()].filter(server=>server.members.has(String(req.user.id))).map(server=>({
+    id:server.id,name:server.name,memberCount:server.members.size,channelCount:server.channels.length
+  }));
+  res.json({communities:rows});
+});
+
+app.get("/api/v1/sdk/communities/:id/channels",authApiKey,requireApiScope("channels.read"),(req,res)=>{
+  const access=member(req.params.id,req.user.id);
+  if(!access)return res.status(403).json({error:"You are not a member of this community."});
+  const rows=access.server.channels.map(idValue=>memory.channels.get(idValue)).filter(Boolean).map(channel=>({id:channel.id,name:channel.name,type:channel.type,topic:channel.topic||""}));
+  res.json({channels:rows});
+});
+
+app.post("/api/v1/sdk/channels/:id/messages",authApiKey,requireApiScope("messages.write"),(req,res)=>{
+  const channel=memory.channels.get(String(req.params.id));
+  if(!channel)return res.status(404).json({error:"Channel not found"});
+  const access=member(channel.serverId,req.user.id);
+  if(!access || !can(access.role,PERMISSIONS.SEND_MESSAGES))return res.status(403).json({error:"Send Messages permission required."});
+  if(!channelAllowsText(channel.type) || channel.locked || channel.archived)return res.status(423).json({error:"This channel is not writable."});
+  const content=String(req.body?.content||"").trim().slice(0,4000);
+  if(!content)return res.status(400).json({error:"Message content is required."});
+  const message={id:id("msg"),channelId:channel.id,serverId:channel.serverId,userId:req.user.id,username:req.user.username,content,createdAt:now(),created_at:now(),attachments:[],reactions:{}};
+  const list=memory.messages.get(channel.id)||[];
+  list.push(message);
+  memory.messages.set(channel.id,list.slice(-2000));
+  const server=memory.servers.get(channel.serverId);
+  for(const uid of server?.members?.keys?.()||[])notify(uid,{type:"message",title:"#"+channel.name,body:req.user.username+": "+content,actorId:req.user.id,channelId:channel.id});
+  emitToServer(channel.serverId,"message:new",message);
+  audit(req.user.id,"API_MESSAGE_CREATE",message.id,{channelId:channel.id,apiKeyId:req.apiKey.id});
+  schedulePersist();
+  res.status(201).json({message});
+});
+
 app.get("/api/v1/platform/manifest", (req, res) => {
   res.json({
     ...platformManifest,
