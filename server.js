@@ -16,6 +16,7 @@ const { configureRedisAdapter, closeRedisAdapter } = require("./platform/realtim
 const { createStorage } = require("./platform/storage");
 const { PERMISSIONS, CHANNEL_TYPES, canManage: canManageRole, hasPermission, canManageMembers, canManageCommunity, canCreateChannel, channelAllowsText, channelAllowsRealtime } = require("./platform/permissions");
 const { generateSecret, verifyTotp, encryptSecret, decryptSecret, makeRecoveryCodes, hashRecoveryCode, consumeRecoveryCode, setupUri } = require("./platform/totp");
+const { API_KEY_SCOPES, hashSecret, safeCredentialName, makeApiKeySecret, makeClientId, makeClientSecret, validScopes } = require("./platform/developer");
 
 const app = express();
 const server = http.createServer(app);
@@ -58,7 +59,9 @@ const memory = {
   blocks: new Set(),
   mutes: new Set(),
   userSettings: new Map(),
-  notificationPreferences: new Map()
+  notificationPreferences: new Map(),
+  apiKeys: new Map(),
+  developerApplications: new Map()
 };
 
 const CALL_EVENT_PREFIX = "call:";
@@ -110,7 +113,9 @@ function serializeMemory() {
     userSettings: [...memory.userSettings.entries()],
     notificationPreferences: [...memory.notificationPreferences.entries()],
     posts: [...memory.posts.entries()],
-    postComments: [...memory.postComments.entries()]
+    postComments: [...memory.postComments.entries()],
+    apiKeys: [...memory.apiKeys.entries()],
+    developerApplications: [...memory.developerApplications.entries()]
   };
 }
 
@@ -140,6 +145,8 @@ function hydrateMemory(data) {
   restoreMap("notificationPreferences");
   restoreMap("posts");
   restoreMap("postComments");
+  restoreMap("apiKeys");
+  restoreMap("developerApplications");
 }
 
 async function sidecarRequest(method, body) {
@@ -321,6 +328,29 @@ function authV1(req, res, next) {
   } catch {
     return res.status(401).json({ error: "Session expired. Please refresh or sign in again." });
   }
+}
+
+
+
+function authApiKey(req,res,next){
+  const secret=apiKeyFromRequest(req);
+  const key=findApiKey(secret);
+  if(!key)return res.status(401).json({error:"Valid ORBIT API key required."});
+  const user=memory.users.get(String(key.userId));
+  if(!user)return res.status(401).json({error:"API key owner no longer exists."});
+  key.lastUsedAt=now();
+  req.user=user;
+  req.apiKey=key;
+  next();
+}
+
+function requireApiScope(scope){
+  return (req,res,next)=>{
+    if(!req.apiKey || !Array.isArray(req.apiKey.scopes) || !req.apiKey.scopes.includes(scope)){
+      return res.status(403).json({error:"API scope required.",scope});
+    }
+    next();
+  };
 }
 function serverSettings(server) {
   if (!server.settings || typeof server.settings !== "object") server.settings = {};
@@ -578,6 +608,107 @@ app.get("/readyz", (req, res) => {
     databaseReady: dbReady,
     requestId: req.orbitRequestId || null
   });
+});
+
+app.get("/api/v1/developer/api-keys",authV1,(req,res)=>{
+  const keys=[...memory.apiKeys.values()].filter(k=>String(k.userId)===String(req.user.id)).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  res.json({scopes:[...API_KEY_SCOPES],keys:keys.map(k=>({id:k.id,name:k.name,scopes:k.scopes,createdAt:k.createdAt,lastUsedAt:k.lastUsedAt||null,expiresAt:k.expiresAt||null,revokedAt:k.revokedAt||null}))});
+});
+
+app.post("/api/v1/developer/api-keys",authV1,(req,res)=>{
+  const name=safeCredentialName(req.body?.name);
+  const scopes=validScopes(req.body?.scopes);
+  if(!scopes.length)return res.status(400).json({error:"Choose at least one valid scope."});
+  if(scopes.includes("community.manage") && !["owner","admin"].includes(String(req.user.globalRole||"member"))){
+    // Community-level authorization is still enforced per endpoint. This gate only prevents accidental broad keys.
+  }
+  const secret=makeApiKeySecret();
+  const record={id:id("apikey"),userId:req.user.id,name,hash:hashSecret(secret),prefix:secret.slice(0,18),scopes,createdAt:now(),lastUsedAt:null,expiresAt:req.body?.expiresAt?new Date(req.body.expiresAt).toISOString():null,revokedAt:null};
+  memory.apiKeys.set(record.id,record);
+  audit(req.user.id,"API_KEY_CREATE",record.id,{scopes:record.scopes});
+  schedulePersist();
+  res.status(201).json({key:{id:record.id,name:record.name,secret,scopes:record.scopes,createdAt:record.createdAt,warning:"This secret is shown once. Store it securely."}});
+});
+
+app.post("/api/v1/developer/api-keys/:id/revoke",authV1,(req,res)=>{
+  const key=memory.apiKeys.get(String(req.params.id));
+  if(!key || String(key.userId)!==String(req.user.id))return res.status(404).json({error:"API key not found"});
+  key.revokedAt=now();
+  audit(req.user.id,"API_KEY_REVOKE",key.id,{});
+  schedulePersist();
+  res.json({ok:true});
+});
+
+app.get("/api/v1/developer/applications",authV1,(req,res)=>{
+  const apps=[...memory.developerApplications.values()].filter(app=>String(app.ownerId)===String(req.user.id)).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  res.json({applications:apps.map(app=>({id:app.id,name:app.name,description:app.description,clientId:app.clientId,redirectUris:app.redirectUris,createdAt:app.createdAt,revokedAt:app.revokedAt||null}))});
+});
+
+app.post("/api/v1/developer/applications",authV1,(req,res)=>{
+  const name=safeCredentialName(req.body?.name||"ORBIT App");
+  const description=String(req.body?.description||"").trim().slice(0,500);
+  const redirectUris=Array.isArray(req.body?.redirectUris)?req.body.redirectUris.map(x=>String(x).trim()).filter(Boolean).slice(0,10):[];
+  for(const uri of redirectUris){
+    if(!/^https?:\/\/[^\s]+$/i.test(uri))return res.status(400).json({error:"Redirect URIs must be valid HTTP(S) URLs."});
+  }
+  const clientId=makeClientId();
+  const clientSecret=makeClientSecret();
+  const record={id:id("app"),ownerId:req.user.id,name,description,clientId,clientSecretHash:hashSecret(clientSecret),redirectUris,createdAt:now(),revokedAt:null};
+  memory.developerApplications.set(record.id,record);
+  audit(req.user.id,"DEVELOPER_APP_CREATE",record.id,{clientId});
+  schedulePersist();
+  res.status(201).json({application:{id:record.id,name,description,clientId,redirectUris,createdAt:record.createdAt},clientSecret,warning:"The client secret is shown once. Store it securely."});
+});
+
+app.post("/api/v1/developer/applications/:id/revoke",authV1,(req,res)=>{
+  const appRecord=memory.developerApplications.get(String(req.params.id));
+  if(!appRecord || String(appRecord.ownerId)!==String(req.user.id))return res.status(404).json({error:"Application not found"});
+  appRecord.revokedAt=now();
+  audit(req.user.id,"DEVELOPER_APP_REVOKE",appRecord.id,{});
+  schedulePersist();
+  res.json({ok:true});
+});
+
+app.get("/api/v1/developer/me",authApiKey,requireApiScope("profile.read"),(req,res)=>{
+  res.json({user:publicUser(req.user),apiKey:{id:req.apiKey.id,name:req.apiKey.name,scopes:req.apiKey.scopes}});
+});
+
+app.get("/api/v1/sdk/me",authApiKey,requireApiScope("profile.read"),(req,res)=>{
+  res.json({user:publicUser(req.user)});
+});
+
+app.get("/api/v1/sdk/communities",authApiKey,requireApiScope("communities.read"),(req,res)=>{
+  const rows=[...memory.servers.values()].filter(server=>server.members.has(String(req.user.id))).map(server=>({
+    id:server.id,name:server.name,memberCount:server.members.size,channelCount:server.channels.length
+  }));
+  res.json({communities:rows});
+});
+
+app.get("/api/v1/sdk/communities/:id/channels",authApiKey,requireApiScope("channels.read"),(req,res)=>{
+  const access=member(req.params.id,req.user.id);
+  if(!access)return res.status(403).json({error:"You are not a member of this community."});
+  const rows=access.server.channels.map(idValue=>memory.channels.get(idValue)).filter(Boolean).map(channel=>({id:channel.id,name:channel.name,type:channel.type,topic:channel.topic||""}));
+  res.json({channels:rows});
+});
+
+app.post("/api/v1/sdk/channels/:id/messages",authApiKey,requireApiScope("messages.write"),(req,res)=>{
+  const channel=memory.channels.get(String(req.params.id));
+  if(!channel)return res.status(404).json({error:"Channel not found"});
+  const access=member(channel.serverId,req.user.id);
+  if(!access || !can(access.role,PERMISSIONS.SEND_MESSAGES))return res.status(403).json({error:"Send Messages permission required."});
+  if(!channelAllowsText(channel.type) || channel.locked || channel.archived)return res.status(423).json({error:"This channel is not writable."});
+  const content=String(req.body?.content||"").trim().slice(0,4000);
+  if(!content)return res.status(400).json({error:"Message content is required."});
+  const message={id:id("msg"),channelId:channel.id,serverId:channel.serverId,userId:req.user.id,username:req.user.username,content,createdAt:now(),created_at:now(),attachments:[],reactions:{}};
+  const list=memory.messages.get(channel.id)||[];
+  list.push(message);
+  memory.messages.set(channel.id,list.slice(-2000));
+  const server=memory.servers.get(channel.serverId);
+  for(const uid of server?.members?.keys?.()||[])notify(uid,{type:"message",title:"#"+channel.name,body:req.user.username+": "+content,actorId:req.user.id,channelId:channel.id});
+  emitToServer(channel.serverId,"message:new",message);
+  audit(req.user.id,"API_MESSAGE_CREATE",message.id,{channelId:channel.id,apiKeyId:req.apiKey.id});
+  schedulePersist();
+  res.status(201).json({message});
 });
 
 app.get("/api/v1/platform/manifest", (req, res) => {
