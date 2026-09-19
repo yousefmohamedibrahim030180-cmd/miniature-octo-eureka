@@ -52,7 +52,11 @@ const memory = {
   aiConversations: new Map(),
   liveSessions: new Map(),
   audit: [],
-  sessions: new Map()
+  sessions: new Map(),
+  blocks: new Set(),
+  mutes: new Set(),
+  userSettings: new Map(),
+  notificationPreferences: new Map()
 };
 
 const CALL_EVENT_PREFIX = "call:";
@@ -98,7 +102,11 @@ function serializeMemory() {
     aiConversations: [...memory.aiConversations.entries()],
     liveSessions: [...memory.liveSessions.entries()],
     audit: memory.audit,
-    sessions: [...memory.sessions.entries()]
+    sessions: [...memory.sessions.entries()],
+    blocks: [...memory.blocks],
+    mutes: [...memory.mutes],
+    userSettings: [...memory.userSettings.entries()],
+    notificationPreferences: [...memory.notificationPreferences.entries()]
   };
 }
 
@@ -122,6 +130,10 @@ function hydrateMemory(data) {
   restoreMap("events"); restoreMap("projects"); restoreMap("aiConversations"); restoreMap("liveSessions");
   memory.audit = Array.isArray(data.audit) ? data.audit : [];
   restoreMap("sessions");
+  memory.blocks.clear(); for(const value of (data.blocks||[])) memory.blocks.add(String(value));
+  memory.mutes.clear(); for(const value of (data.mutes||[])) memory.mutes.add(String(value));
+  restoreMap("userSettings");
+  restoreMap("notificationPreferences");
 }
 
 async function sidecarRequest(method, body) {
@@ -812,6 +824,20 @@ app.get("/api/search", auth, (req, res) => {
 function pairKey(a, b) {
   return [String(a), String(b)].sort().join(":");
 }
+function isBlocked(a,b){return memory.blocks.has(pairKey(a,b));}
+function isMuted(a,b){return memory.mutes.has(pairKey(a,b));}
+function defaultNotificationPreferences(){return {mentions:true,directMessages:true,friendRequests:true,events:true,streams:true,security:true,replies:true,social:true};}
+function userNotificationPreferences(userId){
+  const current=memory.notificationPreferences.get(String(userId));
+  if(!current){const created=defaultNotificationPreferences();memory.notificationPreferences.set(String(userId),created);return created;}
+  return {...defaultNotificationPreferences(),...current};
+}
+function notificationAllowed(userId,type){
+  const prefs=userNotificationPreferences(userId);
+  const map={friend_request:"friendRequests",message:"directMessages",reply:"replies",event:"events",stream:"streams",security:"security",social:"social",mention:"mentions"};
+  const key=map[String(type||"social")]||"social";
+  return prefs[key]!==false;
+}
 function findMessage(messageId) {
   for (const [channelId, list] of memory.messages.entries()) {
     const index = list.findIndex(m => String(m.id) === String(messageId));
@@ -820,6 +846,7 @@ function findMessage(messageId) {
   return null;
 }
 function notify(userId, item) {
+  if(!notificationAllowed(userId,item?.type)) return;
   const list = memory.notifications.get(String(userId)) || [];
   list.unshift({
     id: id("notif"),
@@ -1015,6 +1042,74 @@ app.put("/api/servers/:id/nexus/world", auth, (req, res) => {
   emitToServer(access.server.id, "nexus:world-updated", { world });
   res.json({ world });
 });
+app.get("/api/v1/social/blocks",auth,(req,res)=>{
+  res.json({blocks:[...memory.blocks].filter(key=>key.startsWith(String(req.user.id)+":")||key.endsWith(":"+String(req.user.id))).map(key=>{
+    const ids=key.split(":"); const other=ids[0]===String(req.user.id)?ids[1]:ids[0];
+    return publicUser(memory.users.get(other)||{id:other});
+  })});
+});
+app.post("/api/v1/social/blocks/:userId",auth,(req,res)=>{
+  const other=memory.users.get(String(req.params.userId));
+  if(!other)return res.status(404).json({error:"User not found"});
+  if(String(other.id)===String(req.user.id))return res.status(400).json({error:"You cannot block yourself"});
+  const key=pairKey(req.user.id,other.id);
+  memory.blocks.add(key);
+  memory.friendships.delete(key);
+  for(const [idValue,r] of memory.friendRequests.entries()){
+    if((String(r.from)===String(req.user.id)&&String(r.to)===String(other.id))||(String(r.from)===String(other.id)&&String(r.to)===String(req.user.id))) r.status="cancelled";
+  }
+  audit(req.user.id,"USER_BLOCK",other.id);
+  schedulePersist();
+  res.json({ok:true,user:publicUser(other)});
+});
+app.delete("/api/v1/social/blocks/:userId",auth,(req,res)=>{
+  const key=pairKey(req.user.id,req.params.userId);
+  memory.blocks.delete(key);
+  schedulePersist();
+  res.json({ok:true});
+});
+app.get("/api/v1/social/mutes",auth,(req,res)=>{
+  res.json({mutes:[...memory.mutes].filter(key=>key.startsWith(String(req.user.id)+":")||key.endsWith(":"+String(req.user.id))).map(key=>{
+    const ids=key.split(":"); const other=ids[0]===String(req.user.id)?ids[1]:ids[0];
+    return publicUser(memory.users.get(other)||{id:other});
+  })});
+});
+app.post("/api/v1/social/mutes/:userId",auth,(req,res)=>{
+  const other=memory.users.get(String(req.params.userId));
+  if(!other)return res.status(404).json({error:"User not found"});
+  if(String(other.id)===String(req.user.id))return res.status(400).json({error:"You cannot mute yourself"});
+  memory.mutes.add(pairKey(req.user.id,other.id));
+  schedulePersist();
+  res.json({ok:true});
+});
+app.delete("/api/v1/social/mutes/:userId",auth,(req,res)=>{
+  memory.mutes.delete(pairKey(req.user.id,req.params.userId));
+  schedulePersist();
+  res.json({ok:true});
+});
+app.get("/api/v1/me/preferences",auth,(req,res)=>{
+  res.json({locale:(memory.userSettings.get(String(req.user.id))||{}).locale||"en",timezone:(memory.userSettings.get(String(req.user.id))||{}).timezone||null,notifications:userNotificationPreferences(req.user.id)});
+});
+app.patch("/api/v1/me/preferences",auth,(req,res)=>{
+  const current=memory.userSettings.get(String(req.user.id))||{};
+  if(req.body?.locale!==undefined){
+    const locale=String(req.body.locale||"en").toLowerCase();
+    if(!["en","ar"].includes(locale))return res.status(400).json({error:"Supported locales: en, ar"});
+    current.locale=locale;
+  }
+  if(req.body?.timezone!==undefined) current.timezone=String(req.body.timezone||"").slice(0,80)||null;
+  if(req.body?.notifications && typeof req.body.notifications==="object"){
+    current.notificationPreferences=userNotificationPreferences(req.user.id);
+    for(const key of Object.keys(current.notificationPreferences)){
+      if(req.body.notifications[key]!==undefined) current.notificationPreferences[key]=Boolean(req.body.notifications[key]);
+    }
+    memory.notificationPreferences.set(String(req.user.id),current.notificationPreferences);
+  }
+  memory.userSettings.set(String(req.user.id),current);
+  schedulePersist();
+  res.json({locale:current.locale||"en",timezone:current.timezone||null,notifications:userNotificationPreferences(req.user.id)});
+});
+
 app.get("/api/friends", auth, (req, res) => {
   const userId = String(req.user.id);
   const friends = [];
@@ -1038,6 +1133,8 @@ app.post("/api/friends/request", auth, (req, res) => {
   const target = [...memory.users.values()].find(u => u.username.toLowerCase() === targetName);
   if (!target) return res.status(404).json({ error: "User not found" });
   if (target.id === req.user.id) return res.status(400).json({ error: "You cannot add yourself" });
+  if (isBlocked(req.user.id,target.id)) return res.status(403).json({ error: "You blocked this user" });
+  if (isBlocked(target.id,req.user.id)) return res.status(403).json({ error: "This user cannot receive friend requests from you" });
   if (memory.friendships.has(pairKey(req.user.id, target.id))) return res.status(409).json({ error: "Already friends" });
   const existing = [...memory.friendRequests.values()].find(r =>
     r.status === "pending" &&
@@ -1095,6 +1192,8 @@ app.post("/api/dms", auth, (req, res) => {
   const target = targetId ? memory.users.get(targetId) : [...memory.users.values()].find(u => u.username.toLowerCase() === targetName);
   if (!target) return res.status(404).json({ error: "User not found" });
   if (target.id === req.user.id) return res.status(400).json({ error: "You cannot message yourself" });
+  if (isBlocked(req.user.id,target.id)) return res.status(403).json({error:"You blocked this user"});
+  if (isBlocked(target.id,req.user.id)) return res.status(403).json({error:"This user has blocked you"});
 
   const existing = [...memory.dms.values()].find(dm => dm.type === "dm" && dm.members.length === 2 && dm.members.includes(String(req.user.id)) && dm.members.includes(String(target.id)));
   if (existing) return res.json({ dm: existing });
