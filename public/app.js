@@ -121,7 +121,7 @@ async function api(url, opts = {}, allowRefresh = true) {
     if(await refreshAccountSession()) return api(url,opts,false);
   }
   const data=await response.json().catch(()=>({}));
-  if(!response.ok) throw new Error(data.error || "Request failed");
+  if(!response.ok){ const error=new Error(data.error || "Request failed"); error.code=data.code||null; throw error; }
   return data;
 }
 function fmt(ts) { return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
@@ -224,6 +224,7 @@ function showAuthScreen(mode="signin", legacy=false){
         ((mode==="register"&&!convertMode)?'<label><span>Display name</span><input id="orbit-auth-display" maxlength="24" placeholder="Your name" autocomplete="name"></label>':'')+
         '<label><span>Username</span><div class="orbit-auth-input-wrap"><b>@</b><input id="orbit-auth-username" maxlength="20" placeholder="username" autocomplete="username" required></div></label>'+
         '<label><span>Password</span><input id="orbit-auth-password" type="password" minlength="8" maxlength="72" placeholder="At least 8 characters" autocomplete="'+((mode==="signin"&&!convertMode)?"current-password":"new-password")+'" required></label>'+
+        '<label id="orbit-auth-2fa-wrap" hidden><span>Authenticator code</span><input id="orbit-auth-2fa" maxlength="8" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code or recovery code"></label>'+
         '<div id="orbit-auth-error" class="orbit-auth-error" aria-live="polite"></div>'+
         '<button class="orbit-auth-submit" type="submit"><span>'+(convertMode?"Create account":mode==="signin"?"Sign in":"Create account")+'</span><i>→</i></button>'+
       '</form>'+
@@ -244,7 +245,8 @@ function showAuthScreen(mode="signin", legacy=false){
     if(error)error.textContent="";
     try{
       const endpoint=convertMode?"/api/auth/convert-legacy":mode==="signin"?"/api/v1/auth/login":"/api/v1/auth/register";
-      const body=convertMode?{username,password}:{username,password,...(mode==="register"?{displayName}:{})};
+      const twoFactorCode=$("#orbit-auth-2fa")?.value.trim()||"";
+      const body=convertMode?{username,password}:{username,password,twoFactorCode,...(mode==="register"?{displayName}:{})};
       const data=await api(endpoint,{method:"POST",body:JSON.stringify(body)});
       saveAccountSession(data);
       hideAuthScreen();
@@ -255,7 +257,10 @@ function showAuthScreen(mode="signin", legacy=false){
       await loadServers();
       orbitToast(mode==="signin"?"Welcome back":"Account created","You're now connected to ORBIT.","success");
     }catch(err){
-      if(error)error.textContent=err.message||"Authentication failed.";
+      if(err.code==="TWO_FACTOR_REQUIRED"){
+        const wrap=$("#orbit-auth-2fa-wrap"); if(wrap){wrap.hidden=false;$("#orbit-auth-2fa")?.focus();}
+        if(error)error.textContent="Enter the 6-digit authenticator code, or one of your recovery codes.";
+      }else if(error)error.textContent=err.message||"Authentication failed.";
       if(submit){submit.disabled=false;submit.classList.remove("loading");submit.querySelector("span").textContent=convertMode?"Create account":mode==="signin"?"Sign in":"Create account";}
     }
   });
@@ -3696,7 +3701,7 @@ function renderSettingsPage(section="appearance"){
   }else if(section==="performance"){
     card.innerHTML=setting("Performance mode","Reduce expensive visual effects.",false,"perf-mode")+setting("Lazy media","Load rich media on demand.",true,"perf-lazy");
   }else if(section==="security"){
-    card.innerHTML='<h3>Security center</h3><p>Manage active sessions and see how this account is connected to ORBIT.</p><div class="list-card" id="orbit-session-list"><div class="content-card"><h4>Loading sessions…</h4><p>Checking active devices.</p></div></div><div class="setting-row"><div><strong>Session policy</strong><span>New account sessions use short-lived access tokens with revocable refresh sessions.</span></div><span class="setting-status-badge">V1 SECURITY</span></div><div class="setting-row"><div><strong>Sign out other devices</strong><span>Immediately revoke every other active session.</span></div><button class="primary" id="revoke-other-sessions">Revoke others</button></div>';
+    card.innerHTML='<h3>Security center</h3><p>Manage active sessions, devices and two-factor authentication.</p><div class="list-card" id="orbit-session-list"><div class="content-card"><h4>Loading sessions…</h4><p>Checking active devices.</p></div></div><div class="setting-block" id="orbit-2fa-panel"><div class="content-card"><h4>Loading 2FA…</h4><p>Checking authenticator status.</p></div></div><div class="setting-row"><div><strong>Session policy</strong><span>New account sessions use short-lived access tokens with revocable refresh sessions.</span></div><span class="setting-status-badge">V1 SECURITY</span></div><div class="setting-row"><div><strong>Sign out other devices</strong><span>Immediately revoke every other active session.</span></div><button class="primary" id="revoke-other-sessions">Revoke others</button></div>';
     (async()=>{
       try{
         const data=await api("/api/v1/auth/sessions");
@@ -3725,6 +3730,43 @@ function renderSettingsPage(section="appearance"){
       }catch{
         $("#orbit-session-list").innerHTML='<div class="content-card"><h4>Legacy guest session</h4><p>Account security sessions activate after you sign in with an ORBIT account. Your current connection is still protected by the compatibility session system.</p></div>';
         $("#revoke-other-sessions")?.setAttribute("disabled","disabled");
+      }
+    })();
+    (async()=>{
+      const panel=$("#orbit-2fa-panel");
+      if(!panel)return;
+      try{
+        const state=await api("/api/v1/security/2fa");
+        if(state.enabled){
+          panel.innerHTML='<div class="setting-row"><div><strong>Two-factor authentication</strong><span>Authenticator protection is enabled. '+Number(state.recoveryCodesRemaining||0)+' recovery code(s) remain.</span></div><span class="setting-status-badge">ENABLED</span></div><div class="setting-row"><div><strong>Disable 2FA</strong><span>Requires an authenticator code or recovery code.</span></div><button class="primary" id="orbit-2fa-disable-btn">Disable</button></div>';
+          $("#orbit-2fa-disable-btn").onclick=()=>{
+            openModal("Disable two-factor authentication",'<div class="orbit-form-stack"><input id="orbit-2fa-disable-code" inputmode="numeric" maxlength="6" placeholder="Authenticator code"><input id="orbit-2fa-recovery-code" maxlength="20" placeholder="Or recovery code"><button class="primary" id="orbit-2fa-disable-submit">Disable 2FA</button></div>');
+            $("#orbit-2fa-disable-submit").onclick=async()=>{
+              try{
+                await api("/api/v1/security/2fa/disable",{method:"POST",body:JSON.stringify({code:$("#orbit-2fa-disable-code").value.trim(),recoveryCode:$("#orbit-2fa-recovery-code").value.trim()})});
+                closeModal();orbitToast("2FA disabled","Two-factor authentication has been turned off.","success");renderSettingsPage("security");
+              }catch(err){orbitToast("Could not disable 2FA",err.message,"error")}
+            };
+          };
+        }else{
+          panel.innerHTML='<div class="setting-row"><div><strong>Two-factor authentication</strong><span>Protect sign-ins with an authenticator app. The secret is encrypted and recovery codes are one-time.</span></div><span class="setting-status-badge">OFF</span></div><div class="setting-row"><div><strong>Enable 2FA</strong><span>Start setup, add the secret to your authenticator, then verify one code.</span></div><button class="primary" id="orbit-2fa-start">Enable</button></div>';
+          $("#orbit-2fa-start").onclick=async()=>{
+            try{
+              const setup=await api("/api/v1/security/2fa/setup",{method:"POST",body:"{}"});
+              openModal("Set up two-factor authentication",'<div class="orbit-form-stack"><p>Enter this secret manually in your authenticator app, or use the provisioning URI with an app that supports it:</p><code class="orbit-secret-code">'+escapeHtml(setup.secret)+'</code><p class="hint">'+escapeHtml(setup.otpauthUri)+'</p><input id="orbit-2fa-verify-code" inputmode="numeric" maxlength="6" placeholder="6-digit authenticator code"><button class="primary" id="orbit-2fa-verify-btn">Verify & enable</button></div>');
+              $("#orbit-2fa-verify-btn").onclick=async()=>{
+                try{
+                  const result=await api("/api/v1/security/2fa/verify",{method:"POST",body:JSON.stringify({code:$("#orbit-2fa-verify-code").value.trim()})});
+                  closeModal();
+                  openModal("Save your recovery codes",'<p>These codes are shown once. Store them somewhere safe before closing this window.</p><div class="orbit-recovery-codes">'+(result.recoveryCodes||[]).map(code=>'<code>'+escapeHtml(code)+'</code>').join("")+'</div><button class="primary" id="orbit-2fa-recovery-done">I saved them</button>');
+                  $("#orbit-2fa-recovery-done").onclick=()=>{closeModal();orbitToast("2FA enabled","Authenticator protection is now active.","success");renderSettingsPage("security")};
+                }catch(err){orbitToast("2FA verification failed",err.message,"error")}
+              };
+            }catch(err){orbitToast("2FA setup failed",err.message,"error")}
+          };
+        }
+      }catch(err){
+        panel.innerHTML='<div class="content-card"><h4>2FA unavailable</h4><p>'+escapeHtml(err.message)+'</p></div>';
       }
     })();
   }else if(section==="language"){
