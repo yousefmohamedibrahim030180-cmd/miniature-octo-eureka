@@ -121,3 +121,64 @@ body[data-nexus-surface="mint"] .nexus-ambient i:nth-child(1){background:#bff2e7
 body[data-nexus-surface="pearl"],body[data-nexus-surface="mint"]{background-color:#f1f5f6}
 body[data-nexus-surface="night"]{color:var(--text)}
 @media(max-width:760px){.nexus-surface-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* ===== NEXUS console stays dark even on bright surfaces ===== */
+#nexus-console .nexus-console-card{
+  background:linear-gradient(145deg,rgba(10,15,24,.98),rgba(4,8,14,.99))!important;
+  border-color:rgba(126,147,190,.18)!important;
+  color:#eef3ff;
+  box-shadow:0 50px 140px rgba(0,0,0,.58),0 0 80px color-mix(in srgb,var(--nexus-accent) 8%,transparent)!important;
+}
+#nexus-console .nexus-console-card h2{color:#f5f7ff!important}
+#nexus-console .nexus-console-card p{color:#7f8da5!important}
+#nexus-console .nexus-console-card header span{color:var(--nexus-accent)!important}
+#nexus-console .nexus-console-card header button{
+  background:#ffffff08!important;
+  border-color:#7f91ae26!important;
+  color:#91a0b7!important;
+}
+#nexus-console .nexus-atmos-grid button{
+  background:linear-gradient(145deg,#0c1420,#07101a)!important;
+  border-color:#7183a51e!important;
+  color:#8493aa!important;
+}
+#nexus-console .nexus-atmos-grid button:hover,
+#nexus-console .nexus-atmos-grid button.active{
+  background:linear-gradient(145deg,#121e30,#0a1320)!important;
+  border-color:color-mix(in srgb,var(--nexus-accent) 48%,transparent)!important;
+  color:#f6f8ff!important;
+  box-shadow:0 12px 30px color-mix(in srgb,var(--nexus-accent) 10%,transparent)!important;
+}
+#nexus-console .nexus-atmos-grid button small{color:#5f7088!important}
+#nexus-console .nexus-controls,
+#nexus-console .nexus-surface{
+  background:#ffffff03!important;
+  border-color:#7183a516!important;
+}
+#nexus-console .nexus-controls label,
+#nexus-console .nexus-surface>label{color:#7787a0!important}
+#nexus-console .nexus-controls output{color:#d6deec!important}
+#nexus-console .nexus-surface-grid button{
+  background:#0a1420!important;
+  border-color:#7183a51a!important;
+  color:#8191a9!important;
+}
+#nexus-console .nexus-surface-grid button:hover,
+#nexus-console .nexus-surface-grid button.active{
+  background:#111e2c!important;
+  border-color:color-mix(in srgb,var(--nexus-accent) 44%,transparent)!important;
+  color:#f3f6ff!important;
+}
+#nexus-console .nexus-console-card>footer button{
+  background:#ffffff05!important;
+  border-color:#7183a51a!important;
+  color:#94a2b8!important;
+}
+#nexus-console .nexus-console-card>footer button:last-child{
+  background:color-mix(in srgb,var(--nexus-accent) 16%,#08101a)!important;
+  border-color:color-mix(in srgb,var(--nexus-accent) 34%,transparent)!important;
+  color:#f4f7ff!important;
+}
+#nexus-console{
+  background:rgba(1,4,9,.70)!important;
+}
