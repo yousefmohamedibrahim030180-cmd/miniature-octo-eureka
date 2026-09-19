@@ -39,12 +39,12 @@
       <button id="workspace-menu" class="icon-btn" title="Community menu">⋯</button>
     </div>
 
-    <div class="sidebar-search" id="sidebar-search"><span>⌕</span><input id="quick-search" placeholder="Search or jump to..."><kbd>Ctrl K</kbd></div>
+    <div class="sidebar-search" id="sidebar-search"><span>⌕</span><input id="quick-search" placeholder="Search"><kbd>Ctrl K</kbd></div>
 
-    <div class="section-title"><span>SPACES</span><button id="new-channel" title="Create channel">+</button></div>
+    <div class="section-title"><span>CHANNELS</span><button id="new-channel" title="Create channel">+</button></div>
     <div class="channel-list" id="channel-list"></div>
 
-    <div class="section-title voice-section-title"><span>VOICE ROOMS</span><button id="new-voice-channel" title="Create voice channel">+</button></div>
+    <div class="section-title voice-section-title"><span>VOICE</span><button id="new-voice-channel" title="Create voice channel">+</button></div>
     <div class="channel-list voice-list" id="voice-channel-list"></div>
 
     <div id="voice-dock" class="voice-dock hidden">
@@ -81,7 +81,7 @@
         <button id="mobile-sidebar-btn" class="mobile-sidebar-btn" title="Channels" aria-label="Open channels">☰</button>
         <div class="channel-title">
           <span class="hash" id="channel-symbol">#</span>
-          <div><strong id="channel-name">general</strong><span id="channel-meta">Realtime conversation</span></div>
+          <div><strong id="channel-name">general</strong><span id="channel-meta">Chat</span></div>
         </div>
         <div class="head-actions" aria-label="Channel actions">
           <button id="voice-call-btn" class="head-action call-action" title="Start voice call" aria-label="Start voice call"><span>☎</span><b>Voice</b></button>
@@ -103,7 +103,7 @@
 
       <div class="chat-body">
         <section id="messages" class="messages">
-          <div class="empty"><div class="empty-icon">✦</div><h2>Your community is waiting.</h2><p>Send the first message, start a call, or share your screen.</p></div>
+          <div class="empty"><div class="empty-icon">✦</div><h2>Your community is waiting.</h2><p>Start with a message. Voice, video and screen sharing are always one click away.</p></div>
         </section>
         <div id="typing" class="typing"></div>
       </div>
@@ -111,7 +111,7 @@
       <form id="composer" class="composer">
         <button type="button" id="attach" class="composer-icon" title="More tools">+</button>
         <button type="button" id="poll-btn" class="composer-tool" title="Create poll">◫</button>
-        <input id="message" placeholder="Message #general" autocomplete="off">
+        <input id="message" placeholder="Write a message..." autocomplete="off">
         <button class="send">Send</button>
       </form>
     </div>
