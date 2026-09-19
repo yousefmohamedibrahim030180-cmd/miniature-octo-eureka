@@ -513,3 +513,93 @@ body.orbit-discord-home .orbit-discord-home{background:#1e1f22}
 .dm-highlight{animation:dmHighlight 1.4s ease}
 @keyframes dmHighlight{0%,100%{background:transparent}25%,65%{background:rgba(88,101,242,.24)}}
 @media(max-width:760px){.od-home-dm-drawer{width:100%}.od-home-dm-hover-actions{right:6px}}
+
+
+/* ===== ORBIT MYTHIC DESKTOP VISUAL PASS ===== */
+body.orbit-desktop-app{background:#070910!important;overflow:hidden}
+body.orbit-desktop-app .orbit-discord-home,
+body.orbit-desktop-app .app,
+body.orbit-desktop-app .content{background:transparent!important}
+body.orbit-desktop-app .content,
+body.orbit-desktop-app .sidebar,
+body.orbit-desktop-app .server-rail{
+  box-shadow:inset 0 0 0 1px rgba(120,129,255,.035);
+}
+body.orbit-desktop-app .server-rail{
+  background:
+    radial-gradient(circle at 50% 8%,rgba(106,119,255,.11),transparent 24%),
+    linear-gradient(180deg,#0a0c13 0%,#070910 100%)!important;
+}
+body.orbit-desktop-app .sidebar{
+  background:
+    radial-gradient(circle at 15% 0%,rgba(82,102,255,.08),transparent 28%),
+    linear-gradient(180deg,rgba(17,19,28,.98),rgba(11,13,19,.98))!important;
+  border-right-color:rgba(115,124,255,.10)!important;
+}
+body.orbit-desktop-app .content:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 78% 12%,rgba(99,109,255,.09),transparent 24%),
+    radial-gradient(circle at 22% 84%,rgba(75,211,255,.05),transparent 30%),
+    linear-gradient(135deg,transparent 0 48%,rgba(255,255,255,.012) 50%,transparent 52%);
+  mix-blend-mode:screen;
+  z-index:0;
+}
+body.orbit-desktop-app .chat{
+  position:relative;
+  z-index:1;
+}
+body.orbit-desktop-app .chat-head{
+  background:linear-gradient(180deg,rgba(19,22,31,.94),rgba(13,15,22,.86))!important;
+  border-bottom-color:rgba(116,126,255,.10)!important;
+  backdrop-filter:blur(18px);
+  box-shadow:0 12px 36px rgba(0,0,0,.16);
+}
+body.orbit-desktop-app .head-action,
+body.orbit-desktop-app .icon-btn,
+body.orbit-desktop-app .rail-nav,
+body.orbit-desktop-app .rail-btn{
+  transition:transform .16s ease,box-shadow .16s ease,background .16s ease,border-color .16s ease,color .16s ease!important;
+}
+body.orbit-desktop-app .head-action:hover,
+body.orbit-desktop-app .icon-btn:hover,
+body.orbit-desktop-app .rail-nav:hover,
+body.orbit-desktop-app .rail-btn:hover{
+  transform:translateY(-1px);
+  box-shadow:0 8px 24px rgba(76,90,255,.16);
+}
+body.orbit-desktop-app .workspace-head,
+body.orbit-desktop-app .profile,
+body.orbit-desktop-app .sidebar-search{
+  box-shadow:0 10px 30px rgba(0,0,0,.11);
+}
+body.orbit-desktop-app .rail-logo,
+body.orbit-desktop-app .workspace-avatar{
+  box-shadow:0 0 28px rgba(105,117,255,.22);
+}
+body.orbit-desktop-app .chat-messages,
+body.orbit-desktop-app .message-list,
+body.orbit-desktop-app .channel-list{
+  scrollbar-width:thin;
+  scrollbar-color:rgba(124,134,255,.32) transparent;
+}
+body.orbit-desktop-app ::-webkit-scrollbar{width:8px;height:8px}
+body.orbit-desktop-app ::-webkit-scrollbar-track{background:transparent}
+body.orbit-desktop-app ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,rgba(124,134,255,.45),rgba(72,214,255,.24));border-radius:999px}
+body.orbit-desktop-app .chat-form{
+  background:linear-gradient(180deg,rgba(35,38,48,.96),rgba(23,25,32,.96))!important;
+  border-color:rgba(120,129,255,.13)!important;
+  box-shadow:0 18px 42px rgba(0,0,0,.20),0 0 30px rgba(84,98,255,.06);
+  backdrop-filter:blur(16px);
+}
+body.orbit-desktop-app .send-btn{
+  box-shadow:0 10px 28px rgba(88,101,242,.25)!important;
+}
+body.orbit-desktop-app .message:hover{
+  background:rgba(255,255,255,.018);
+}
+body.orbit-desktop-app .profile-spark{animation:orbitSpark 2.6s ease-in-out infinite}
+@keyframes orbitSpark{0%,100%{opacity:.45;transform:rotate(-8deg) scale(.92)}50%{opacity:1;transform:rotate(8deg) scale(1.08)}}
