@@ -1600,7 +1600,7 @@ function setOrbitSoundSetting(key,value){
 document.addEventListener("pointerdown",()=>ensureSoundContext(),{once:true,passive:true});
 function renderPage(view) {
   const cfg={
-    home:["ORBIT / COMMAND CENTER","Home","A single control surface for communities, conversations, and live rooms."],
+    space:["ORBIT / SPACE","Space","A living social universe connecting people, worlds, messages, and live rooms."],\n    home:["ORBIT / COMMAND CENTER","Home","A single control surface for communities, conversations, and live rooms."],
     "server-home":["SERVER / HOME",currentServer?.name||"Server Home","Your community command center, members, roles, and channels."],
     discover:["DISCOVER","Discover communities","Explore spaces, categories, and new conversations."],
     dms:["DIRECT MESSAGES","Messages","Private conversations, groups, and recent contacts."],
@@ -1621,7 +1621,7 @@ function renderPage(view) {
   $("#page-title").textContent=cfg[1];
   $("#page-subtitle").textContent=cfg[2];
   $("#page-actions").innerHTML="";
-  if(view==="home")renderHomePage();
+  if(view==="space")renderSpacePage();\n  if(view==="home")renderHomePage();
   if(view==="server-home")renderServerHomePage().catch(err=>orbitToast("Server Home",err.message,"error"));
   if(view==="communities")renderCommunitiesPage();
   if(view==="discover")renderDiscoverPage();
@@ -1650,7 +1650,7 @@ function setView(view){
     $("#sidebar")?.classList.remove("open");
     document.body.classList.remove("mobile-sidebar-open");
   }
-  const globalViews=["home","server-home","communities","discover","dms","friends","calls","live","events","projects","files","ai","notifications","saved","explore","settings"];
+  const globalViews=["space","home","server-home","communities","discover","dms","friends","calls","live","events","projects","files","ai","notifications","saved","explore","settings"];
   if(globalViews.includes(view)){
     global.classList.remove("hidden");
     chat.classList.add("hidden");
@@ -3195,7 +3195,55 @@ function applySavedOrbitBackground(){
   const opacity=localStorage.getItem("orbit_bg_overlay")||"72";
   document.documentElement.style.setProperty("--orbit-overlay-opacity",(Number(opacity)||72)/100);
 }
-function renderSettingsPage(section="appearance"){
+
+/* ==========================================================
+   ORBIT // SPACE ENGINE + PERSONAL VISUAL MODES
+   ========================================================== */
+const ORBIT_INTERFACE_MODES={
+  singularity:{name:"SINGULARITY",desc:"Spatial, cinematic, luminous and immersive.",accent:"#7b82ff"},
+  aurora:{name:"AURORA",desc:"Soft glass, flowing color and atmospheric depth.",accent:"#55b9ff"},
+  obsidian:{name:"OBSIDIAN",desc:"Minimal black glass with razor-sharp contrast.",accent:"#a9b7d8"},
+  cyber:{name:"CYBERPULSE",desc:"Electric cyan, magenta energy and hard edges.",accent:"#18e8e0"},
+  solar:{name:"SOLAR FLARE",desc:"Warm amber energy with cinematic highlights.",accent:"#ffb84d"}
+};
+function applyOrbitInterfaceMode(name){
+  const key=ORBIT_INTERFACE_MODES[name]?name:"singularity";
+  document.body.dataset.orbitInterface=key;
+  localStorage.setItem("orbit_interface_mode",key);
+  document.documentElement.style.setProperty("--orbit-mode-accent",ORBIT_INTERFACE_MODES[key].accent);
+  document.querySelectorAll("[data-interface-mode]").forEach(b=>b.classList.toggle("active",b.dataset.interfaceMode===key));
+}
+function applySavedOrbitInterfaceMode(){
+  applyOrbitInterfaceMode(localStorage.getItem("orbit_interface_mode")||"singularity");
+}
+function renderSpacePage(){
+  const body=$("#page-body"); if(!body)return;
+  const worlds=(servers||[]).slice(0,12);
+  const activeUsers=(pulseState?.users||[]).filter(u=>String(u.status||"online").toLowerCase()!=="offline").slice(0,8);
+  const calls=(pulseState?.calls||[]).slice(0,5);
+  const node=(type,label,meta,icon,action)=>'<button class="orbit-space-node node-'+type+'" data-space-action="'+action+'"><span class="space-node-core">'+icon+'</span><span class="space-node-label">'+escapeHtml(label)+'</span><small>'+escapeHtml(meta)+'</small></button>';
+  body.innerHTML=
+    '<div class="orbit-space">'+
+      '<div class="space-topline"><div><span class="eyebrow">ORBIT / SPACE</span><h2>One social universe.</h2><p>Navigate people, worlds, conversations and live rooms as one connected space.</p></div><div class="space-status"><span class="live-dot"></span><strong>'+activeUsers.length+' active</strong><span>LIVE NETWORK</span></div></div>'+
+      '<section class="space-stage" aria-label="Orbit Space">'+
+        '<div class="space-grid"></div><div class="space-stars"></div>'+
+        '<div class="space-core"><div class="core-rings"></div><div class="core-orb">◈</div><strong>ORBIT</strong><span>LIVING SPACE</span></div>'+
+        node("friends","Friends",activeUsers.length+" active","♟","friends")+
+        node("messages","Messages","Private conversations","✉","home")+
+        node("calls","Calls",calls.length+" live rooms","◉","calls")+
+        node("discover","Discover","Find new Worlds","✦","discover")+
+        worlds.map((sv,i)=>'<button class="orbit-space-node node-world" style="--node-angle:'+(i*38-70)+'deg;--node-radius:'+(31+(i%3)*8)+'%" data-space-server="'+escapeHtml(sv.id)+'"><span class="space-node-avatar">'+escapeHtml(String(sv.name||"W").slice(0,2).toUpperCase())+'</span><span class="space-node-label">'+escapeHtml(sv.name||"World")+'</span><small>WORLD</small></button>').join("")+
+      '</section>'+
+      '<div class="space-feed">'+
+        '<section class="space-panel"><header><span>LIVE PRESENCE</span><b>'+activeUsers.length+'</b></header><div class="space-user-strip">'+(activeUsers.length?activeUsers.map(u=>'<button data-space-user="'+escapeHtml(u.id)+'" title="'+escapeHtml(u.username||u.display_name||"Member")+'"><span class="space-user-avatar">'+escapeHtml(avatar(u.username||u.display_name||"U"))+'</span><i></i></button>').join(""):'<span class="space-empty">No live presence yet.</span>')+'</div></section>'+
+        '<section class="space-panel"><header><span>ACTIVE WORLDS</span><b>'+worlds.length+'</b></header><div class="space-world-list">'+(worlds.slice(0,5).map(w=>'<button data-space-server="'+escapeHtml(w.id)+'"><span>'+escapeHtml(String(w.name||"W").slice(0,2).toUpperCase())+'</span><div><strong>'+escapeHtml(w.name||"World")+'</strong><small>Open world</small></div><b>ENTER</b></button>').join("")||'<span class="space-empty">Create your first World.</span>')+'</div></section>'+
+        '<section class="space-panel"><header><span>LIVE ROOMS</span><b>'+calls.length+'</b></header><div class="space-call-list">'+(calls.length?calls.map(c=>'<button data-space-action="calls"><span class="call-wave">◉</span><div><strong>'+escapeHtml(c.channelName||"Live room")+'</strong><small>'+escapeHtml(c.mode||"voice")+' · '+((c.participants||[]).length||1)+' people</small></div><b>JOIN</b></button>').join(""):'<span class="space-empty">No live rooms right now.</span>')+'</div></section>'+
+      '</div>'+
+    '</div>';
+  body.querySelectorAll("[data-space-action]").forEach(el=>el.onclick=()=>{const a=el.dataset.spaceAction;if(a==="home"){setView("home");return}if(a==="friends"){setView("friends");return}if(a==="calls"){setView("calls");return}if(a==="discover"){setView("discover")}});
+  body.querySelectorAll("[data-space-server]").forEach(el=>el.onclick=async()=>{const sv=servers.find(x=>String(x.id)===String(el.dataset.spaceServer));if(sv){await selectServer(sv);setView("server-home")}});
+}
+\nfunction renderSettingsPage(section="appearance"){
   const sections=[["appearance","Appearance"],["profile","Profile"],["privacy","Privacy"],["voice","Voice & Video"],["sound","Sounds"],["notifications","Notifications"],["accessibility","Accessibility"],["performance","Performance"],["files","Files & Sharing"],["security","Security"],["advanced","Advanced"]];
   $("#page-actions").innerHTML="";
   $("#page-body").innerHTML='<div class="settings-layout"><nav class="settings-nav">'+sections.map(s=>'<button class="'+(s[0]===section?"active":"")+'" data-settings-section="'+s[0]+'">'+s[1]+'</button>').join("")+'</nav><div id="settings-card" class="settings-card"></div></div>';
@@ -3209,6 +3257,9 @@ function renderSettingsPage(section="appearance"){
     card.innerHTML='<h3>Appearance</h3><p>Customize Orbit colors, spacing and the background of the whole app.</p>'+
       setting("Reduced motion","Reduce transitions and animation.",reduced,"appearance-motion")+
       setting("Compact density","Tighter chat and navigation spacing.",compact,"appearance-density")+
+      '<div class="appearance-divider"></div>'+
+      '<div class="setting-row"><div><strong>Interface style</strong><span>Choose the visual language of your entire Orbit Space.</span></div></div>'+
+      '<div class="orbit-interface-grid">'+Object.entries(ORBIT_INTERFACE_MODES).map(([name,t])=>'<button type="button" class="orbit-interface-card '+((localStorage.getItem("orbit_interface_mode")||"singularity")===name?"active":"")+'" data-interface-mode="'+name+'" style="--mode-accent:'+t.accent+'"><span class="interface-mini"></span><div><strong>'+t.name+'</strong><small>'+t.desc+'</small></div></button>').join("")+'</div>'+
       '<div class="setting-row"><div><strong>Theme color</strong><span>Choose an Orbit accent.</span></div></div>'+
       '<div class="accent-palette">'+Object.entries(ORBIT_ACCENTS).map(([name,t])=>'<button type="button" class="accent-swatch '+((localStorage.getItem("orbit_theme")||"purple")===name?"active":"")+'" data-accent-theme="'+name+'" style="--swatch:'+t.accent+'"><span></span><strong>'+name+'</strong></button>').join("")+'</div>'+
       '<div class="setting-row"><div><strong>Custom accent</strong><span>Choose any color.</span></div><input id="accent-color" type="color" value="'+escapeHtml(orbitUI.profile.accent)+'" style="width:42px;height:30px"></div>'+
@@ -3218,7 +3269,7 @@ function renderSettingsPage(section="appearance"){
       '<div class="background-tools"><label class="background-url"><span>Image URL</span><input id="bg-url" placeholder="https://example.com/background.jpg" value="'+(bgType==="image"?escapeHtml(bgValue):"")+'"></label><button type="button" id="bg-apply-url">Use image</button><button type="button" id="bg-upload">Upload</button><button type="button" id="bg-reset">Reset</button></div>'+
       '<div class="setting-row bg-opacity-row"><div><strong>Background darkness</strong><span>More darkness keeps text easy to read.</span></div><input id="bg-overlay" type="range" min="35" max="90" value="'+bgOverlay+'"><b id="bg-overlay-value">'+bgOverlay+'%</b></div>';
     $("#accent-color").onchange=e=>{document.documentElement.style.setProperty("--accent",e.target.value);document.documentElement.style.setProperty("--accent2",e.target.value);orbitUI.profile.accent=e.target.value;localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));document.querySelectorAll("[data-accent-theme]").forEach(b=>b.classList.remove("active"));};
-    document.querySelectorAll("[data-accent-theme]").forEach(b=>b.onclick=()=>applyAccentTheme(b.dataset.accentTheme));
+    document.querySelectorAll("[data-accent-theme]").forEach(b=>b.onclick=()=>applyAccentTheme(b.dataset.accentTheme));\n    document.querySelectorAll("[data-interface-mode]").forEach(b=>b.onclick=()=>{applyOrbitInterfaceMode(b.dataset.interfaceMode);orbitToast("Interface updated",ORBIT_INTERFACE_MODES[b.dataset.interfaceMode].name+" is now active.","success");});
     document.querySelectorAll("[data-bg-preset]").forEach(b=>b.onclick=()=>applyOrbitBackground("preset",b.dataset.bgPreset));
     $("#bg-apply-url").onclick=()=>{const url=$("#bg-url").value.trim();if(!/^https?:\/\//i.test(url))return orbitToast("Background","Enter a valid image URL.","error");applyOrbitBackground("image",url);orbitToast("Background updated","Custom image applied.","success");renderSettingsPage("appearance");};
     $("#bg-reset").onclick=()=>{applyOrbitBackground("preset","midnight");localStorage.removeItem("orbit_background_type");localStorage.removeItem("orbit_background_value");renderSettingsPage("appearance");orbitToast("Background reset","Orbit's default background is back.","success");};
@@ -3909,7 +3960,7 @@ bindPremiumNavigation();
 wireEnhancedControls();
 updateVoiceDock();
 
-applyAccentTheme(localStorage.getItem("orbit_theme")||"purple");
+applyAccentTheme(localStorage.getItem("orbit_theme")||"purple");\napplySavedOrbitInterfaceMode();
 if(localStorage.getItem("orbit_video_quality")) callState.settings.quality=localStorage.getItem("orbit_video_quality");
 applySavedOrbitBackground();
 syncScreenShareControls();
