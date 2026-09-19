@@ -2556,7 +2556,39 @@ function bindPremiumNavigation(){
 $("#quick-search")?.addEventListener("focus",()=>$("#sidebar-search")?.classList.add("focused"));
 $("#quick-search")?.addEventListener("blur",()=>$("#sidebar-search")?.classList.remove("focused"));
   $("#quick-search")?.addEventListener("keydown",e=>{if(e.key==="Enter")runGlobalSearch(e.target.value)});
-  $("#join-server")?.addEventListener("click",()=>openModal("Join server",'<input id="invite-code" placeholder="Invite code or full invite URL"><button class="primary" id="join-by-invite">Join community</button>'));
+  function openJoinCommunityModal(){
+  openModal("Join a community",
+    '<div class="community-modal-shell">'+
+      '<div class="community-modal-hero join-hero"><div class="community-modal-icon join-icon">↗</div><div><span class="community-kicker">JOIN A SPACE</span><h3>Join an existing community</h3><p>Paste an Orbit invite code or a full invite link. We will add the community to your workspace.</p></div></div>'+
+      '<div class="community-form-card"><label><span>Invite code or link</span><input id="invite-code" maxlength="300" placeholder="Paste invite code or https://…/?invite=…"></label><div class="community-join-status" id="community-join-status"><span class="status-dot"></span><span>Waiting for an invite</span></div></div>'+
+      '<div class="community-modal-actions"><button class="community-cancel" id="join-server-cancel">Cancel</button><button class="primary community-create-btn" id="join-by-invite" disabled>Join community</button></div>'+
+    '</div>'
+  );
+  const input=$("#invite-code"),btn=$("#join-by-invite"),status=$("#community-join-status");
+  const sync=()=>{
+    const raw=input.value.trim();
+    const valid=raw.length>=3;
+    btn.disabled=!valid;
+    status.innerHTML=valid?'<span class="status-dot ready"></span><span>Invite detected — ready to join</span>':'<span class="status-dot"></span><span>Paste an invite code or link</span>';
+  };
+  input?.addEventListener("input",sync);
+  input?.addEventListener("keydown",e=>{if(e.key==="Enter"&&!btn.disabled)btn.click()});
+  $("#join-server-cancel")?.addEventListener("click",closeModal);
+  setTimeout(()=>input?.focus(),30);
+  btn?.addEventListener("click",async()=>{
+    const raw=input.value.trim();let code=raw;
+    try{if(raw.includes("invite="))code=new URL(raw).searchParams.get("invite")||raw}catch{}
+    btn.disabled=true;btn.textContent="Joining…";
+    try{
+      await api("/api/invites/"+encodeURIComponent(code)+"/accept",{method:"POST",body:"{}"});
+      closeModal();await loadServers();orbitToast("Joined community","The community has been added to your workspace.","success");
+    }catch(err){
+      btn.disabled=false;btn.textContent="Join community";
+      orbitToast("Invite failed",err.message,"error");
+    }
+  });
+}
+$("#join-server")?.addEventListener("click",openJoinCommunityModal);
   $("#command-input")?.addEventListener("input",e=>renderCommandResults(e.target.value));
   $("#command-palette")?.addEventListener("click",e=>{if(e.target.id==="command-palette")closeCommandPalette()});
   $("#modal-close")?.addEventListener("click",closeModal);
@@ -2607,7 +2639,36 @@ async function loadPolls(){
 }
 
 
-$("#new-server").onclick=()=>openModal("Create server",'<input id="server-name-input" placeholder="Community name"><button class="primary" id="create-server-now">Create server</button>');
+function openCreateCommunityModal(){
+  openModal("Create a community",
+    '<div class="community-modal-shell">'+
+      '<div class="community-modal-hero"><div class="community-modal-icon">◈</div><div><span class="community-kicker">START YOUR SPACE</span><h3>Create your community</h3><p>Give your community a name. You can add Spaces, members and roles after it is created.</p></div></div>'+
+      '<div class="community-form-card"><label><span>Community name</span><input id="server-name-input" maxlength="60" placeholder="e.g. Orbit Gaming, Study Hub, Friends"></label><div class="community-name-hint"><span>Tip</span><span>Keep it short and recognizable.</span></div><div class="community-preview"><span class="community-preview-icon" id="community-preview-icon">O</span><div><strong id="community-preview-name">Your community</strong><span>Ready for channels, voice rooms and members</span></div></div></div>'+
+      '<div class="community-modal-actions"><button class="community-cancel" id="create-server-cancel">Cancel</button><button class="primary community-create-btn" id="create-server-now" disabled>Create community</button></div>'+
+    '</div>'
+  );
+  const input=$("#server-name-input"),btn=$("#create-server-now"),preview=$("#community-preview-name"),icon=$("#community-preview-icon");
+  const sync=()=>{const v=input.value.trim();btn.disabled=v.length<2;preview.textContent=v||"Your community";icon.textContent=(v||"O").slice(0,1).toUpperCase()};
+  input?.addEventListener("input",sync);
+  $("#create-server-cancel")?.addEventListener("click",closeModal);
+  input?.addEventListener("keydown",e=>{if(e.key==="Enter"&&!btn.disabled)btn.click()});
+  setTimeout(()=>input?.focus(),30);
+  btn?.addEventListener("click",async()=>{
+    const name=input.value.trim();
+    if(name.length<2)return;
+    btn.disabled=true;btn.textContent="Creating…";
+    try{
+      const d=await api("/api/servers",{method:"POST",body:JSON.stringify({name})});
+      closeModal();await loadServers();const created=servers.find(x=>String(x.id)===String(d.server.id));
+      if(created)await selectServer(created);
+      orbitToast("Community created",d.server.name+" is ready.","success");
+    }catch(err){
+      btn.disabled=false;btn.textContent="Create community";
+      orbitToast("Creation failed",err.message,"error");
+    }
+  });
+}
+$("#new-server").onclick=openCreateCommunityModal;
 $("#new-channel").onclick=()=>openChannelModal("text");
 $("#new-voice-channel").onclick=()=>openChannelModal("voice");
 $("#modal-close").onclick=closeModal;
