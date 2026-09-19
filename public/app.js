@@ -1846,10 +1846,15 @@ async function openHomeDirectMessage(dmId){
     }
     const dm=dmState.list.find(x=>String(x.id)===String(dmId));
     if(!dm)return;
-    if(dmState.activeId&&String(dmState.activeId)!==String(dmId))socket?.emit("dm:typing",{dmId:dmState.activeId,isTyping:false});
+
+    if(dmState.activeId&&String(dmState.activeId)!==String(dmId)){
+      socket?.emit("dm:typing",{dmId:dmState.activeId,isTyping:false});
+    }
+
     dmState.activeId=dm.id;
     dmState.active=dm;
     dmState.messages=[];
+
     const data=await api("/api/dms/"+encodeURIComponent(dmId)+"/messages");
     dmState.messages=data.messages||[];
     socket?.emit("dm:join",dmId);
@@ -1871,28 +1876,35 @@ async function openHomeDirectMessage(dmId){
     const bio=u.bio||"No bio added yet.";
     const statusText=online?"Online":"Offline";
 
-    side.innerHTML=
-      '<div class="od-profile-head"><strong>Profile</strong><button id="od-profile-close" title="Close profile">×</button></div>'+
-      '<div class="od-profile-cover"></div>'+
-      '<div class="od-profile-card">'+
-        '<div class="od-profile-avatar-xl">'+(avatarUrl?'<img src="'+escapeHtml(avatarUrl)+'" alt="">':escapeHtml(avatar(username)))+'<i class="'+(online?"online":"offline")+'"></i></div>'+
-        '<strong class="od-profile-name">'+escapeHtml(displayName)+'</strong>'+
-        '<span class="od-profile-handle">@'+escapeHtml(username)+'</span>'+
-        '<div class="od-profile-status-line"><i class="'+(online?"online":"offline")+'"></i>'+statusText+'</div>'+
-        '<div class="od-profile-divider"></div>'+
-        '<div class="od-profile-section">ABOUT ME</div>'+
-        '<p class="od-profile-bio">'+escapeHtml(bio)+'</p>'+
-        '<div class="od-profile-section">USER INFO</div>'+
-        '<div class="od-profile-info"><span>Username</span><strong>'+escapeHtml(username)+'</strong></div>'+
-        '<div class="od-profile-info"><span>Status</span><strong>'+statusText+'</strong></div>'+
-        '<button id="od-profile-view" class="od-profile-view">View Full Profile</button>'+
-      '</div>';
-    $("#od-profile-close").onclick=()=>{
-      side.classList.remove("od-profile-active");
-      side.innerHTML='<div class="od-active-title"><strong>Active Now</strong></div><div id="od-active-list" class="od-active-list"></div>';
-      renderActive();
+    const renderProfilePanel=()=>{
+      side.classList.add("od-profile-active");
+      side.innerHTML=
+        '<div class="od-profile-head"><div><strong>Profile</strong><span class="od-profile-sub">Direct message</span></div><button id="od-profile-close" title="Close profile">×</button></div>'+
+        '<div class="od-profile-cover"></div>'+
+        '<div class="od-profile-card">'+
+          '<div class="od-profile-avatar-xl">'+(avatarUrl?'<img src="'+escapeHtml(avatarUrl)+'" alt="">':escapeHtml(avatar(username)))+'<i class="'+(online?"online":"offline")+'"></i></div>'+
+          '<strong class="od-profile-name">'+escapeHtml(displayName)+'</strong>'+
+          '<span class="od-profile-handle">@'+escapeHtml(username)+'</span>'+
+          '<div class="od-profile-status-line"><i class="'+(online?"online":"offline")+'"></i>'+statusText+'</div>'+
+          '<div class="od-profile-action-row"><button id="od-profile-msg" class="od-profile-soft">Message</button><button id="od-profile-view" class="od-profile-soft">View Profile</button></div>'+
+          '<div class="od-profile-divider"></div>'+
+          '<div class="od-profile-section">ABOUT ME</div>'+
+          '<p class="od-profile-bio">'+escapeHtml(bio)+'</p>'+
+          '<div class="od-profile-section">USER INFO</div>'+
+          '<div class="od-profile-info"><span>Username</span><strong>'+escapeHtml(username)+'</strong></div>'+
+          '<div class="od-profile-info"><span>Status</span><strong>'+statusText+'</strong></div>'+
+        '</div>';
+
+      $("#od-profile-close").onclick=()=>{
+        side.classList.remove("od-profile-active");
+        side.innerHTML='<div class="od-active-title"><strong>Active Now</strong></div><div id="od-active-list" class="od-active-list"></div>';
+        renderActive();
+      };
+      $("#od-profile-view").onclick=()=>openPulseProfile(u.id);
+      $("#od-profile-msg").onclick=()=>{$("#od-home-dm-input")?.focus()};
     };
-    $("#od-profile-view").onclick=()=>openPulseProfile(u.id);
+
+    renderProfilePanel();
 
     home.innerHTML=
       '<header class="od-home-dm-head">'+
@@ -1901,9 +1913,10 @@ async function openHomeDirectMessage(dmId){
           '<div><strong>'+escapeHtml(displayName)+'</strong><span><i class="'+(online?"online":"offline")+'"></i>'+statusText+' · @'+escapeHtml(username)+'</span></div>'+
         '</div>'+
         '<div class="od-home-dm-actions">'+
-          '<button id="od-home-dm-call" title="Voice call">☎</button>'+
-          '<button id="od-home-dm-video" title="Video call">▣</button>'+
+          '<button id="od-home-dm-call" title="Start voice call">☎</button>'+
+          '<button id="od-home-dm-video" title="Start video call">▣</button>'+
           '<button id="od-home-dm-pin" title="Pinned messages">⌖</button>'+
+          '<button id="od-home-dm-add-user" title="Add friend">♙</button>'+
           '<button id="od-home-dm-search" title="Search messages">⌕</button>'+
           '<button id="od-home-dm-profile" title="Toggle profile">◉</button>'+
         '</div>'+
@@ -1939,7 +1952,8 @@ async function openHomeDirectMessage(dmId){
       }catch(err){orbitToast("Message failed",err.message,"error")}
     };
     input?.addEventListener("input",()=>{
-      input.style.height="auto";input.style.height=Math.min(input.scrollHeight,150)+"px";
+      input.style.height="auto";
+      input.style.height=Math.min(input.scrollHeight,150)+"px";
       if(!socket)return;
       socket.emit("dm:typing",{dmId:dmId,isTyping:true});
       clearTimeout(dmState.typingTimer);
@@ -1952,24 +1966,37 @@ async function openHomeDirectMessage(dmId){
       const el=$("#od-home-dm-input");if(!el)return;
       const start=el.selectionStart??el.value.length;
       el.value=el.value.slice(0,start)+"🙂"+el.value.slice(el.selectionEnd??start);
-      el.focus();el.selectionStart=el.selectionEnd=start+2;
+      el.focus();
+      el.selectionStart=el.selectionEnd=start+2;
     };
     $("#od-home-dm-add").onclick=()=>orbitToast("Attachments","Attachment upload is available in community channels.");
     $("#od-home-dm-search").onclick=()=>{
       const q=prompt("Search messages");
       if(q===null)return;
       const term=q.trim().toLowerCase();
-      document.querySelectorAll("#od-home-dm-messages .od-home-dm-message").forEach(row=>row.style.display=!term||row.innerText.toLowerCase().includes(term)?"grid":"none");
+      document.querySelectorAll("#od-home-dm-messages .od-home-dm-message").forEach(row=>{
+        row.style.display=!term||row.innerText.toLowerCase().includes(term)?"grid":"none";
+      });
     };
     $("#od-home-dm-pin").onclick=()=>orbitToast("Pinned messages","Pinned message view is ready for this conversation.");
+    $("#od-home-dm-add-user").onclick=async()=>{
+      try{
+        await api("/api/friends/request",{method:"POST",body:JSON.stringify({username})});
+        orbitToast("Friend request sent","Request sent to @"+username+".","success");
+      }catch(e){orbitToast("Friend request",e.message,"error")}
+    };
     $("#od-home-dm-profile").onclick=()=>{
-      if(side.classList.contains("od-profile-active")) $("#od-profile-close")?.click();
-      else {
-        side.classList.add("od-profile-active");
+      if(side.classList.contains("od-profile-active")){
+        side.classList.remove("od-profile-active");
+        side.innerHTML='<div class="od-active-title"><strong>Active Now</strong></div><div id="od-active-list" class="od-active-list"></div>';
+        renderActive();
+      }else{
+        renderProfilePanel();
       }
     };
     $("#od-home-dm-call").onclick=()=>orbitToast("Voice call","Use a community voice room to start a live call.");
     $("#od-home-dm-video").onclick=()=>orbitToast("Video call","Use a community voice room to start a live video call.");
+
     document.querySelectorAll("[data-od-social]").forEach(btn=>btn.classList.toggle("active",btn.dataset.odSocial==="dms"));
     document.querySelectorAll("[data-od-dm]").forEach(btn=>btn.classList.toggle("active",String(btn.dataset.odDm)===String(dmId)));
   }catch(e){orbitToast("Direct message",e.message,"error")}
