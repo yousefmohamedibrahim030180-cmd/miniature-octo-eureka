@@ -2446,30 +2446,30 @@ function bindDMPage(){
   });
 }
 async function renderDMPage(selectId=null){
-  $("#page-actions").innerHTML='<button id="new-dm-page">+ New message</button><button id="refresh-dm-page">Refresh</button>';
-  renderDMPageShell();bindDMPage();
-  $("#new-dm-page").onclick=()=>$("#dm-new-inline")?.click();
-  $("#refresh-dm-page").onclick=renderDMPage;
   try{
-    const d=await api("/api/dms");dmState.list=d.dms||[];renderDMList();
+    // Legacy Messages route is now permanently redirected into Home inline chat.
+    orbitUI.view="home";
+    document.body.classList.add("orbit-discord-home");
+    $("#global-page")?.classList.add("discord-home-active");
+    $("#global-page")?.classList.remove("hidden");
+    $("#chat-view")?.classList.add("hidden");
+    $("#page-actions").innerHTML="";
+    renderHomePage();
+
+    const d=await api("/api/dms");
+    dmState.list=d.dms||[];
     const preferred=selectId||dmState.activeId||dmState.list[0]?.id;
-    if(preferred)await openDM(preferred);else renderDMHeader();
-  }catch(e){$("#dm-list").innerHTML='<div class="dm-list-empty"><strong>Could not load conversations</strong><span>'+escapeHtml(e.message)+'</span></div>'}
+    if(preferred){
+      await new Promise(resolve=>requestAnimationFrame(resolve));
+      await openHomeDirectMessage(preferred);
+    }
+  }catch(e){
+    orbitToast("Direct messages",e.message,"error");
+  }
 }
+
 async function openDM(idValue){
-  try{
-    const dm=dmState.list.find(x=>String(x.id)===String(idValue));if(!dm)return;
-    if(dmState.activeId&&String(dmState.activeId)!==String(idValue))socket?.emit("dm:typing",{dmId:dmState.activeId,isTyping:false});
-    dmState.activeId=dm.id;dmState.active=dm;dmState.messages=[];
-    renderDMList();renderDMHeader();
-    const d=await api("/api/dms/"+encodeURIComponent(idValue)+"/messages");
-    dmState.messages=d.messages||[];renderDMMessageFeed(true);
-    socket?.emit("dm:join",idValue);socket?.emit("dm:read",idValue);
-    api("/api/dms/"+encodeURIComponent(idValue)+"/read",{method:"POST",body:"{}"}).catch(()=>{});
-    const input=$("#dm-input"),draft=dmState.drafts[idValue]||"";
-    if(input){input.value=draft;input.style.height="auto";input.style.height=Math.min(input.scrollHeight,130)+"px";requestAnimationFrame(()=>input.focus())}
-    dmState.active.unreadCount=0;renderDMList();
-  }catch(e){orbitToast("DM failed",e.message,"error")}
+  return renderDMPage(idValue);
 }
 async function renderFriendsPage(){
   $("#page-actions").innerHTML='<button id="add-friend-page">+ Add friend</button><button id="refresh-friends-page">Refresh</button>';
@@ -3369,6 +3369,37 @@ closeServerSidebar();
 })();
 
 
+/* Root DM compatibility bridge: every legacy conversation row opens in Home. */
+(function bridgeLegacyConversationClicks(){
+  function openLegacy(id){
+    if(!id)return;
+    try{
+      orbitUI.view="home";
+      document.body.classList.add("orbit-discord-home");
+      $("#global-page")?.classList.add("discord-home-active");
+      $("#global-page")?.classList.remove("hidden");
+      $("#chat-view")?.classList.add("hidden");
+      renderHomePage();
+      Promise.resolve().then(async()=>{
+        if(!dmState.list.length){
+          const d=await api("/api/dms");
+          dmState.list=d.dms||[];
+        }
+        if(dmState.list.some(x=>String(x.id)===String(id))) await openHomeDirectMessage(id);
+      });
+    }catch(err){orbitToast("Direct message",err.message,"error")}
+  }
+  document.addEventListener("click",e=>{
+    const row=e.target.closest(".dm-conversation,[data-dm-open]");
+    if(!row)return;
+    const id=row.dataset.dmOpen;
+    if(!id)return;
+    e.preventDefault();
+    e.stopPropagation();
+    openLegacy(id);
+  },true);
+})();
+ 
 /* Never allow the legacy standalone Messages screen/nav to remain active. */
 (function enforceHomeDmMode(){
   function scrub(){
