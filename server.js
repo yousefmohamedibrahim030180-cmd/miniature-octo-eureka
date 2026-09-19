@@ -2795,4 +2795,20 @@ async function boot() {
   await initPersistence();
   server.listen(PORT, "0.0.0.0", () => console.log("[orbit] guest mode listening on " + PORT + (dbReady ? " with PostgreSQL" : " in memory mode")));
 }
+
+let shuttingDown=false;
+async function shutdown(signal) {
+  if(shuttingDown)return;
+  shuttingDown=true;
+  console.log("[orbit] graceful shutdown:",signal);
+  clearTimeout(persistTimer);
+  try{await persistState()}catch(error){console.error("[orbit] final persistence failed:",error.message)}
+  try{await closeRedisAdapter(realtimeScale)}catch(error){console.error("[orbit] Redis shutdown failed:",error.message)}
+  try{if(dbPool)await dbPool.end()}catch(error){console.error("[orbit] PostgreSQL shutdown failed:",error.message)}
+  server.close(()=>process.exit(0));
+  setTimeout(()=>process.exit(1),10000).unref();
+}
+process.on("SIGTERM",()=>shutdown("SIGTERM"));
+process.on("SIGINT",()=>shutdown("SIGINT"));
+
 boot().catch(error => { console.error("[orbit] boot failed", error); process.exit(1); });
