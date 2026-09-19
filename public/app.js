@@ -3309,12 +3309,21 @@ async function renderNotificationsPage(){
   }catch(e){$("#page-body").innerHTML='<div class="content-card"><h4>Notifications unavailable</h4><p>'+escapeHtml(e.message)+'</p></div>'}
 }
 
-function renderSavedPage(){
-  $("#page-actions").innerHTML='<button id="clear-saved">Clear all</button>';
-  const rows=orbitUI.saved||[];
-  $("#page-body").innerHTML='<div class="list-card">'+(rows.length?rows.map((m,i)=>'<div class="list-row"><div class="chip">⌑</div><div><strong>'+escapeHtml(m.title||"Message")+'</strong><span>'+escapeHtml(m.text||"")+'</span></div><button data-remove-saved="'+i+'">Remove</button></div>').join(""):'<div class="content-card"><h4>Nothing saved</h4><p>Use the bookmark action on a message.</p></div>')+'</div>';
-  $("#clear-saved").onclick=()=>{orbitUI.saved=[];localStorage.setItem("orbit_saved","[]");renderSavedPage()};
-  document.querySelectorAll("[data-remove-saved]").forEach(b=>b.onclick=()=>{orbitUI.saved.splice(Number(b.dataset.removeSaved),1);localStorage.setItem("orbit_saved",JSON.stringify(orbitUI.saved));renderSavedPage()});
+async function renderSavedPage(){
+  $("#page-actions").innerHTML='<button id="refresh-saved">Refresh</button>';
+  $("#page-body").innerHTML='<div class="os-empty"><strong>Loading saved messages…</strong><span>Syncing your bookmarks from ORBIT.</span></div>';
+  try{
+    const data=await api("/api/v1/bookmarks");
+    const rows=data.bookmarks||[];
+    $("#page-body").innerHTML='<div class="os-list">'+(rows.length?rows.map(item=>{
+      const m=item.message||{};
+      return '<div class="list-row saved-message-row"><div class="chip">⌑</div><div><strong>'+escapeHtml(m.username||"Message")+'</strong><span>'+escapeHtml(String(m.content||""))+'</span><small>'+escapeHtml(item.channelId||"channel")+' · '+escapeHtml(orbitDate(item.createdAt))+'</small></div><button data-remove-bookmark="'+escapeHtml(item.messageId)+'">Remove</button></div>';
+    }).join(""):'<div class="content-card"><h4>Nothing saved</h4><p>Use the bookmark action on a message. Saved items follow your account across devices.</p></div>')+'</div>';
+    $("#refresh-saved").onclick=renderSavedPage;
+    document.querySelectorAll("[data-remove-bookmark]").forEach(btn=>btn.onclick=async()=>{try{await api("/api/v1/messages/"+encodeURIComponent(btn.dataset.removeBookmark)+"/bookmark",{method:"POST",body:"{}"});renderSavedPage()}catch(err){orbitToast("Remove failed",err.message,"error")}});
+  }catch(err){
+    $("#page-body").innerHTML='<div class="os-empty"><strong>Saved unavailable</strong><span>'+escapeHtml(err.message)+'</span></div>';
+  }
 }
 
 function renderExplorePage(){
@@ -4224,7 +4233,7 @@ appendMessage=function(m){
   actions.querySelector('[data-msg="react"]').onclick=async()=>{try{await api("/api/messages/"+encodeURIComponent(m.id)+"/reaction",{method:"POST",body:JSON.stringify({emoji:"👍"})})}catch(e){orbitToast("Reaction failed",e.message,"error")}};
   actions.querySelector('[data-msg="reply"]').onclick=()=>{$("#message").value="@"+m.username+" ";$("#message").focus()};
   actions.querySelector('[data-msg="thread"]').onclick=()=>openThread(el);
-  actions.querySelector('[data-msg="save"]').onclick=()=>{orbitUI.saved.unshift({title:m.username,meta:"#"+(currentChannel?.name||"channel")+" · "+new Date().toLocaleString(),text:m.content});localStorage.setItem("orbit_saved",JSON.stringify(orbitUI.saved));orbitToast("Saved","Message added to Saved.","success")};
+  actions.querySelector('[data-msg="save"]').onclick=async()=>{try{const out=await api("/api/v1/messages/"+encodeURIComponent(m.id)+"/bookmark",{method:"POST",body:"{}"});orbitToast(out.bookmarked?"Saved":"Removed","Message bookmark updated on your account.","success");if(orbitUI.view==="saved")renderSavedPage()}catch(e){orbitToast("Save failed",e.message,"error")}};
   actions.querySelector('[data-msg="more"]').onclick=()=>openMessageMore(el);
 };
 async function openThread(el){
