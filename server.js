@@ -16,6 +16,7 @@ const { configureRedisAdapter, closeRedisAdapter } = require("./platform/realtim
 const { createStorage } = require("./platform/storage");
 const { PERMISSIONS, CHANNEL_TYPES, canManage: canManageRole, hasPermission, canManageMembers, canManageCommunity, canCreateChannel, channelAllowsText, channelAllowsRealtime } = require("./platform/permissions");
 const { generateSecret, verifyTotp, encryptSecret, decryptSecret, makeRecoveryCodes, hashRecoveryCode, consumeRecoveryCode, setupUri } = require("./platform/totp");
+const { API_KEY_SCOPES, hashSecret, safeCredentialName, makeApiKeySecret, makeClientId, makeClientSecret, validScopes } = require("./platform/developer");
 
 const app = express();
 const server = http.createServer(app);
@@ -329,52 +330,7 @@ function authV1(req, res, next) {
   }
 }
 
-const API_KEY_SCOPES = new Set([
-  "profile.read",
-  "communities.read",
-  "channels.read",
-  "messages.read",
-  "messages.write",
-  "community.manage",
-  "events.read",
-  "events.write",
-  "moderation.read",
-  "webhooks.manage"
-]);
 
-function hashSecret(value){
-  return crypto.createHash("sha256").update(String(value||"")).digest("hex");
-}
-
-function safeApiKeyName(value){
-  return String(value||"API key").trim().replace(/[^\w .:@-]/g,"").slice(0,100) || "API key";
-}
-
-function makeApiKeySecret(){
-  return "orb_live_" + crypto.randomBytes(32).toString("base64url");
-}
-
-function makeClientId(){
-  return "orb_app_" + crypto.randomBytes(18).toString("base64url").replace(/[^A-Za-z0-9_-]/g,"");
-}
-
-function makeClientSecret(){
-  return "orb_secret_" + crypto.randomBytes(40).toString("base64url");
-}
-
-function apiKeyFromRequest(req){
-  const auth=String(req.get("authorization")||"");
-  if(/^Bearer\s+/i.test(auth))return auth.replace(/^Bearer\s+/i,"").trim();
-  return String(req.get("x-orbit-api-key")||"").trim();
-}
-
-function findApiKey(secret){
-  const hash=hashSecret(secret);
-  for(const key of memory.apiKeys.values()){
-    if(!key.revokedAt && (!key.expiresAt || new Date(key.expiresAt).getTime()>Date.now()) && key.hash===hash)return key;
-  }
-  return null;
-}
 
 function authApiKey(req,res,next){
   const secret=apiKeyFromRequest(req);
@@ -660,8 +616,8 @@ app.get("/api/v1/developer/api-keys",authV1,(req,res)=>{
 });
 
 app.post("/api/v1/developer/api-keys",authV1,(req,res)=>{
-  const name=safeApiKeyName(req.body?.name);
-  const scopes=Array.isArray(req.body?.scopes)?[...new Set(req.body.scopes.map(x=>String(x)).filter(x=>API_KEY_SCOPES.has(x)))]:["profile.read"];
+  const name=safeCredentialName(req.body?.name);
+  const scopes=validScopes(req.body?.scopes);
   if(!scopes.length)return res.status(400).json({error:"Choose at least one valid scope."});
   if(scopes.includes("community.manage") && !["owner","admin"].includes(String(req.user.globalRole||"member"))){
     // Community-level authorization is still enforced per endpoint. This gate only prevents accidental broad keys.
@@ -689,7 +645,7 @@ app.get("/api/v1/developer/applications",authV1,(req,res)=>{
 });
 
 app.post("/api/v1/developer/applications",authV1,(req,res)=>{
-  const name=safeApiKeyName(req.body?.name||"ORBIT App");
+  const name=safeCredentialName(req.body?.name||"ORBIT App");
   const description=String(req.body?.description||"").trim().slice(0,500);
   const redirectUris=Array.isArray(req.body?.redirectUris)?req.body.redirectUris.map(x=>String(x).trim()).filter(Boolean).slice(0,10):[];
   for(const uri of redirectUris){
