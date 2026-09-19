@@ -372,6 +372,40 @@ function connectRealtime() {
     }
   });
   socket.on("live:ended", () => refreshSharedSurface("live"));
+  socket.on("channel:created", payload => {
+    if (payload?.channel?.serverId && currentServer && String(payload.channel.serverId)===String(currentServer.id)) {
+      channels=[...channels.filter(c=>String(c.id)!==String(payload.channel.id)),payload.channel].sort((a,b)=>Number(a.position||0)-Number(b.position||0));
+      renderChannels();
+    }
+  });
+  socket.on("channel:updated", payload => {
+    if (!payload?.channel)return;
+    const index=channels.findIndex(c=>String(c.id)===String(payload.channel.id));
+    if(index!==-1){channels[index]=payload.channel;renderChannels();if(String(currentChannel?.id)===String(payload.channel.id))$("#channel-name").textContent=payload.channel.name;}
+    if(orbitUI.view==="chat"&&currentChannel?.type==="forum"&&String(currentChannel?.id)===String(payload.channel.id))renderForumChannel(payload.channel);
+  });
+  socket.on("channel:deleted", payload => {
+    if(!payload?.channelId)return;
+    channels=channels.filter(c=>String(c.id)!==String(payload.channelId));
+    if(String(currentChannel?.id)===String(payload.channelId)){
+      currentChannel=channels.find(c=>!isRealtimeChannel(c.type))||null;
+      if(currentChannel)selectChannel(currentChannel);
+    }
+    renderChannels();
+  });
+  socket.on("forum:post-created", payload => {
+    if(currentChannel?.type==="forum" && String(currentChannel.id)===String(payload?.post?.channelId)){
+      renderForumChannel(currentChannel);
+      if(String(payload?.post?.authorId)!==String(me?.id))orbitToast("New discussion",payload.post.title||"A new post was created.");
+    }
+  });
+  socket.on("forum:comment-created", payload => {
+    if(currentChannel?.type==="forum" && String(payload?.postId)===String(currentChannel?.id)) return;
+    if(payload?.comment?.authorId && String(payload.comment.authorId)!==String(me?.id)) orbitToast("Forum reply","A discussion received a new reply.");
+  });
+  socket.on("forum:post-reaction", payload => {
+    if(currentChannel?.type==="forum" && payload?.postId)renderForumChannel(currentChannel);
+  });
 
   socket.on("call:incoming", call => {
     if (callState.active || String(call.userId) === String(me?.id)) return;
