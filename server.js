@@ -11,7 +11,8 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: true, credentials: true },
-  transports: ["websocket", "polling"]
+  transports: ["polling"],
+  allowUpgrades: false
 });
 
 const PORT = Number(process.env.PORT || 8080);
