@@ -15,6 +15,7 @@ const { createSessionManager, cookieMap, setRefreshCookie, clearRefreshCookie } 
 const { configureRedisAdapter, closeRedisAdapter } = require("./platform/realtime");
 const { createStorage } = require("./platform/storage");
 const { PERMISSIONS, CHANNEL_TYPES, canManage: canManageRole, hasPermission, canManageMembers, canManageCommunity, canCreateChannel, channelAllowsText, channelAllowsRealtime } = require("./platform/permissions");
+const { generateSecret, verifyTotp, encryptSecret, decryptSecret, makeRecoveryCodes, hashRecoveryCode, consumeRecoveryCode, setupUri } = require("./platform/totp");
 
 const app = express();
 const server = http.createServer(app);
@@ -707,6 +708,18 @@ app.post("/api/v1/auth/login", async (req,res)=>{
   const user=[...memory.users.values()].find(item=>String(item.username||"").toLowerCase()===username.toLowerCase()&&item.passwordHash);
   const ok=Boolean(user)&&await bcrypt.compare(password,user.passwordHash);
   if(!ok){history.count+=1;accountLoginAttempts.set(key,history);return res.status(401).json({error:"Incorrect username or password."})}
+  if(user?.twoFactor?.enabled){
+    const rawTwoFactor=String(req.body?.twoFactorCode||"").trim();
+    let validTwoFactor=false;
+    try{
+      const secret=decryptSecret(user.twoFactor.secretEncrypted,JWT_SECRET);
+      validTwoFactor=verifyTotp(secret,rawTwoFactor);
+    }catch{}
+    if(!validTwoFactor){
+      if(rawTwoFactor) validTwoFactor=consumeRecoveryCode(user.twoFactor.recoveryCodes||[],rawTwoFactor);
+    }
+    if(!validTwoFactor) return res.status(401).json({error:"Two-factor authentication is required.",code:"TWO_FACTOR_REQUIRED"});
+  }
   accountLoginAttempts.delete(key);
   user.status="online";user.activity="Online";
   const issued=v1Sessions.issue(user,req);
@@ -775,6 +788,56 @@ app.post("/api/auth/convert-legacy", authLegacy, async (req, res) => {
 
 app.get("/api/me", authLegacy, (req, res) => {
   res.json({ user: publicUser(req.user) });
+});
+
+app.get("/api/v1/security/2fa",authV1,(req,res)=>{
+  const two=req.user.twoFactor||{};
+  res.json({enabled:Boolean(two.enabled),pending:Boolean(two.pendingSecretEncrypted),recoveryCodesRemaining:Array.isArray(two.recoveryCodes)?two.recoveryCodes.filter(x=>!x.usedAt).length:0});
+});
+
+app.post("/api/v1/security/2fa/setup",authV1,(req,res)=>{
+  const two=req.user.twoFactor||{};
+  if(two.enabled)return res.status(409).json({error:"Two-factor authentication is already enabled."});
+  const secret=generateSecret();
+  const pendingSecretEncrypted=encryptSecret(secret,JWT_SECRET);
+  req.user.twoFactor={enabled:false,pendingSecretEncrypted,pendingCreatedAt:now(),recoveryCodes:[]};
+  schedulePersist();
+  res.json({secret,otpauthUri:setupUri(secret,req.user.username),expiresInSeconds:900});
+});
+
+app.post("/api/v1/security/2fa/verify",authV1,(req,res)=>{
+  const two=req.user.twoFactor||{};
+  if(two.enabled)return res.status(409).json({error:"Two-factor authentication is already enabled."});
+  if(!two.pendingSecretEncrypted)return res.status(400).json({error:"Start 2FA setup first."});
+  if(two.pendingCreatedAt && Date.now()-new Date(two.pendingCreatedAt).getTime()>15*60*1000)return res.status(400).json({error:"The pending 2FA setup expired. Start again."});
+  let secret="";
+  try{secret=decryptSecret(two.pendingSecretEncrypted,JWT_SECRET)}catch{return res.status(400).json({error:"The pending 2FA setup is invalid."})}
+  if(!verifyTotp(secret,String(req.body?.code||"")))return res.status(400).json({error:"Invalid authenticator code."});
+  const recoveryCodes=makeRecoveryCodes(10);
+  req.user.twoFactor={
+    enabled:true,
+    enabledAt:now(),
+    secretEncrypted:two.pendingSecretEncrypted,
+    pendingSecretEncrypted:null,
+    pendingCreatedAt:null,
+    recoveryCodes:recoveryCodes.map(code=>({hash:hashRecoveryCode(code),usedAt:null}))
+  };
+  audit(req.user.id,"2FA_ENABLE",req.user.id);
+  schedulePersist();
+  res.json({enabled:true,recoveryCodes});
+});
+
+app.post("/api/v1/security/2fa/disable",authV1,(req,res)=>{
+  const two=req.user.twoFactor||{};
+  if(!two.enabled)return res.status(400).json({error:"Two-factor authentication is not enabled."});
+  let valid=false;
+  try{valid=verifyTotp(decryptSecret(two.secretEncrypted,JWT_SECRET),String(req.body?.code||""))}catch{}
+  if(!valid && req.body?.recoveryCode)valid=consumeRecoveryCode(two.recoveryCodes||[],String(req.body.recoveryCode));
+  if(!valid)return res.status(400).json({error:"Valid authenticator or recovery code required."});
+  req.user.twoFactor={enabled:false,pendingSecretEncrypted:null,pendingCreatedAt:null,recoveryCodes:[]};
+  audit(req.user.id,"2FA_DISABLE",req.user.id);
+  schedulePersist();
+  res.json({enabled:false});
 });
 
 app.post("/api/v1/uploads/presign", authV1, async (req,res)=>{
