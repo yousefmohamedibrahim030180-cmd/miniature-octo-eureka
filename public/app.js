@@ -1605,37 +1605,82 @@ async function renderServerHomePage(){
 }
 
 function renderHomePage(){
-  $("#page-actions").innerHTML='<button id="home-create">+ Create server</button><button id="home-search">Search</button>';
-  $("#page-body").innerHTML=
-  '<div class="pulse-command"><div><span class="eyebrow">REALTIME SOCIAL OS</span><h2>Orbit Pulse</h2><p>Your community, alive in one view.</p></div><div class="pulse-command-actions"><button id="pulse-open-chat">Open chat</button><button id="pulse-open-settings">Personalize</button></div></div>'+
-  '<div id="pulse-panel" class="pulse-live-surface"></div>'+
-  '<div class="hero-grid">'+
-    '<div class="hero-card"><span class="eyebrow">WORKSPACE</span><h2>Everything in one place.</h2><p>Chat, communities, voice rooms, screen sharing, search, threads and moderation controls.</p><button class="hero-action" id="home-open-chat">Open #'+escapeHtml(currentChannel?.name||"general")+'</button></div>'+
-    '<div class="hero-card"><span class="eyebrow">LIVE</span><h2>Voice & Video</h2><p>Jump into a room with high-quality media, screen sharing and live controls.</p><button class="hero-action" id="home-call">Start video</button></div>'+
-    '<div class="hero-card"><span class="eyebrow">PROFILE</span><h2>'+escapeHtml(orbitUI.profile.displayName||me?.displayName||me?.username||"Guest")+'</h2><p>'+escapeHtml(orbitUI.profile.bio)+'</p><button class="hero-action" id="home-profile">Customize</button></div>'+
-  '</div>'+
-  '<div class="metric-grid">'+
-    '<div class="metric"><span>Communities</span><strong>'+servers.length+'</strong><span>Connected workspaces</span></div>'+
-    '<div class="metric"><span>Live now</span><strong id="home-live-count">—</strong><span>People online</span></div>'+
-    '<div class="metric"><span>Active rooms</span><strong id="home-call-count">—</strong><span>Live calls</span></div>'+
-    '<div class="metric"><span>Identity</span><strong>@'+escapeHtml(me?.username||"guest")+'</strong><span>Unique Orbit username</span></div>'+
-  '</div>'+
-  '<div class="section-block"><div class="section-heading"><h3>Quick actions</h3><span>Built into Orbit Pulse</span></div><div class="card-grid">'+
-    '<button class="content-card" id="qa-search"><div class="chip">⌕</div><h4>Search Orbit</h4><p>Find people, communities, channels and messages.</p></button>'+
-    '<button class="content-card" id="qa-poll"><div class="chip">◫</div><h4>Create poll</h4><p>Publish a realtime poll in the current channel.</p></button>'+
-    '<button class="content-card" id="qa-friends"><div class="chip">◎</div><h4>Friends</h4><p>Meet people who are online right now.</p></button>'+
-  '</div></div>';
-  $("#home-open-chat").onclick=goChat;
-  $("#home-call").onclick=()=>{goChat();startCall("video")};
-  $("#home-profile").onclick=()=>{setView("settings");renderSettingsPage("profile")};
-  $("#home-create").onclick=()=>$("#new-server").click();
-  $("#home-search").onclick=()=>openSearchModal("");
-  $("#pulse-open-chat").onclick=goChat;
-  $("#pulse-open-settings").onclick=()=>{setView("settings");renderSettingsPage("appearance")};
-  $("#qa-search").onclick=()=>openSearchModal("");
-  $("#qa-poll").onclick=openPoll;
-  $("#qa-friends").onclick=()=>setView("friends");
-  loadPulse();
+  const body=$("#page-body");
+  const actions=$("#page-actions");
+  if(!body)return;
+
+  const meName=me?.display_name||me?.username||"Guest";
+  const current=currentServer||null;
+  const liveUsers=(pulseState?.users||[]).filter(u=>String(u.status||"online").toLowerCase()!=="offline");
+  const calls=(pulseState?.calls||[]).slice(0,2);
+
+  actions.innerHTML='<button class="oh-top-btn" id="oh-add-friend">Add Friend</button>';
+
+  const empty=(title,text)=>'<div class="oh-empty"><strong>'+escapeHtml(title)+'</strong><span>'+escapeHtml(text)+'</span></div>';
+  const userRow=(u)=>'<button class="oh-user-row" data-oh-user="'+escapeHtml(u.id||"")+'"><span class="oh-avatar">'+avatar(u.username||"G")+'</span><span class="oh-user-copy"><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>'+escapeHtml(u.activity||u.status||"Online")+'</span></span><span class="oh-user-action">Message</span></button>';
+  const callCard=(c)=>{
+    const count=(c.participants||[]).length||0;
+    return '<button class="oh-active-card" data-oh-call="'+escapeHtml(c.channelId||"")+'"><div class="oh-active-head"><span class="oh-active-title"><b class="oh-live-dot"></b>'+escapeHtml(c.channelName||"Live room")+'</span><span class="oh-live-pill">LIVE</span></div><div class="oh-active-screen"><div class="oh-screen-top"><span></span><span></span><span></span><i></i></div><div class="oh-screen-lines"><b></b><b></b><b></b><b></b><b></b></div><div class="oh-screen-caption">'+escapeHtml(c.mode==="voice"?"Voice room":"Screen sharing")+'</div></div><div class="oh-active-foot"><span>◉ '+count+' '+(count===1?"person":"people")+'</span><span>Join</span></div></button>';
+  };
+
+  (async()=>{
+    let friendsData={friends:[],incoming:[],outgoing:[]};
+    try{friendsData=await api("/api/friends")}catch(e){}
+    const friends=friendsData.friends||[];
+    const online=friends.filter(u=>String(u.status||"").toLowerCase()!=="offline");
+    const friendIds=new Set(friends.map(u=>String(u.id)));
+    const suggestions=liveUsers.filter(u=>String(u.id)!==String(me?.id)&&!friendIds.has(String(u.id))).slice(0,10);
+
+    const tabContent=(mode)=>{
+      if(mode==="friends") return '<section class="oh-section"><div class="oh-section-head"><div><strong>Friends — '+friends.length+'</strong><span>Your people on Orbit</span></div><button data-oh-open-dms>Messages</button></div><div class="oh-user-list">'+(friends.length?friends.map(userRow).join(""):empty("No friends yet","Add people to build your Orbit circle."))+'</div></section><section class="oh-section"><div class="oh-section-head"><div><strong>Recent conversations</strong><span>Jump back into people you know</span></div><button data-oh-open-dms>Open Messages</button></div><div class="oh-recent-list">'+(friends.length?friends.slice(0,6).map(userRow).join(""):empty("No conversations yet","Start a message from the Messages page."))+'</div></section>';
+      if(mode==="online") return '<section class="oh-section"><div class="oh-section-head"><div><strong>Online — '+online.length+'</strong><span>Friends currently online</span></div><button data-oh-open-friends>View All</button></div><div class="oh-user-list">'+(online.length?online.map(userRow).join(""):empty("Nobody is online","Your online friends will appear here."))+'</div></section>';
+      if(mode==="all") return '<section class="oh-section"><div class="oh-section-head"><div><strong>All Friends — '+friends.length+'</strong><span>Everyone in your friends list</span></div></div><div class="oh-user-list">'+(friends.length?friends.map(userRow).join(""):empty("No friends yet","Add people to see them here."))+'</div></section>';
+      if(mode==="pending"){
+        return '<section class="oh-section"><div class="oh-section-head"><div><strong>Incoming — '+(friendsData.incoming||[]).length+'</strong><span>Friend requests waiting for you</span></div></div><div class="oh-user-list">'+((friendsData.incoming||[]).length?(friendsData.incoming||[]).map(r=>'<div class="oh-user-row"><span class="oh-avatar">'+avatar(r.fromUser?.username||"G")+'</span><span class="oh-user-copy"><strong>'+escapeHtml(r.fromUser?.username||"Guest")+'</strong><span>Wants to be your friend</span></span><span class="oh-request-actions"><button data-oh-accept="'+escapeHtml(r.id)+'">Accept</button><button data-oh-reject="'+escapeHtml(r.id)+'">Decline</button></span></div>').join(""):empty("No incoming requests","You are all caught up."))+'</div></section>'+
+        '<section class="oh-section"><div class="oh-section-head"><div><strong>Outgoing — '+(friendsData.outgoing||[]).length+'</strong><span>Requests waiting for a response</span></div></div><div class="oh-user-list">'+((friendsData.outgoing||[]).length?(friendsData.outgoing||[]).map(r=>'<div class="oh-user-row"><span class="oh-avatar">'+avatar(r.toUser?.username||"G")+'</span><span class="oh-user-copy"><strong>'+escapeHtml(r.toUser?.username||"Guest")+'</strong><span>Friend request · waiting</span></span><span class="oh-user-action">Pending</span></div>').join(""):empty("No outgoing requests","Requests you send will appear here."))+'</div></section>';
+      }
+      return '<section class="oh-section"><div class="oh-section-head"><div><strong>Suggestions</strong><span>People you may want to connect with</span></div></div><div class="oh-user-list">'+(suggestions.length?suggestions.map(u=>'<div class="oh-user-row"><span class="oh-avatar">'+avatar(u.username||"G")+'</span><span class="oh-user-copy"><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><span>'+escapeHtml(u.status||"online")+' · @'+escapeHtml(u.username||"guest")+'</span></span><button class="oh-suggestion-add" data-oh-add="'+escapeHtml(u.username||"")+'">Add</button></div>').join(""):empty("No suggestions right now","Try searching for someone by username."))+'</div></section>';
+    };
+
+    body.innerHTML='<div class="orbit-home-simple">'+
+      '<div class="oh-homebar"><div class="oh-home-tabs">'+
+        '<button class="oh-tab active" data-oh-tab="friends">Friends</button>'+
+        '<button class="oh-tab" data-oh-tab="online">Online</button>'+
+        '<button class="oh-tab" data-oh-tab="all">All</button>'+
+        '<button class="oh-tab" data-oh-tab="pending">Pending <span class="oh-badge">'+((friendsData.incoming||[]).length)+'</span></button>'+
+        '<button class="oh-tab" data-oh-tab="suggestions">Suggestions</button>'+
+      '</div><button class="oh-top-btn primary" id="oh-add-friend-2">Add Friend</button></div>'+
+      '<div class="oh-columns"><main class="oh-main">'+
+        '<div class="oh-notice"><span class="oh-notice-icon">i</span><div><strong>Welcome to Orbit</strong><span>Your communities, friends, messages and live rooms stay connected here.</span></div><button id="oh-notice-close">×</button></div>'+
+        '<div class="oh-search"><span>⌕</span><input id="oh-friend-search" placeholder="Search friends, communities, or conversations" autocomplete="off"></div>'+
+        '<div id="oh-tab-content"></div>'+
+      '</main><aside class="oh-side">'+
+        '<section class="oh-side-card"><div class="oh-side-head"><strong>Active Now</strong><button id="oh-open-calls">View All</button></div><div class="oh-side-body">'+(calls.length?calls.map(callCard).join(""):empty("No active rooms","Voice, video and screen sharing will appear here."))+'</div></section>'+
+        '<section class="oh-side-card"><div class="oh-side-head"><strong>Your Space</strong><button id="oh-open-community">Open</button></div><div class="oh-space-card"><span class="oh-space-avatar">'+escapeHtml((current?.name||"O").slice(0,1).toUpperCase())+'</span><div><strong>'+escapeHtml(current?.name||"Orbit Lobby")+'</strong><span>'+escapeHtml(current?"Jump into your current community":"Choose a community from the left rail")+'</span></div></div><div class="oh-space-actions"><button id="oh-open-chat">Open Chat</button><button id="oh-open-events">Events</button></div></section>'+
+        '<section class="oh-side-card oh-profile-card"><div class="oh-profile-row"><span class="oh-avatar large">'+avatar(me?.username||"G")+'</span><div><strong>'+escapeHtml(meName)+'</strong><span>@'+escapeHtml(me?.username||"guest")+'</span></div><button id="oh-profile">Edit</button></div></section>'+
+      '</aside></div></div>';
+
+    const addFriend=()=>{setView("friends");setTimeout(()=>$("#add-friend-page")?.click(),60)};
+    const activateTab=(mode)=>{
+      document.querySelectorAll("[data-oh-tab]").forEach(b=>b.classList.toggle("active",b.dataset.ohTab===mode));
+      const slot=$("#oh-tab-content");
+      if(slot)slot.innerHTML=tabContent(mode);
+      slot?.querySelectorAll("[data-oh-open-dms]").forEach(b=>b.onclick=()=>setView("dms"));
+      slot?.querySelectorAll("[data-oh-open-friends]").forEach(b=>b.onclick=()=>setView("friends"));
+      slot?.querySelectorAll("[data-oh-user]").forEach(b=>b.onclick=()=>openPulseProfile(b.dataset.ohUser));
+      slot?.querySelectorAll("[data-oh-accept]").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request/"+encodeURIComponent(b.dataset.ohAccept)+"/accept",{method:"POST",body:"{}"});orbitToast("Friend added","Request accepted.","success");renderHomePage()}catch(e){orbitToast("Request failed",e.message,"error")}});
+      slot?.querySelectorAll("[data-oh-reject]").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request/"+encodeURIComponent(b.dataset.ohReject)+"/reject",{method:"POST",body:"{}"});orbitToast("Request declined","The request was rejected.","");renderHomePage()}catch(e){orbitToast("Request failed",e.message,"error")}});
+      slot?.querySelectorAll("[data-oh-add]").forEach(b=>b.onclick=async()=>{try{await api("/api/friends/request",{method:"POST",body:JSON.stringify({username:b.dataset.ohAdd})});orbitToast("Friend request sent","Request sent.","success");b.textContent="Sent";b.disabled=true}catch(e){orbitToast("Friend request failed",e.message,"error")}});
+    };
+
+    document.querySelectorAll("[data-oh-tab]").forEach(b=>b.onclick=()=>activateTab(b.dataset.ohTab));
+    activateTab("friends");
+    $("#oh-add-friend").onclick=addFriend; $("#oh-add-friend-2").onclick=addFriend;
+    $("#oh-open-calls").onclick=()=>setView("calls"); $("#oh-open-community").onclick=()=>setView("communities"); $("#oh-open-chat").onclick=goChat; $("#oh-open-events").onclick=()=>setView("events"); $("#oh-profile").onclick=()=>setView("settings");
+    $("#oh-notice-close").onclick=e=>e.currentTarget.closest(".oh-notice")?.remove();
+    $("#oh-friend-search").oninput=e=>{const term=e.target.value.toLowerCase().trim();document.querySelectorAll("#oh-tab-content .oh-user-row").forEach(row=>row.style.display=!term||row.innerText.toLowerCase().includes(term)?"flex":"none")};
+    document.querySelectorAll("[data-oh-call]").forEach(b=>b.onclick=async()=>{const c=calls.find(x=>String(x.channelId)===String(b.dataset.ohCall));if(!c)return;const s=servers.find(x=>String(x.id)===String(c.serverId));if(s)await selectServer(s);const ch=(channels||[]).find(x=>String(x.id)===String(c.channelId));if(ch)await selectChannel(ch);goChat()});
+  })();
 }
 
 /* ===== ORBIT PRODUCT EXPANSION / SOCIAL OS MODULES ===== */
