@@ -135,21 +135,108 @@ function showError(message) {
   openModal("Something went wrong", '<p class="modal-error">' + escapeHtml(message) + "</p>");
 }
 
-async function enterAsGuest() {
-  const data = await api("/api/guest", {
-    method: "POST",
-    body: JSON.stringify({ guestId: guestId || undefined, username: guestName || undefined })
+function saveAccountSession(data){
+  token=data.token||"";
+  guestId=data.user?.id||"";
+  guestName=data.user?.username||"";
+  me=data.user||null;
+  localStorage.setItem("orbit_guest_token",token);
+  localStorage.setItem("orbit_guest_id",guestId);
+  localStorage.setItem("orbit_guest_name",guestName);
+}
+
+function hideAuthScreen(){
+  const screen=$("#orbit-auth-screen");
+  screen?.remove();
+  document.body.classList.remove("orbit-auth-required");
+}
+
+function showAuthScreen(mode="signin", legacy=false){
+  let screen=$("#orbit-auth-screen");
+  if(!screen){
+    screen=document.createElement("section");
+    screen.id="orbit-auth-screen";
+    screen.className="orbit-auth-screen";
+    document.body.classList.add("orbit-auth-required");
+    document.body.appendChild(screen);
+  }
+  const convertMode=legacy && mode==="convert";
+  const title=convertMode?"Secure your Orbit account":"Welcome to ORBIT";
+  const subtitle=convertMode?"This session has saved data. Create a permanent username and password to keep it.":"Create an account or sign in to continue.";
+  screen.innerHTML=
+    '<div class="orbit-auth-backdrop"><i></i><i></i><i></i></div>'+
+    '<div class="orbit-auth-card">'+
+      '<div class="orbit-auth-brand"><div class="orbit-auth-orb">◈</div><div><strong>ORBIT</strong><span>PRIVATE COMMUNITY NETWORK</span></div></div>'+
+      '<div class="orbit-auth-copy"><span class="orbit-auth-kicker">ACCOUNT ACCESS</span><h1>'+escapeHtml(title)+'</h1><p>'+escapeHtml(subtitle)+'</p></div>'+
+      (convertMode?'':'<div class="orbit-auth-tabs"><button type="button" data-auth-tab="signin" class="'+(mode==="signin"?"active":"")+'">Sign in</button><button type="button" data-auth-tab="register" class="'+(mode==="register"?"active":"")+'">Create account</button></div>')+
+      '<form id="orbit-auth-form" class="orbit-auth-form">'+
+        ((mode==="register"&&!convertMode)?'<label><span>Display name</span><input id="orbit-auth-display" maxlength="24" placeholder="Your name" autocomplete="name"></label>':'')+
+        '<label><span>Username</span><div class="orbit-auth-input-wrap"><b>@</b><input id="orbit-auth-username" maxlength="20" placeholder="username" autocomplete="username" required></div></label>'+
+        '<label><span>Password</span><input id="orbit-auth-password" type="password" minlength="8" maxlength="72" placeholder="At least 8 characters" autocomplete="'+((mode==="signin"&&!convertMode)?"current-password":"new-password")+'" required></label>'+
+        '<div id="orbit-auth-error" class="orbit-auth-error" aria-live="polite"></div>'+
+        '<button class="orbit-auth-submit" type="submit"><span>'+(convertMode?"Create account":mode==="signin"?"Sign in":"Create account")+'</span><i>→</i></button>'+
+      '</form>'+
+      '<div class="orbit-auth-foot"><span>ORBIT accounts are required for messages, communities and calls.</span></div>'+
+    '</div>';
+  screen.querySelectorAll("[data-auth-tab]").forEach(btn=>btn.onclick=()=>showAuthScreen(btn.dataset.authTab,false));
+  const form=$("#orbit-auth-form");
+  const error=$("#orbit-auth-error");
+  form?.addEventListener("submit",async e=>{
+    e.preventDefault();
+    const submit=form.querySelector(".orbit-auth-submit");
+    const username=$("#orbit-auth-username")?.value.trim().toLowerCase();
+    const password=$("#orbit-auth-password")?.value||"";
+    const displayName=$("#orbit-auth-display")?.value.trim()||username;
+    if(username.length<4){if(error)error.textContent="Username must be at least 4 characters.";return}
+    if(password.length<8){if(error)error.textContent="Password must be at least 8 characters.";return}
+    if(submit){submit.disabled=true;submit.classList.add("loading");submit.querySelector("span").textContent=convertMode?"Securing…":mode==="signin"?"Signing in…":"Creating…";}
+    if(error)error.textContent="";
+    try{
+      const endpoint=convertMode?"/api/auth/convert-legacy":mode==="signin"?"/api/auth/login":"/api/auth/register";
+      const body=convertMode?{username,password}:{username,password,...(mode==="register"?{displayName}:{})};
+      const data=await api(endpoint,{method:"POST",body:JSON.stringify(body)});
+      saveAccountSession(data);
+      hideAuthScreen();
+      $("#me-name").textContent=me.display_name||me.username;
+      renderOwnAvatar();
+      $("#me-status").textContent="online · @"+me.username;
+      connectRealtime();
+      await loadServers();
+      orbitToast(mode==="signin"?"Welcome back":"Account created","You're now connected to ORBIT.","success");
+    }catch(err){
+      if(error)error.textContent=err.message||"Authentication failed.";
+      if(submit){submit.disabled=false;submit.classList.remove("loading");submit.querySelector("span").textContent=convertMode?"Create account":mode==="signin"?"Sign in":"Create account";}
+    }
   });
-  token = data.token;
-  guestId = data.user.id;
-  guestName = data.user.username;
-  me = data.user;
-  saveGuest();
-  $("#me-name").textContent = me.display_name || me.username;
-  renderOwnAvatar();
-  $("#me-status").textContent = "online · @" + (me.username || "guest");
-  connectRealtime();
-  await loadServers();
+  setTimeout(()=>$("#orbit-auth-username")?.focus(),40);
+}
+
+async function enterAsGuest() {
+  if(token){
+    try{
+      const data=await api("/api/me");
+      if(data.user?.account){
+        me=data.user;
+        guestId=me.id;
+        guestName=me.username;
+        saveAccountSession({token,user:me});
+        $("#me-name").textContent=me.display_name||me.username;
+        renderOwnAvatar();
+        $("#me-status").textContent="online · @"+me.username;
+        connectRealtime();
+        await loadServers();
+        return;
+      }
+      showAuthScreen("convert",true);
+      return;
+    }catch{
+      token="";
+      localStorage.removeItem("orbit_guest_token");
+      localStorage.removeItem("orbit_guest_id");
+      localStorage.removeItem("orbit_guest_name");
+    }
+  }
+  showAuthScreen("signin",false);
 }
 
 function connectRealtime() {
