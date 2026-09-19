@@ -733,16 +733,45 @@ app.post("/api/dms/:id/messages", auth, (req, res) => {
   const dm = memory.dms.get(req.params.id);
   if (!dm || !dm.members.includes(String(req.user.id))) return res.status(403).json({ error: "Not a participant" });
   const content = String(req.body?.content || "").trim().slice(0, 4000);
-  if (!content) return res.status(400).json({ error: "Message is empty" });
-  const message = { id: id("dmmsg"), dm_id: dm.id, content, user_id: req.user.id, username: req.user.username, created_at: now(), seen_at: null };
+  const rawAttachment = req.body?.attachment && typeof req.body.attachment === "object" ? req.body.attachment : null;
+  let attachment = null;
+  if (rawAttachment?.id) {
+    const stored = memory.uploads.get(String(rawAttachment.id));
+    if (!stored || String(stored.user_id) !== String(req.user.id)) return res.status(400).json({ error: "Attachment not found" });
+    attachment = { id: stored.id, name: String(stored.name || "Attachment").slice(0, 180), type: String(stored.type || "application/octet-stream").slice(0, 120), size: Number(stored.size || 0) };
+  }
+  if (!content && !attachment) return res.status(400).json({ error: "Message is empty" });
+  const message = {
+    id: id("dmmsg"), dm_id: dm.id, content, attachment, reactions: {},
+    user_id: req.user.id, username: req.user.username, created_at: now(), seen_at: null
+  };
   const list = memory.dmMessages.get(dm.id) || [];
   list.push(message);
   memory.dmMessages.set(dm.id, list.slice(-500));
+  const notificationText = attachment ? "📎 " + attachment.name : content;
   for (const memberId of dm.members.filter(idValue => idValue !== String(req.user.id))) {
-    notify(memberId, { type: "message", title: "New direct message", body: req.user.username + ": " + content.slice(0, 120), actorId: req.user.id, dmId: dm.id });
+    notify(memberId, { type: "message", title: "New direct message", body: req.user.username + ": " + notificationText.slice(0, 120), actorId: req.user.id, dmId: dm.id });
   }
+  schedulePersist();
   io.to(socketRoom("dm", dm.id)).emit("dm:message", message);
   res.status(201).json({ message });
+});
+
+app.post("/api/dms/:id/messages/:messageId/reaction", auth, (req, res) => {
+  const dm = memory.dms.get(req.params.id);
+  if (!dm || !dm.members.includes(String(req.user.id))) return res.status(403).json({ error: "Not a participant" });
+  const list = memory.dmMessages.get(dm.id) || [];
+  const message = list.find(item => String(item.id) === String(req.params.messageId));
+  if (!message) return res.status(404).json({ error: "Message not found" });
+  const emoji = String(req.body?.emoji || "👍").slice(0, 8);
+  message.reactions = message.reactions || {};
+  message.reactions[emoji] = message.reactions[emoji] || [];
+  const users = message.reactions[emoji];
+  const idx = users.map(String).indexOf(String(req.user.id));
+  if (idx === -1) users.push(String(req.user.id)); else users.splice(idx, 1);
+  schedulePersist();
+  io.to(socketRoom("dm", dm.id)).emit("dm:reaction", { dmId: dm.id, messageId: message.id, reactions: message.reactions });
+  res.json({ reactions: message.reactions });
 });
 
 app.post("/api/dms/:id/read", auth, (req, res) => {
@@ -1302,7 +1331,7 @@ app.post("/api/live/:id/end", auth, (req,res)=>{
 
 app.post("/api/uploads", auth, (req,res)=>{
   const data=String(req.body?.data||"");
-  if(!data || data.length>2_500_000) return res.status(400).json({error:"File is missing or too large"});
+  if(!data || data.length>6_000_000) return res.status(400).json({error:"File is missing or too large"});
   const type=String(req.body?.type||"application/octet-stream").slice(0,120);
   const size=Number(req.body?.size||0);
   const purpose=String(req.body?.purpose||"file");
