@@ -17,4 +17,6 @@ async function migrate() {
   } catch (error) { await client.query("ROLLBACK"); throw error; }
   finally { client.release(); await pool.end(); }
 }
-module.exports = { migrate };\n\nif (require.main === module) migrate().catch(error=>{console.error("[orbit] migration failed:",error.message);process.exit(1)});
+module.exports = { migrate };
+
+if (require.main === module) migrate().catch(error=>{console.error("[orbit] migration failed:",error.message);process.exit(1)});
