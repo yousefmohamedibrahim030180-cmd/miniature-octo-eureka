@@ -121,7 +121,7 @@ async function api(url, opts = {}, allowRefresh = true) {
     if(await refreshAccountSession()) return api(url,opts,false);
   }
   const data=await response.json().catch(()=>({}));
-  if(!response.ok) throw new Error(data.error || "Request failed");
+  if(!response.ok){ const error=new Error(data.error || "Request failed"); error.code=data.code||null; throw error; }
   return data;
 }
 function fmt(ts) { return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
@@ -224,6 +224,7 @@ function showAuthScreen(mode="signin", legacy=false){
         ((mode==="register"&&!convertMode)?'<label><span>Display name</span><input id="orbit-auth-display" maxlength="24" placeholder="Your name" autocomplete="name"></label>':'')+
         '<label><span>Username</span><div class="orbit-auth-input-wrap"><b>@</b><input id="orbit-auth-username" maxlength="20" placeholder="username" autocomplete="username" required></div></label>'+
         '<label><span>Password</span><input id="orbit-auth-password" type="password" minlength="8" maxlength="72" placeholder="At least 8 characters" autocomplete="'+((mode==="signin"&&!convertMode)?"current-password":"new-password")+'" required></label>'+
+        '<label id="orbit-auth-2fa-wrap" hidden><span>Authenticator code</span><input id="orbit-auth-2fa" maxlength="8" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code or recovery code"></label>'+
         '<div id="orbit-auth-error" class="orbit-auth-error" aria-live="polite"></div>'+
         '<button class="orbit-auth-submit" type="submit"><span>'+(convertMode?"Create account":mode==="signin"?"Sign in":"Create account")+'</span><i>→</i></button>'+
       '</form>'+
@@ -244,7 +245,8 @@ function showAuthScreen(mode="signin", legacy=false){
     if(error)error.textContent="";
     try{
       const endpoint=convertMode?"/api/auth/convert-legacy":mode==="signin"?"/api/v1/auth/login":"/api/v1/auth/register";
-      const body=convertMode?{username,password}:{username,password,...(mode==="register"?{displayName}:{})};
+      const twoFactorCode=$("#orbit-auth-2fa")?.value.trim()||"";
+      const body=convertMode?{username,password}:{username,password,twoFactorCode,...(mode==="register"?{displayName}:{})};
       const data=await api(endpoint,{method:"POST",body:JSON.stringify(body)});
       saveAccountSession(data);
       hideAuthScreen();
@@ -255,7 +257,10 @@ function showAuthScreen(mode="signin", legacy=false){
       await loadServers();
       orbitToast(mode==="signin"?"Welcome back":"Account created","You're now connected to ORBIT.","success");
     }catch(err){
-      if(error)error.textContent=err.message||"Authentication failed.";
+      if(err.code==="TWO_FACTOR_REQUIRED"){
+        const wrap=$("#orbit-auth-2fa-wrap"); if(wrap){wrap.hidden=false;$("#orbit-auth-2fa")?.focus();}
+        if(error)error.textContent="Enter the 6-digit authenticator code, or one of your recovery codes.";
+      }else if(error)error.textContent=err.message||"Authentication failed.";
       if(submit){submit.disabled=false;submit.classList.remove("loading");submit.querySelector("span").textContent=convertMode?"Create account":mode==="signin"?"Sign in":"Create account";}
     }
   });
