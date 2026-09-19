@@ -1710,24 +1710,14 @@ function renderHomePage(){
       $("#od-dm-list").innerHTML=rows.length?rows.slice(0,30).map(dm=>{
         const u=dm.otherUser||{};
         const onlineNow=dmUserStatus(u)==="Online";
-        return '<button class="od-dm-row '+(String(dm.id)===String(dmState.activeId)?"active":"")+'" data-od-dm="'+escapeHtml(dm.id)+'">'+
+        return '<a class="od-dm-row '+(String(dm.id)===String(dmState.activeId)?"active":"")+'" href="?dm='+encodeURIComponent(dm.id)+'" data-od-dm="'+escapeHtml(dm.id)+'" data-dm-id="'+escapeHtml(dm.id)+'">'+
           avatarMarkup({...u,status:onlineNow?"online":"offline"})+
           '<span><strong>'+escapeHtml(u.display_name||u.username||"Guest")+'</strong><em>'+escapeHtml(dm.lastMessage?.content||"Start a conversation")+'</em></span>'+
           (dm.unreadCount?'<b>'+escapeHtml(dm.unreadCount)+'</b>':"")+
-        '</button>';
+        '</a>';
       }).join(""):'<div class="od-dm-empty">No direct messages yet.</div>';
       const dmListRoot=$("#od-dm-list");
-      if(dmListRoot){
-        dmListRoot.style.pointerEvents="auto";
-        dmListRoot.onclick=e=>{
-          const btn=e.target.closest("[data-od-dm]");
-          if(!btn || !dmListRoot.contains(btn))return;
-          e.preventDefault();
-          e.stopPropagation();
-          const id=btn.dataset.odDm;
-          if(id) window.openHomeDirectMessage?.(id);
-        };
-      }
+      if(dmListRoot)dmListRoot.style.pointerEvents="auto";
     };
 
     const renderActive=()=>{
@@ -3331,6 +3321,7 @@ closeServerSidebar();
     const params = new URLSearchParams(location.search);
     const serverParam = params.get("server");
     const channelParam = params.get("channel");
+    const dmParam = params.get("dm");
     if (serverParam) {
       const linkedServer = servers.find(s => String(s.id) === String(serverParam));
       if (linkedServer && String(linkedServer.id) !== String(currentServer?.id)) await selectServer(linkedServer);
@@ -3345,6 +3336,13 @@ closeServerSidebar();
       }
     } else {
       setView("home");
+    }
+    if(dmParam){
+      setView("home");
+      await new Promise(resolve=>requestAnimationFrame(resolve));
+      await window.openHomeDirectMessage?.(dmParam);
+      // Keep the URL clean after restoring the conversation.
+      history.replaceState({},document.title,location.pathname);
     }
   }catch(err){
     console.error("Orbit boot failed",err);
@@ -3418,9 +3416,7 @@ closeServerSidebar();
   document.addEventListener("click",function(e){
     const btn=e.target.closest && e.target.closest(".od-dm-row[data-od-dm]");
     if(!btn)return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    const id=btn.dataset.odDm;
-    if(id) window.openHomeDirectMessage?.(id);
+    // Let the native ?dm=... navigation run; boot will restore the Home chat.
+    playUiTone("click");
   },true);
 })();
