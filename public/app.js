@@ -1600,7 +1600,8 @@ function setOrbitSoundSetting(key,value){
 document.addEventListener("pointerdown",()=>ensureSoundContext(),{once:true,passive:true});
 function renderPage(view) {
   const cfg={
-    space:["ORBIT / SPACE","Space","A living social universe connecting people, worlds, messages, and live rooms."],\n    home:["ORBIT / COMMAND CENTER","Home","A single control surface for communities, conversations, and live rooms."],
+    space:["ORBIT / SPACE","Space","A living social universe connecting people, worlds, messages, and live rooms."],
+    home:["ORBIT / COMMAND CENTER","Home","A single control surface for communities, conversations, and live rooms."],
     "server-home":["SERVER / HOME",currentServer?.name||"Server Home","Your community command center, members, roles, and channels."],
     discover:["DISCOVER","Discover communities","Explore spaces, categories, and new conversations."],
     dms:["DIRECT MESSAGES","Messages","Private conversations, groups, and recent contacts."],
@@ -1621,7 +1622,8 @@ function renderPage(view) {
   $("#page-title").textContent=cfg[1];
   $("#page-subtitle").textContent=cfg[2];
   $("#page-actions").innerHTML="";
-  if(view==="space")renderSpacePage();\n  if(view==="home")renderHomePage();
+  if(view==="space")renderSpacePage();
+  if(view==="home")renderHomePage();
   if(view==="server-home")renderServerHomePage().catch(err=>orbitToast("Server Home",err.message,"error"));
   if(view==="communities")renderCommunitiesPage();
   if(view==="discover")renderDiscoverPage();
@@ -3243,7 +3245,8 @@ function renderSpacePage(){
   body.querySelectorAll("[data-space-action]").forEach(el=>el.onclick=()=>{const a=el.dataset.spaceAction;if(a==="home"){setView("home");return}if(a==="friends"){setView("friends");return}if(a==="calls"){setView("calls");return}if(a==="discover"){setView("discover")}});
   body.querySelectorAll("[data-space-server]").forEach(el=>el.onclick=async()=>{const sv=servers.find(x=>String(x.id)===String(el.dataset.spaceServer));if(sv){await selectServer(sv);setView("server-home")}});
 }
-\nfunction renderSettingsPage(section="appearance"){
+
+function renderSettingsPage(section="appearance"){
   const sections=[["appearance","Appearance"],["profile","Profile"],["privacy","Privacy"],["voice","Voice & Video"],["sound","Sounds"],["notifications","Notifications"],["accessibility","Accessibility"],["performance","Performance"],["files","Files & Sharing"],["security","Security"],["advanced","Advanced"]];
   $("#page-actions").innerHTML="";
   $("#page-body").innerHTML='<div class="settings-layout"><nav class="settings-nav">'+sections.map(s=>'<button class="'+(s[0]===section?"active":"")+'" data-settings-section="'+s[0]+'">'+s[1]+'</button>').join("")+'</nav><div id="settings-card" class="settings-card"></div></div>';
@@ -3269,7 +3272,8 @@ function renderSpacePage(){
       '<div class="background-tools"><label class="background-url"><span>Image URL</span><input id="bg-url" placeholder="https://example.com/background.jpg" value="'+(bgType==="image"?escapeHtml(bgValue):"")+'"></label><button type="button" id="bg-apply-url">Use image</button><button type="button" id="bg-upload">Upload</button><button type="button" id="bg-reset">Reset</button></div>'+
       '<div class="setting-row bg-opacity-row"><div><strong>Background darkness</strong><span>More darkness keeps text easy to read.</span></div><input id="bg-overlay" type="range" min="35" max="90" value="'+bgOverlay+'"><b id="bg-overlay-value">'+bgOverlay+'%</b></div>';
     $("#accent-color").onchange=e=>{document.documentElement.style.setProperty("--accent",e.target.value);document.documentElement.style.setProperty("--accent2",e.target.value);orbitUI.profile.accent=e.target.value;localStorage.setItem("orbit_profile",JSON.stringify(orbitUI.profile));document.querySelectorAll("[data-accent-theme]").forEach(b=>b.classList.remove("active"));};
-    document.querySelectorAll("[data-accent-theme]").forEach(b=>b.onclick=()=>applyAccentTheme(b.dataset.accentTheme));\n    document.querySelectorAll("[data-interface-mode]").forEach(b=>b.onclick=()=>{applyOrbitInterfaceMode(b.dataset.interfaceMode);orbitToast("Interface updated",ORBIT_INTERFACE_MODES[b.dataset.interfaceMode].name+" is now active.","success");});
+    document.querySelectorAll("[data-accent-theme]").forEach(b=>b.onclick=()=>applyAccentTheme(b.dataset.accentTheme));
+    document.querySelectorAll("[data-interface-mode]").forEach(b=>b.onclick=()=>{applyOrbitInterfaceMode(b.dataset.interfaceMode);orbitToast("Interface updated",ORBIT_INTERFACE_MODES[b.dataset.interfaceMode].name+" is now active.","success");});
     document.querySelectorAll("[data-bg-preset]").forEach(b=>b.onclick=()=>applyOrbitBackground("preset",b.dataset.bgPreset));
     $("#bg-apply-url").onclick=()=>{const url=$("#bg-url").value.trim();if(!/^https?:\/\//i.test(url))return orbitToast("Background","Enter a valid image URL.","error");applyOrbitBackground("image",url);orbitToast("Background updated","Custom image applied.","success");renderSettingsPage("appearance");};
     $("#bg-reset").onclick=()=>{applyOrbitBackground("preset","midnight");localStorage.removeItem("orbit_background_type");localStorage.removeItem("orbit_background_value");renderSettingsPage("appearance");orbitToast("Background reset","Orbit's default background is back.","success");};
@@ -3960,7 +3964,8 @@ bindPremiumNavigation();
 wireEnhancedControls();
 updateVoiceDock();
 
-applyAccentTheme(localStorage.getItem("orbit_theme")||"purple");\napplySavedOrbitInterfaceMode();
+applyAccentTheme(localStorage.getItem("orbit_theme")||"purple");
+applySavedOrbitInterfaceMode();
 if(localStorage.getItem("orbit_video_quality")) callState.settings.quality=localStorage.getItem("orbit_video_quality");
 applySavedOrbitBackground();
 syncScreenShareControls();
