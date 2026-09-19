@@ -2522,16 +2522,57 @@ function wireEnhancedControls() {
       openModal("Share channel", '<input value="' + escapeHtml(link) + '" readonly><p class="hint">Copy this link to share the current channel.</p>');
     }
   });
+  async function openServerSettings(){
+    if(!currentServer)return;
+    const role=String(currentServer.role||"");
+    if(!["owner","admin"].includes(role)) return orbitToast("Server settings","Only server managers can change these settings.","error");
+    let settings={locked:false,slowmode:0,verification:"open"};
+    try{
+      const d=await api("/api/servers/"+encodeURIComponent(currentServer.id)+"/admin/dashboard");
+      settings=d.server?.settings||settings;
+    }catch(err){return orbitToast("Server settings",err.message,"error")}
+    const verification=String(settings.verification||"open");
+    openModal("Server settings",
+      '<div class="server-settings-shell">'+
+        '<div class="server-settings-hero"><div class="server-settings-icon">⚙</div><div><span class="community-kicker">SERVER SETTINGS</span><h3>'+escapeHtml(currentServer.name)+'</h3><p>Manage the rules that shape this community. Changes apply to this server only.</p></div></div>'+
+        '<div class="server-setting-list">'+
+          '<div class="server-setting-row"><div><strong>Lock community</strong><span>Prevent members from sending new messages while you handle moderation.</span></div><button type="button" class="server-toggle '+(settings.locked?"on":"")+'" id="server-setting-locked" aria-pressed="'+(settings.locked?"true":"false")+'"><i></i></button></div>'+
+          '<div class="server-setting-row"><div><strong>Message slowmode</strong><span>Set a delay between messages to reduce spam.</span></div><select id="server-setting-slowmode"><option value="0">Off</option><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="30">30 seconds</option><option value="60">60 seconds</option><option value="120">120 seconds</option></select></div>'+
+          '<div class="server-setting-row"><div><strong>Verification level</strong><span>Choose how much verification new members need before participating.</span></div><select id="server-setting-verification"><option value="open">Open</option><option value="verified">Verified</option><option value="high">High</option></select></div>'+
+        '</div>'+
+        '<div class="server-settings-footer"><span id="server-settings-status">Unsaved changes</span><div><button class="community-cancel" id="server-settings-cancel">Cancel</button><button class="primary community-create-btn" id="server-settings-save">Save changes</button></div></div>'+
+      '</div>'
+    );
+    $("#server-setting-slowmode").value=String(settings.slowmode||0);
+    $("#server-setting-verification").value=verification;
+    let locked=Boolean(settings.locked);
+    $("#server-setting-locked").onclick=()=>{
+      locked=!locked;
+      const b=$("#server-setting-locked");b.classList.toggle("on",locked);b.setAttribute("aria-pressed",locked?"true":"false");
+    };
+    $("#server-settings-cancel").onclick=closeModal;
+    $("#server-settings-save").onclick=async()=>{
+      const btn=$("#server-settings-save");btn.disabled=true;btn.textContent="Saving…";
+      try{
+        const patch={locked,slowmode:Number($("#server-setting-slowmode").value),verification:$("#server-setting-verification").value};
+        const d=await api("/api/servers/"+encodeURIComponent(currentServer.id)+"/admin/settings",{method:"PATCH",body:JSON.stringify(patch)});
+        if(currentServer.settings)currentServer.settings=d.settings;
+        closeModal();orbitToast("Server settings saved","Your community settings are updated.","success");
+      }catch(err){btn.disabled=false;btn.textContent="Save changes";orbitToast("Settings failed",err.message,"error")}
+    };
+  }
   $("#workspace-menu")?.addEventListener("click", () => {
     if (!currentServer) return;
+    const role=String(currentServer.role||"");
+    const manager=["owner","admin"].includes(role);
     openModal("Community controls",
       '<div class="control-grid">' +
-      '<div class="control-row"><strong>' + escapeHtml(currentServer.name) + '</strong><span>Workspace</span></div>' +
+      '<div class="control-row"><strong>' + escapeHtml(currentServer.name) + '</strong><span>'+ (role==="owner"?"Owner":"Administrator") +'</span></div>' +
       '<div class="control-row"><strong>Members</strong><span>Open the Members panel from chat.</span></div>' +
       '<div class="control-row"><strong>Invite</strong><span>Create a 7-day invite link.</span></div>' +
-      '<button class="primary" id="workspace-open-settings">Open settings</button>' +
+      (manager?'<button class="primary" id="workspace-open-server-settings">Server settings</button>':"")+
       '</div>');
-    $("#workspace-open-settings").onclick = () => { closeModal(); setView("settings"); };
+    if(manager)$("#workspace-open-server-settings").onclick=()=>{closeModal();openServerSettings()};
   });
   $("#more-call-btn")?.addEventListener("click", e => togglePopover("participants", e.currentTarget));
   $("#dock-mic")?.addEventListener("click", toggleMic);
