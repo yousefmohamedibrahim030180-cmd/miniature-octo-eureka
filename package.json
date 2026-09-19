@@ -11,7 +11,8 @@
     "desktop:dist": "electron-builder --win nsis portable --publish never",
     "test": "node --test tests",
     "db:migrate": "node db/migrate.js",
-    "check": "node --check server.js && node --check platform/security.js && node --check platform/config.js && node --check platform/manifest.js && node --check platform/session.js && node --check platform/realtime.js"
+    "check": "node --check server.js && node --check worker.js && node --check platform/security.js && node --check platform/config.js && node --check platform/manifest.js && node --check platform/session.js && node --check platform/realtime.js && node --check platform/storage.js && node --check platform/jobs.js",
+    "worker": "node worker.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
@@ -23,7 +24,9 @@
     "helmet": "^8.3.0",
     "express-rate-limit": "^8.7.0",
     "redis": "^6.2.1",
-    "@socket.io/redis-adapter": "^8.3.0"
+    "@socket.io/redis-adapter": "^8.3.0",
+    "@aws-sdk/client-s3": "^3.1136.0",
+    "@aws-sdk/s3-request-presigner": "^3.1136.0"
   },
   "engines": {
     "node": ">=22.0.0 <23.0.0"
