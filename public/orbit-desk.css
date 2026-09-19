@@ -324,3 +324,7 @@ body.orbit-discord-home .od-dm-row::before{pointer-events:none!important}
 .global-nav [data-view="dms"]{display:none!important}
 
 [data-view="dms"],[data-od-social="dms"],[data-dm-nav="messages"]{display:none!important}
+
+
+/* DM rows stay clickable while chat loads */
+.od-dm-list,.od-dm-row{pointer-events:auto!important}
