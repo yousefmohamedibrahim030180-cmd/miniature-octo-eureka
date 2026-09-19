@@ -52,6 +52,9 @@ const callState = {
   }
 };
 
+Object.defineProperty(window, "__orbitCallState", { configurable: true, get: () => callState });
+Object.defineProperty(window, "__orbitCurrentChannel", { configurable: true, get: () => currentChannel });
+
 const QUALITY_PRESETS = {
   "360p": { width: 640, height: 360, frameRate: 24 },
   "480p": { width: 854, height: 480, frameRate: 30 },
