@@ -58,7 +58,9 @@ const memory = {
   blocks: new Set(),
   mutes: new Set(),
   userSettings: new Map(),
-  notificationPreferences: new Map()
+  notificationPreferences: new Map(),
+  apiKeys: new Map(),
+  developerApplications: new Map()
 };
 
 const CALL_EVENT_PREFIX = "call:";
@@ -110,7 +112,9 @@ function serializeMemory() {
     userSettings: [...memory.userSettings.entries()],
     notificationPreferences: [...memory.notificationPreferences.entries()],
     posts: [...memory.posts.entries()],
-    postComments: [...memory.postComments.entries()]
+    postComments: [...memory.postComments.entries()],
+    apiKeys: [...memory.apiKeys.entries()],
+    developerApplications: [...memory.developerApplications.entries()]
   };
 }
 
@@ -140,6 +144,8 @@ function hydrateMemory(data) {
   restoreMap("notificationPreferences");
   restoreMap("posts");
   restoreMap("postComments");
+  restoreMap("apiKeys");
+  restoreMap("developerApplications");
 }
 
 async function sidecarRequest(method, body) {
@@ -321,6 +327,74 @@ function authV1(req, res, next) {
   } catch {
     return res.status(401).json({ error: "Session expired. Please refresh or sign in again." });
   }
+}
+
+const API_KEY_SCOPES = new Set([
+  "profile.read",
+  "communities.read",
+  "channels.read",
+  "messages.read",
+  "messages.write",
+  "community.manage",
+  "events.read",
+  "events.write",
+  "moderation.read",
+  "webhooks.manage"
+]);
+
+function hashSecret(value){
+  return crypto.createHash("sha256").update(String(value||"")).digest("hex");
+}
+
+function safeApiKeyName(value){
+  return String(value||"API key").trim().replace(/[^\w .:@-]/g,"").slice(0,100) || "API key";
+}
+
+function makeApiKeySecret(){
+  return "orb_live_" + crypto.randomBytes(32).toString("base64url");
+}
+
+function makeClientId(){
+  return "orb_app_" + crypto.randomBytes(18).toString("base64url").replace(/[^A-Za-z0-9_-]/g,"");
+}
+
+function makeClientSecret(){
+  return "orb_secret_" + crypto.randomBytes(40).toString("base64url");
+}
+
+function apiKeyFromRequest(req){
+  const auth=String(req.get("authorization")||"");
+  if(/^Bearer\s+/i.test(auth))return auth.replace(/^Bearer\s+/i,"").trim();
+  return String(req.get("x-orbit-api-key")||"").trim();
+}
+
+function findApiKey(secret){
+  const hash=hashSecret(secret);
+  for(const key of memory.apiKeys.values()){
+    if(!key.revokedAt && (!key.expiresAt || new Date(key.expiresAt).getTime()>Date.now()) && key.hash===hash)return key;
+  }
+  return null;
+}
+
+function authApiKey(req,res,next){
+  const secret=apiKeyFromRequest(req);
+  const key=findApiKey(secret);
+  if(!key)return res.status(401).json({error:"Valid ORBIT API key required."});
+  const user=memory.users.get(String(key.userId));
+  if(!user)return res.status(401).json({error:"API key owner no longer exists."});
+  key.lastUsedAt=now();
+  req.user=user;
+  req.apiKey=key;
+  next();
+}
+
+function requireApiScope(scope){
+  return (req,res,next)=>{
+    if(!req.apiKey || !Array.isArray(req.apiKey.scopes) || !req.apiKey.scopes.includes(scope)){
+      return res.status(403).json({error:"API scope required.",scope});
+    }
+    next();
+  };
 }
 function serverSettings(server) {
   if (!server.settings || typeof server.settings !== "object") server.settings = {};
@@ -578,6 +652,69 @@ app.get("/readyz", (req, res) => {
     databaseReady: dbReady,
     requestId: req.orbitRequestId || null
   });
+});
+
+app.get("/api/v1/developer/api-keys",authV1,(req,res)=>{
+  const keys=[...memory.apiKeys.values()].filter(k=>String(k.userId)===String(req.user.id)).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  res.json({scopes:[...API_KEY_SCOPES],keys:keys.map(k=>({id:k.id,name:k.name,scopes:k.scopes,createdAt:k.createdAt,lastUsedAt:k.lastUsedAt||null,expiresAt:k.expiresAt||null,revokedAt:k.revokedAt||null}))});
+});
+
+app.post("/api/v1/developer/api-keys",authV1,(req,res)=>{
+  const name=safeApiKeyName(req.body?.name);
+  const scopes=Array.isArray(req.body?.scopes)?[...new Set(req.body.scopes.map(x=>String(x)).filter(x=>API_KEY_SCOPES.has(x)))]:["profile.read"];
+  if(!scopes.length)return res.status(400).json({error:"Choose at least one valid scope."});
+  if(scopes.includes("community.manage") && !["owner","admin"].includes(String(req.user.globalRole||"member"))){
+    // Community-level authorization is still enforced per endpoint. This gate only prevents accidental broad keys.
+  }
+  const secret=makeApiKeySecret();
+  const record={id:id("apikey"),userId:req.user.id,name,hash:hashSecret(secret),prefix:secret.slice(0,18),scopes,createdAt:now(),lastUsedAt:null,expiresAt:req.body?.expiresAt?new Date(req.body.expiresAt).toISOString():null,revokedAt:null};
+  memory.apiKeys.set(record.id,record);
+  audit(req.user.id,"API_KEY_CREATE",record.id,{scopes:record.scopes});
+  schedulePersist();
+  res.status(201).json({key:{id:record.id,name:record.name,secret,scopes:record.scopes,createdAt:record.createdAt,warning:"This secret is shown once. Store it securely."}});
+});
+
+app.post("/api/v1/developer/api-keys/:id/revoke",authV1,(req,res)=>{
+  const key=memory.apiKeys.get(String(req.params.id));
+  if(!key || String(key.userId)!==String(req.user.id))return res.status(404).json({error:"API key not found"});
+  key.revokedAt=now();
+  audit(req.user.id,"API_KEY_REVOKE",key.id,{});
+  schedulePersist();
+  res.json({ok:true});
+});
+
+app.get("/api/v1/developer/applications",authV1,(req,res)=>{
+  const apps=[...memory.developerApplications.values()].filter(app=>String(app.ownerId)===String(req.user.id)).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  res.json({applications:apps.map(app=>({id:app.id,name:app.name,description:app.description,clientId:app.clientId,redirectUris:app.redirectUris,createdAt:app.createdAt,revokedAt:app.revokedAt||null}))});
+});
+
+app.post("/api/v1/developer/applications",authV1,(req,res)=>{
+  const name=safeApiKeyName(req.body?.name||"ORBIT App");
+  const description=String(req.body?.description||"").trim().slice(0,500);
+  const redirectUris=Array.isArray(req.body?.redirectUris)?req.body.redirectUris.map(x=>String(x).trim()).filter(Boolean).slice(0,10):[];
+  for(const uri of redirectUris){
+    if(!/^https?:\/\/[^\s]+$/i.test(uri))return res.status(400).json({error:"Redirect URIs must be valid HTTP(S) URLs."});
+  }
+  const clientId=makeClientId();
+  const clientSecret=makeClientSecret();
+  const record={id:id("app"),ownerId:req.user.id,name,description,clientId,clientSecretHash:hashSecret(clientSecret),redirectUris,createdAt:now(),revokedAt:null};
+  memory.developerApplications.set(record.id,record);
+  audit(req.user.id,"DEVELOPER_APP_CREATE",record.id,{clientId});
+  schedulePersist();
+  res.status(201).json({application:{id:record.id,name,description,clientId,redirectUris,createdAt:record.createdAt},clientSecret,warning:"The client secret is shown once. Store it securely."});
+});
+
+app.post("/api/v1/developer/applications/:id/revoke",authV1,(req,res)=>{
+  const appRecord=memory.developerApplications.get(String(req.params.id));
+  if(!appRecord || String(appRecord.ownerId)!==String(req.user.id))return res.status(404).json({error:"Application not found"});
+  appRecord.revokedAt=now();
+  audit(req.user.id,"DEVELOPER_APP_REVOKE",appRecord.id,{});
+  schedulePersist();
+  res.json({ok:true});
+});
+
+app.get("/api/v1/developer/me",authApiKey,requireApiScope("profile.read"),(req,res)=>{
+  res.json({user:publicUser(req.user),apiKey:{id:req.apiKey.id,name:req.apiKey.name,scopes:req.apiKey.scopes}});
 });
 
 app.get("/api/v1/platform/manifest", (req, res) => {
