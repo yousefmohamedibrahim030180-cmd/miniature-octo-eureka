@@ -11,6 +11,8 @@ const { applySecurity, createApiLimiter } = require("./platform/security");
 const { env, assertProductionBasics } = require("./platform/config");
 const platformManifest = require("./platform/manifest");
 const { migrate } = require("./db/migrate");
+const { createSessionManager, cookieMap, setRefreshCookie, clearRefreshCookie } = require("./platform/session");
+const { configureRedisAdapter, closeRedisAdapter } = require("./platform/realtime");
 
 const app = express();
 const server = http.createServer(app);
@@ -48,7 +50,8 @@ const memory = {
   projects: new Map(),
   aiConversations: new Map(),
   liveSessions: new Map(),
-  audit: []
+  audit: [],
+  sessions: new Map()
 };
 
 const CALL_EVENT_PREFIX = "call:";
@@ -56,6 +59,8 @@ const callRoomFor = channelId => CALL_EVENT_PREFIX + String(channelId);
 const dmCallRoomFor = callId => "dmcall:" + String(callId);
 const dmCalls = new Map();
 const serverMessageRate = new Map();
+const v1Sessions = createSessionManager({ jwtSecret: JWT_SECRET, sessions: memory.sessions, users: memory.users });
+let realtimeScale = { enabled: false, reason: "Redis adapter not initialized" };
 
 const DATABASE_URL = String(process.env.DATABASE_URL || "").trim();
 const PERSIST_URL = String(process.env.ORBIT_PERSIST_URL || "").trim().replace(/\/$/, "");
@@ -90,7 +95,8 @@ function serializeMemory() {
     projects: [...memory.projects.entries()],
     aiConversations: [...memory.aiConversations.entries()],
     liveSessions: [...memory.liveSessions.entries()],
-    audit: memory.audit
+    audit: memory.audit,
+    sessions: [...memory.sessions.entries()]
   };
 }
 
@@ -105,6 +111,7 @@ function hydrateMemory(data) {
   restoreMap("threads"); restoreMap("polls"); restoreMap("uploads");
   restoreMap("events"); restoreMap("projects"); restoreMap("aiConversations"); restoreMap("liveSessions");
   memory.audit = Array.isArray(data.audit) ? data.audit : [];
+  restoreMap("sessions");
 }
 
 async function sidecarRequest(method, body) {
@@ -261,6 +268,7 @@ function readToken(req) {
 function authenticate(req, res, next, allowLegacy = false) {
   try {
     const payload = jwt.verify(readToken(req), JWT_SECRET);
+    if (payload?.sessionId) v1Sessions.verifyAccess(readToken(req));
     const user = memory.users.get(payload.id);
     if (!user) return res.status(401).json({ error: "Session expired. Please sign in again." });
     if (user.suspended) return res.status(403).json({ error: "This ORBIT account is suspended." });
@@ -275,6 +283,17 @@ function authenticate(req, res, next, allowLegacy = false) {
 }
 function auth(req, res, next) { return authenticate(req, res, next, false); }
 function authLegacy(req, res, next) { return authenticate(req, res, next, true); }
+function authV1(req, res, next) {
+  try {
+    const result = v1Sessions.verifyAccess(readToken(req));
+    req.user = result.user;
+    req.authPayload = result.payload;
+    req.v1Session = result.session;
+    next();
+  } catch {
+    return res.status(401).json({ error: "Session expired. Please refresh or sign in again." });
+  }
+}
 function serverSettings(server) {
   if (!server.settings || typeof server.settings !== "object") server.settings = {};
   if (typeof server.settings.locked !== "boolean") server.settings.locked = false;
@@ -521,7 +540,8 @@ app.get("/api/v1/platform/manifest", (req, res) => {
     runtime: {
       node: process.version,
       uptime: Math.floor(process.uptime()),
-      persistence: persistMode
+      persistence: persistMode,
+    realtimeScaling: realtimeScale.enabled
     }
   });
 });
@@ -609,6 +629,87 @@ app.post("/api/auth/login", async (req, res) => {
   user.activity = "Online";
   schedulePersist();
   res.json({ user: publicUser(user), token: tokenFor(user) });
+});
+
+app.post("/api/v1/auth/register", async (req,res)=>{
+  const username=validAccountUsername(req.body?.username);
+  const password=String(req.body?.password||"");
+  const displayName=cleanName(req.body?.displayName||username,username);
+  if(!username) return res.status(400).json({error:"Username must be 4–20 characters and use letters, numbers, dots, underscores or hyphens."});
+  if(!validAccountPassword(password)) return res.status(400).json({error:"Password must be 8–72 characters."});
+  if([...memory.users.values()].some(user=>String(user.username||"").toLowerCase()===username.toLowerCase()))
+    return res.status(409).json({error:"That username is already in use."});
+  const passwordHash=await bcrypt.hash(password,12);
+  const user={id:id("user"),username,displayName,passwordHash,accountCreatedAt:now(),status:"online",activity:"Online",activityType:"custom",bio:"",createdAt:now(),avatarUrl:null,avatarDecoration:"none",avatarDecorationUrl:null,stats:{messages:0,voiceJoins:0,serversCreated:0,friends:0}};
+  memory.users.set(user.id,user);
+  ensureDefaultServer(user);
+  const issued=v1Sessions.issue(user,req);
+  setRefreshCookie(res,issued.refreshToken,env.nodeEnv==="production");
+  schedulePersist();
+  res.status(201).json({user:publicUser(user),token:issued.accessToken,accessToken:issued.accessToken,expiresIn:900,session:issued.session});
+});
+
+app.post("/api/v1/auth/login", async (req,res)=>{
+  const username=validAccountUsername(req.body?.username);
+  const password=String(req.body?.password||"");
+  if(!username||!password) return res.status(400).json({error:"Username and password are required."});
+  const key=authAttemptKey(req,username);
+  const nowMs=Date.now();
+  const history=accountLoginAttempts.get(key)||{count:0,resetAt:nowMs+10*60*1000};
+  if(nowMs>history.resetAt){history.count=0;history.resetAt=nowMs+10*60*1000}
+  if(history.count>=12) return res.status(429).json({error:"Too many sign-in attempts. Try again later."});
+  const user=[...memory.users.values()].find(item=>String(item.username||"").toLowerCase()===username.toLowerCase()&&item.passwordHash);
+  const ok=Boolean(user)&&await bcrypt.compare(password,user.passwordHash);
+  if(!ok){history.count+=1;accountLoginAttempts.set(key,history);return res.status(401).json({error:"Incorrect username or password."})}
+  accountLoginAttempts.delete(key);
+  user.status="online";user.activity="Online";
+  const issued=v1Sessions.issue(user,req);
+  setRefreshCookie(res,issued.refreshToken,env.nodeEnv==="production");
+  schedulePersist();
+  res.json({user:publicUser(user),token:issued.accessToken,accessToken:issued.accessToken,expiresIn:900,session:issued.session});
+});
+
+app.post("/api/v1/auth/refresh",(req,res)=>{
+  try{
+    const cookies=cookieMap(req);
+    const issued=v1Sessions.refresh(cookies.orbit_refresh,req);
+    setRefreshCookie(res,issued.refreshToken,env.nodeEnv==="production");
+    schedulePersist();
+    res.json({user:publicUser(v1Sessions.verifyAccess(issued.accessToken).user),token:issued.accessToken,accessToken:issued.accessToken,expiresIn:900,session:issued.session});
+  }catch{
+    clearRefreshCookie(res,env.nodeEnv==="production");
+    res.status(401).json({error:"Refresh session is invalid or expired."});
+  }
+});
+
+app.post("/api/v1/auth/logout",authV1,(req,res)=>{
+  const sessionId=req.v1Session?.id;
+  if(sessionId) v1Sessions.revoke(sessionId,req.user.id);
+  clearRefreshCookie(res,env.nodeEnv==="production");
+  schedulePersist();
+  res.json({ok:true});
+});
+
+app.get("/api/v1/auth/me",authV1,(req,res)=>{
+  res.json({user:publicUser(req.user),sessionId:req.v1Session.id});
+});
+
+app.get("/api/v1/auth/sessions",authV1,(req,res)=>{
+  res.json({sessions:v1Sessions.list(req.user.id),currentSessionId:req.v1Session.id});
+});
+
+app.post("/api/v1/auth/sessions/:id/revoke",authV1,(req,res)=>{
+  const target=String(req.params.id);
+  if(target===String(req.v1Session.id)) return res.status(400).json({error:"Use Log out for the current session."});
+  if(!v1Sessions.revoke(target,req.user.id)) return res.status(404).json({error:"Session not found"});
+  schedulePersist();
+  res.json({ok:true});
+});
+
+app.post("/api/v1/auth/sessions/revoke-others",authV1,(req,res)=>{
+  const count=v1Sessions.revokeAllExcept(req.v1Session.id,req.user.id);
+  schedulePersist();
+  res.json({ok:true,revoked:count});
 });
 
 app.post("/api/auth/convert-legacy", authLegacy, async (req, res) => {
@@ -2677,6 +2778,8 @@ io.on("connection", socket => {
 
 async function boot() {
   assertProductionBasics();
+  realtimeScale = await configureRedisAdapter(io, env.redisUrl, console);
+
   if (env.autoMigrate) {
     if (!env.databaseUrl) throw new Error("ORBIT_AUTO_MIGRATE=true requires DATABASE_URL.");
     await migrate();
