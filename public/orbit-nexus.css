@@ -24,3 +24,23 @@ body[data-nexus-surface="luminous"] .nexus-ambient{opacity:calc(.08 + var(--nexu
 #app,.app,.sidebar,.server-rail,.chat,.content,.hero-card,.metric,.content-card,.list-card,.settings-card,.members-panel,.thread-panel,.call-panel,.command-card,.modal-card{backdrop-filter:blur(calc(5px + var(--nexus-glass)*24px))}
 body[data-nexus-glass="20"]{--nexus-blur:.2}body[data-nexus-glass="30"]{--nexus-blur:.3}body[data-nexus-glass="40"]{--nexus-blur:.4}body[data-nexus-glass="50"]{--nexus-blur:.5}body[data-nexus-glass="60"]{--nexus-blur:.6}body[data-nexus-glass="70"]{--nexus-blur:.7}body[data-nexus-glass="80"]{--nexus-blur:.8}body[data-nexus-glass="90"]{--nexus-blur:.9}
 .nexus-reduced #nexus-status{transition:none!important}.nexus-reduced #nexus-status:hover{transform:none!important}
+
+/* ===== distinct atmosphere profiles ===== */
+body[data-nexus="aether"] .nexus-ambient i:nth-child(1){background:#8ea6ff;opacity:.18}
+body[data-nexus="aether"] .nexus-ambient i:nth-child(2){background:#6be0ff;opacity:.10}
+body[data-nexus="pulse"] .nexus-ambient i:nth-child(1){background:#4de7d8;opacity:.24}
+body[data-nexus="pulse"] .nexus-ambient i:nth-child(2){background:#5bf4c7;opacity:.16}
+body[data-nexus="solar"] .nexus-ambient i:nth-child(1){background:#ffc86b;opacity:.24}
+body[data-nexus="solar"] .nexus-ambient i:nth-child(2){background:#ff8b4d;opacity:.13}
+body[data-nexus="void"] .nexus-ambient i:nth-child(1){background:#9f73ff;opacity:.15}
+body[data-nexus="void"] .nexus-ambient i:nth-child(2){background:#6c5ce7;opacity:.08}
+body[data-nexus="cobalt"] .nexus-ambient i:nth-child(1){background:#5b8dff;opacity:.22}
+body[data-nexus="cobalt"] .nexus-ambient i:nth-child(2){background:#55c9ff;opacity:.11}
+body[data-nexus="prism"] .nexus-ambient i:nth-child(1){background:#ff7ad9;opacity:.23}
+body[data-nexus="prism"] .nexus-ambient i:nth-child(2){background:#8b7dff;opacity:.15}
+body[data-nexus="pulse"] #nexus-status{box-shadow:0 12px 34px rgba(0,0,0,.22),0 0 34px rgba(77,231,216,.18)}
+body[data-nexus="solar"] #nexus-status{box-shadow:0 12px 34px rgba(0,0,0,.22),0 0 34px rgba(255,200,107,.18)}
+body[data-nexus="void"] #nexus-status{box-shadow:0 12px 34px rgba(0,0,0,.22),0 0 34px rgba(193,155,255,.16)}
+body[data-nexus="prism"] #nexus-status{box-shadow:0 12px 34px rgba(0,0,0,.22),0 0 34px rgba(255,122,217,.18)}
+body[data-nexus-glass] #app,body[data-nexus-glass] .app,body[data-nexus-glass] .sidebar,body[data-nexus-glass] .server-rail,body[data-nexus-glass] .chat,body[data-nexus-glass] .content,body[data-nexus-glass] .hero-card,body[data-nexus-glass] .metric,body[data-nexus-glass] .content-card,body[data-nexus-glass] .list-card,body[data-nexus-glass] .settings-card,body[data-nexus-glass] .members-panel,body[data-nexus-glass] .thread-panel,body[data-nexus-glass] .call-panel,body[data-nexus-glass] .command-card,body[data-nexus-glass] .modal-card{backdrop-filter:blur(var(--nexus-blur));-webkit-backdrop-filter:blur(var(--nexus-blur))}
+body[data-nexus="void"] .nexus-grid{opacity:calc(.15 + var(--nexus-intensity)*.20)}
