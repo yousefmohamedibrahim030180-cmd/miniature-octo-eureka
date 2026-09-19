@@ -4371,6 +4371,26 @@ body::before,body::after,.app::before{display:none!important}
   background:#29253f;color:#c8bfff;font-size:8px;font-weight:800;letter-spacing:.06em;
 }
 .message-attachment.media-attachment>div{padding-bottom:10px}
+/* Inline image previews inside chat */
+.message-attachment.media-attachment>a{
+  display:block!important;
+  padding:0!important;
+  background:transparent!important;
+}
+.message-attachment.media-attachment>a:hover{background:transparent!important}
+.message-attachment.media-attachment img{
+  display:block;
+  width:100%;
+  max-width:100%;
+  max-height:420px;
+  object-fit:contain;
+  background:#0b0e13;
+  cursor:zoom-in;
+}
+.message-attachment.media-attachment>div{
+  padding:9px 12px 10px!important;
+}
+
 
 .settings-status-badge{
   display:inline-flex;align-items:center;justify-content:center;
