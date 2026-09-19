@@ -1283,7 +1283,7 @@ function renderPage(view) {
   if(view==="server-home")renderServerHomePage().catch(err=>orbitToast("Server Home",err.message,"error"));
   if(view==="communities")renderCommunitiesPage();
   if(view==="discover")renderDiscoverPage();
-  if(view==="dms")renderDMPage();
+  if(view==="dms")renderHomePage();
   if(view==="friends")renderFriendsPage();
   if(view==="calls")renderCallsPage();
   if(view==="live")renderLivePage();
@@ -1296,6 +1296,7 @@ function renderPage(view) {
   if(view==="settings")renderSettingsPage();
 }
 function setView(view){
+  if(view==="dms"){view="home";}
   orbitUI.view=view;
   document.querySelectorAll(".rail-nav[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
   const global=$("#global-page"),chat=$("#chat-view");
@@ -3358,4 +3359,15 @@ closeServerSidebar();
   }
   hide();
   new MutationObserver(hide).observe(document.body,{subtree:true,childList:true});
+})();
+
+
+/* Never allow the legacy standalone Messages screen/nav to remain active. */
+(function enforceHomeDmMode(){
+  function scrub(){
+    document.querySelectorAll('[data-view="dms"],[data-od-social="dms"],[data-dm-nav="messages"]').forEach(el=>el.remove());
+    if(window.orbitUI && orbitUI.view==="dms") setView("home");
+  }
+  scrub();
+  new MutationObserver(scrub).observe(document.body,{subtree:true,childList:true});
 })();
