@@ -102,11 +102,19 @@ function serializeMemory() {
 
 function hydrateMemory(data) {
   if (!data || typeof data !== "object") return;
-  const restoreMap = name => { memory[name] = new Map(Array.isArray(data[name]) ? data[name] : []); };
+  const restoreMap = name => {
+    const target = memory[name];
+    target.clear();
+    for (const [key,value] of (Array.isArray(data[name]) ? data[name] : [])) target.set(key,value);
+  };
   restoreMap("users");
-  memory.servers = new Map((data.servers || []).map(([key, value]) => [key, { ...value, members: new Map(value?.members || []) }]));
+  memory.servers.clear();
+  for(const [key,value] of (Array.isArray(data.servers)?data.servers:[])){
+    memory.servers.set(key,{...value,members:new Map(value?.members||[])});
+  }
   restoreMap("channels"); restoreMap("messages"); restoreMap("invites"); restoreMap("friendRequests");
-  memory.friendships = new Set(data.friendships || []);
+  memory.friendships.clear();
+  for(const value of (data.friendships||[])) memory.friendships.add(value);
   restoreMap("dms"); restoreMap("dmMessages"); restoreMap("dmReads"); restoreMap("notifications");
   restoreMap("threads"); restoreMap("polls"); restoreMap("uploads");
   restoreMap("events"); restoreMap("projects"); restoreMap("aiConversations"); restoreMap("liveSessions");
