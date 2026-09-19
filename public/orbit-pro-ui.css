@@ -432,3 +432,121 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .msg-head strong{font-size:13px!important}
 .msg-head time{font-size:10px!important}
 .msg-body{font-size:14px!important;line-height:1.55!important}
+
+/* ORBIT PRO UI V2 — visible hierarchy refresh */
+body{
+  background:#080b10!important;
+}
+.app{
+  background:
+    radial-gradient(900px 520px at 75% -10%,rgba(141,120,255,.10),transparent 65%),
+    radial-gradient(760px 500px at 100% 100%,rgba(67,209,255,.06),transparent 65%),
+    #080b10!important;
+}
+.app.server-sidebar-open .sidebar{
+  width:310px!important;
+  min-width:310px!important;
+  background:linear-gradient(180deg,#10151d 0%,#0d1219 100%)!important;
+  box-shadow:18px 0 45px rgba(0,0,0,.16)!important;
+}
+.server-rail{
+  background:linear-gradient(180deg,#070a0f,#090d13)!important;
+}
+.channel{
+  min-height:46px!important;
+  padding:0 13px!important;
+  margin:4px 0!important;
+  border:1px solid transparent!important;
+  font-size:14px!important;
+  color:#aeb7c6!important;
+}
+.channel:hover{
+  background:#171e28!important;
+  border-color:rgba(255,255,255,.05)!important;
+}
+.channel.active{
+  background:linear-gradient(135deg,rgba(141,120,255,.22),rgba(141,120,255,.08))!important;
+  border-color:rgba(166,149,255,.20)!important;
+  color:#fff!important;
+}
+.chat-head{
+  min-height:78px!important;
+  background:rgba(9,12,17,.92)!important;
+  backdrop-filter:blur(18px)!important;
+}
+.chat{
+  background:rgba(9,12,17,.82)!important;
+}
+.messages{
+  max-width:1100px!important;
+  padding-top:30px!important;
+}
+.message{
+  padding:10px 12px!important;
+  margin-bottom:4px!important;
+  border:1px solid transparent!important;
+}
+.message:hover{
+  background:rgba(255,255,255,.03)!important;
+  border-color:rgba(255,255,255,.045)!important;
+}
+.msg-head strong{font-size:13px!important}
+.msg-body{font-size:15px!important;line-height:1.62!important}
+.composer{
+  max-width:1100px!important;
+  padding:12px 18px 18px!important;
+  background:linear-gradient(180deg,transparent,rgba(8,11,16,.92) 35%)!important;
+}
+.composer input{
+  min-height:54px!important;
+  background:#141a23!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  font-size:14px!important;
+}
+.composer .send{
+  min-width:84px!important;
+  min-height:48px!important;
+}
+.head-action{
+  min-height:42px!important;
+  height:42px!important;
+  border-radius:12px!important;
+  font-size:12px!important;
+}
+.call-action{
+  min-width:88px!important;
+  background:rgba(141,120,255,.10)!important;
+  border-color:rgba(141,120,255,.18)!important;
+}
+.screen-head-action{
+  background:rgba(63,192,230,.07)!important;
+}
+#quick-share-btn,#invite-btn,#members-btn,#admin-btn{
+  width:42px!important;
+  min-width:42px!important;
+  padding:0!important;
+  font-size:0!important;
+}
+#quick-share-btn span{font-size:16px!important}
+#quick-screen-share-btn span{font-size:16px!important}
+#invite-btn::after{content:"+";font-size:20px;font-weight:700}
+#members-btn::after{content:"♙";font-size:17px}
+#admin-btn::after{content:"⚙";font-size:16px}
+@media(max-width:980px){
+  .app.server-sidebar-open .sidebar{
+    width:min(310px,calc(100vw - 64px))!important;
+    min-width:0!important;
+  }
+}
+@media(max-width:720px){
+  .app.server-sidebar-open .sidebar{
+    width:min(320px,calc(100vw - 56px))!important;
+  }
+  .head-action.call-action{
+    width:42px!important;
+    min-width:42px!important;
+    padding:0!important;
+    font-size:0!important;
+  }
+  .call-action span{font-size:15px!important}
+}
