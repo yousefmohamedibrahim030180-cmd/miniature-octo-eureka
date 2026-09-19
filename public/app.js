@@ -1875,12 +1875,6 @@ async function openHomeDirectMessage(dmId){
     dmState.active=dm;
     dmState.messages=[];
 
-    const data=await api("/api/dms/"+encodeURIComponent(dmId)+"/messages");
-    dmState.messages=data.messages||[];
-    socket?.emit("dm:join",dmId);
-    socket?.emit("dm:read",dmId);
-    api("/api/dms/"+encodeURIComponent(dmId)+"/read",{method:"POST",body:"{}"}).catch(()=>{});
-
     const u=dm.otherUser||{};
     const avatarUrl=avatarImageUrl(u);
     const online=dmUserStatus(u)==="Online";
@@ -1957,6 +1951,19 @@ async function openHomeDirectMessage(dmId){
       '</form>';
 
     renderHomeDirectMessageFeed(true);
+
+    // Open the chat immediately; message history loads in the background.
+    try{
+      const history=await api("/api/dms/"+encodeURIComponent(dmId)+"/messages");
+      dmState.messages=history.messages||[];
+      renderHomeDirectMessageFeed(true);
+      socket?.emit("dm:join",dmId);
+      socket?.emit("dm:read",dmId);
+      api("/api/dms/"+encodeURIComponent(dmId)+"/read",{method:"POST",body:"{}"}).catch(()=>{});
+    }catch(historyError){
+      console.warn("DM history load failed",historyError);
+      orbitToast("Chat opened","Message history could not be loaded yet.");
+    }
 
     const input=$("#od-home-dm-input");
     $("#od-home-dm-form").onsubmit=async e=>{
