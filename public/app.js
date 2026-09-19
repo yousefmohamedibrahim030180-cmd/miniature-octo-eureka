@@ -1620,7 +1620,7 @@ function renderHomePage(){
   if(!body)return;
 
   const meName=me?.display_name||me?.username||"Guest";
-  const liveUsers=(pulseState?.users||[]).filter(u=>String(u.status||"online").toLowerCase()!=="offline");
+  const initialLiveUsers=(pulseState?.users||[]).filter(u=>String(u.status||"online").toLowerCase()!=="offline");
   
   const avatarMarkup=(u, extra="")=>{
     const name=u?.display_name||u?.username||"Guest";
@@ -1684,6 +1684,12 @@ function renderHomePage(){
     let dmData={dms:[]};
     try{friendsData=await api("/api/friends")}catch{}
     try{dmData=await api("/api/dms")}catch{}
+    try{
+      const pulse=await api("/api/pulse");
+      pulseState.users=pulse.users||pulseState.users||[];
+      pulseState.calls=pulse.calls||pulseState.calls||[];
+    }catch{}
+    const liveUsers=(pulseState?.users||initialLiveUsers).filter(u=>String(u.status||"online").toLowerCase()!=="offline");
     const friends=friendsData.friends||[];
     const online=friends.filter(u=>String(u.status||"").toLowerCase()!=="offline");
     const friendIds=new Set(friends.map(u=>String(u.id)));
