@@ -249,18 +249,22 @@ function tokenFor(user) {
 function readToken(req) {
   return (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
 }
-function auth(req, res, next) {
+function authenticate(req, res, next, allowLegacy = false) {
   try {
     const payload = jwt.verify(readToken(req), JWT_SECRET);
     const user = memory.users.get(payload.id);
     if (!user) return res.status(401).json({ error: "Session expired. Please sign in again." });
+    if (!allowLegacy && !payload.account) return res.status(401).json({ error: "An ORBIT account is required. Please create an account or sign in." });
     user.status = "online";
     req.user = user;
+    req.authPayload = payload;
     next();
   } catch {
-    return res.status(401).json({ error: "Guest session expired" });
+    return res.status(401).json({ error: "Session expired. Please sign in again." });
   }
 }
+function auth(req, res, next) { return authenticate(req, res, next, false); }
+function authLegacy(req, res, next) { return authenticate(req, res, next, true); }
 function serverSettings(server) {
   if (!server.settings || typeof server.settings !== "object") server.settings = {};
   if (typeof server.settings.locked !== "boolean") server.settings.locked = false;
@@ -541,7 +545,7 @@ app.post("/api/auth/login", async (req, res) => {
   res.json({ user: publicUser(user), token: tokenFor(user) });
 });
 
-app.post("/api/auth/convert-legacy", auth, async (req, res) => {
+app.post("/api/auth/convert-legacy", authLegacy, async (req, res) => {
   if (req.user.passwordHash) return res.status(400).json({ error: "This account is already configured." });
   const username = validAccountUsername(req.body?.username || req.user.username);
   const password = String(req.body?.password || "");
@@ -556,7 +560,7 @@ app.post("/api/auth/convert-legacy", auth, async (req, res) => {
   res.json({ user: publicUser(req.user), token: tokenFor(req.user) });
 });
 
-app.get("/api/me", auth, (req, res) => {
+app.get("/api/me", authLegacy, (req, res) => {
   res.json({ user: publicUser(req.user) });
 });
 
@@ -1749,7 +1753,7 @@ io.use((socket, next) => {
   try {
     const payload = jwt.verify(socket.handshake.auth?.token, JWT_SECRET);
     const user = memory.users.get(payload.id);
-    if (!user) return next(new Error("Guest session expired"));
+    if (!user || !payload.account || !user.passwordHash) return next(new Error("Account authentication required"));
     socket.user = user;
     user.status = "online";
     next();
