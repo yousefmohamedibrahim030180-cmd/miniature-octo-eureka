@@ -2885,7 +2885,7 @@ function openCommandPalette(){
 function closeCommandPalette(){$("#command-palette").classList.add("hidden")}
 function renderCommandResults(q){
   const commands=[
-    ["⌂","Home","home"],["◌","Messages","dms"],["☎","Calls","calls"],["●","Live","live"],["◷","Events","events"],["◫","Projects","projects"],["□","Files","files"],["✧","ORBIT AI","ai"],["✦","Discover","discover"],["◎","Friends","friends"],["⌑","Saved","saved"],["⌖","Explore","explore"],["⚙","Settings","settings"],["+","Create server","create-server"],["#","Create channel","create-channel"],["☎","Start voice call","voice"],["▣","Start video call","video"],["↗","Share screen","share"],["⌕","Search","search"]
+    ["⌂","Home","home"],["☎","Calls","calls"],["●","Live","live"],["◷","Events","events"],["◫","Projects","projects"],["□","Files","files"],["✧","ORBIT AI","ai"],["✦","Discover","discover"],["◎","Friends","friends"],["⌑","Saved","saved"],["⌖","Explore","explore"],["⚙","Settings","settings"],["+","Create server","create-server"],["#","Create channel","create-channel"],["☎","Start voice call","voice"],["▣","Start video call","video"],["↗","Share screen","share"],["⌕","Search","search"]
   ].filter(x=>(x[1]+" "+x[2]).toLowerCase().includes(String(q||"").toLowerCase()));
   $("#command-results").innerHTML=(commands.length?commands:[["⌕","No matches",""]]).map((x,i)=>'<button class="command-item" data-command-index="'+i+'"><span class="command-icon">'+x[0]+'</span><div><strong>'+x[1]+'</strong><span>'+x[2]+'</span></div><span>↵</span></button>').join("");
   document.querySelectorAll("[data-command-index]").forEach((b,i)=>b.onclick=()=>runCommand(commands[i]));
@@ -3347,4 +3347,15 @@ closeServerSidebar();
     console.error("Orbit boot failed",err);
     showError(err.message||"Unable to start Orbit");
   }
+})();
+
+
+/* Hard hide the standalone Messages navigation button.
+   Direct Messages remain available as people in the Home sidebar. */
+(function hideStandaloneMessagesNav(){
+  function hide(){
+    document.querySelectorAll('[data-od-social="dms"], [data-dm-nav="messages"], [data-view="dms"]').forEach(el=>el.remove());
+  }
+  hide();
+  new MutationObserver(hide).observe(document.body,{subtree:true,childList:true});
 })();
