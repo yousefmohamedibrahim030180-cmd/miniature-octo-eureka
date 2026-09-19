@@ -43,6 +43,8 @@ const memory = {
 
 const CALL_EVENT_PREFIX = "call:";
 const callRoomFor = channelId => CALL_EVENT_PREFIX + String(channelId);
+const dmCallRoomFor = callId => "dmcall:" + String(callId);
+const dmCalls = new Map();
 const serverMessageRate = new Map();
 
 const DATABASE_URL = String(process.env.DATABASE_URL || "").trim();
@@ -1869,6 +1871,159 @@ io.on("connection", socket => {
     });
   });
 
+  socket.on("dm:call", ({ dmId, mode = "video" } = {}, ack) => {
+    const dm = memory.dms.get(String(dmId));
+    if (!dm || !dm.members.includes(String(socket.user.id))) {
+      ack?.({ ok: false, error: "Private conversation not found" });
+      return;
+    }
+    const targetUserIds = dm.members.filter(idValue => String(idValue) !== String(socket.user.id)).map(String);
+    const targets = [...io.sockets.sockets.values()].filter(peer =>
+      targetUserIds.includes(String(peer.user?.id)) && String(peer.id) !== String(socket.id)
+    );
+    if (!targets.length) {
+      ack?.({ ok: false, error: "This person is offline right now." });
+      return;
+    }
+    if (socket.data.dmCallId && dmCalls.has(socket.data.dmCallId)) dmCalls.delete(socket.data.dmCallId);
+    const callId = id("dmcall");
+    const roomId = dmCallRoomFor(callId);
+    const invite = {
+      callId,
+      dmId: dm.id,
+      roomId,
+      mode: mode === "voice" ? "voice" : "video",
+      callerSocketId: socket.id,
+      caller: callParticipant(socket),
+      targetUserIds,
+      createdAt: now()
+    };
+    dmCalls.set(callId, invite);
+    socket.data.dmCallId = callId;
+    socket.data.dmCallRoom = null;
+    targets.forEach(peer => peer.emit("dm:call:incoming", {
+      scope: "dm",
+      callId,
+      dmId: dm.id,
+      roomId,
+      mode: invite.mode,
+      socketId: socket.id,
+      userId: socket.user.id,
+      username: socket.user.username,
+      fromUser: callParticipant(socket),
+      createdAt: invite.createdAt
+    }));
+    ack?.({ ok: true, callId, roomId });
+  });
+
+  socket.on("dm:call:accept", ({ callId } = {}) => {
+    const invite = dmCalls.get(String(callId));
+    if (!invite) return socket.emit("error:toast", { message: "That private call has already ended." });
+    const dm = memory.dms.get(String(invite.dmId));
+    if (!dm || !dm.members.includes(String(socket.user.id))) return;
+    if (!invite.targetUserIds.includes(String(socket.user.id))) return;
+    const caller = io.sockets.sockets.get(String(invite.callerSocketId));
+    if (!caller) {
+      dmCalls.delete(String(callId));
+      return socket.emit("error:toast", { message: "The caller disconnected." });
+    }
+    caller.join(invite.roomId);
+    socket.join(invite.roomId);
+    caller.data.dmCallId = invite.callId;
+    caller.data.dmCallRoom = invite.roomId;
+    socket.data.dmCallId = invite.callId;
+    socket.data.dmCallRoom = invite.roomId;
+    dmCalls.delete(String(callId));
+    caller.emit("dm:call:accepted", {
+      scope: "dm",
+      callId: invite.callId,
+      dmId: invite.dmId,
+      roomId: invite.roomId,
+      mode: invite.mode,
+      participant: callParticipant(socket)
+    });
+    socket.emit("dm:call:participants", [callParticipant(caller)]);
+  });
+
+  socket.on("dm:call:decline", ({ callId } = {}) => {
+    const invite = dmCalls.get(String(callId));
+    if (!invite) return;
+    if (!invite.targetUserIds.includes(String(socket.user.id))) return;
+    const caller = io.sockets.sockets.get(String(invite.callerSocketId));
+    if (caller) {
+      caller.emit("dm:call:declined", {
+        callId: invite.callId,
+        dmId: invite.dmId,
+        userId: socket.user.id,
+        username: socket.user.username
+      });
+    }
+    dmCalls.delete(String(callId));
+    const callerSocket = io.sockets.sockets.get(String(invite.callerSocketId));
+    if (callerSocket?.data?.dmCallId === invite.callId) callerSocket.data.dmCallId = null;
+  });
+
+  socket.on("dm:call:cancel", ({ callId } = {}) => {
+    const invite = dmCalls.get(String(callId));
+    if (!invite || String(invite.callerSocketId) !== String(socket.id)) return;
+    invite.targetUserIds.forEach(userId => {
+      for (const peer of io.sockets.sockets.values()) {
+        if (String(peer.user?.id) === String(userId)) peer.emit("dm:call:cancelled", { callId: invite.callId, dmId: invite.dmId });
+      }
+    });
+    dmCalls.delete(String(callId));
+    socket.data.dmCallId = null;
+  });
+
+  socket.on("dm:call:leave", ({ callId, dmId } = {}) => {
+    const room = socket.data.dmCallRoom || (callId ? dmCallRoomFor(callId) : null);
+    if (room && socket.rooms.has(room)) {
+      socket.leave(room);
+      socket.to(room).emit("dm:call:participant-left", {
+        socketId: socket.id,
+        userId: socket.user.id,
+        dmId: dmId || null
+      });
+    }
+    if (callId && dmCalls.has(String(callId))) dmCalls.delete(String(callId));
+    socket.data.dmCallId = null;
+    socket.data.dmCallRoom = null;
+  });
+
+  socket.on("dm:call:media-state", ({ callId, dmId, muted, cameraOff, screenShare } = {}) => {
+    const room = socket.data.dmCallRoom || (callId ? dmCallRoomFor(callId) : null);
+    if (!room || !socket.rooms.has(room)) return;
+    socket.to(room).emit("dm:call:media-state", {
+      socketId: socket.id,
+      userId: socket.user.id,
+      dmId: dmId || null,
+      muted: Boolean(muted),
+      cameraOff: Boolean(cameraOff),
+      screenShare: Boolean(screenShare)
+    });
+  });
+
+  socket.on("dmrtc:offer", ({ to, offer } = {}) => {
+    const peer = io.sockets.sockets.get(String(to));
+    const room = socket.data.dmCallRoom;
+    if (!peer || !offer || !room || !socket.rooms.has(room) || !peer.rooms.has(room)) return;
+    peer.emit("dmrtc:offer", { from: socket.id, fromUser: callParticipant(socket), offer });
+  });
+
+  socket.on("dmrtc:answer", ({ to, answer } = {}) => {
+    const peer = io.sockets.sockets.get(String(to));
+    const room = socket.data.dmCallRoom;
+    if (!peer || !answer || !room || !socket.rooms.has(room) || !peer.rooms.has(room)) return;
+    peer.emit("dmrtc:answer", { from: socket.id, answer });
+  });
+
+  socket.on("dmrtc:ice", ({ to, candidate } = {}) => {
+    const peer = io.sockets.sockets.get(String(to));
+    const room = socket.data.dmCallRoom;
+    if (!peer || !candidate || !room || !socket.rooms.has(room) || !peer.rooms.has(room)) return;
+    peer.emit("dmrtc:ice", { from: socket.id, candidate });
+  });
+
   socket.on("rtc:offer", ({ to, offer }) => {
     const peer = io.sockets.sockets.get(to);
     if (!peer || !offer) return;
@@ -1968,6 +2123,25 @@ io.on("connection", socket => {
   });
 
   socket.on("disconnect", () => {
+    if (socket.data?.dmCallRoom) {
+      const room = socket.data.dmCallRoom;
+      socket.to(room).emit("dm:call:participant-left", {
+        socketId: socket.id,
+        userId: socket.user.id
+      });
+      socket.data.dmCallRoom = null;
+      socket.data.dmCallId = null;
+    }
+    for (const [callId, invite] of dmCalls.entries()) {
+      if (String(invite.callerSocketId) === String(socket.id)) {
+        invite.targetUserIds.forEach(userId => {
+          for (const peer of io.sockets.sockets.values()) {
+            if (String(peer.user?.id) === String(userId)) peer.emit("dm:call:cancelled", { callId, dmId: invite.dmId });
+          }
+        });
+        dmCalls.delete(callId);
+      }
+    }
     for(const session of memory.liveSessions.values()){
       if(session.status==="live" && String(session.hostUserId)===String(socket.user.id)){
         session.status="ended";
