@@ -23,8 +23,13 @@ const pulseState = {
 
 const callState = {
   active: false,
+  scope: "channel",
   mode: "video",
   roomId: null,
+  dmId: null,
+  callId: null,
+  joined: false,
+  remoteUser: null,
   peers: new Map(),
   localStream: null,
   cameraTrack: null,
@@ -555,6 +560,31 @@ async function loadRealtimeConfig() {
   return realtimeConfigPromise;
 }
 
+function callSignalEvent(kind){
+  return callState.scope === "dm" ? "dmrtc:" + kind : "rtc:" + kind;
+}
+function emitCallMediaState(){
+  if(!socket || !callState.active)return;
+  if(callState.scope === "dm"){
+    if(!callState.callId || !callState.joined)return;
+    socket.emit("dm:call:media-state",{
+      callId:callState.callId,
+      dmId:callState.dmId,
+      muted:callState.micTrack ? !callState.micTrack.enabled : true,
+      cameraOff:callState.cameraTrack ? !callState.cameraTrack.enabled : true,
+      screenShare:Boolean(callState.screenTrack)
+    });
+    return;
+  }
+  if(!callState.roomId)return;
+  socket.emit("call:media-state",{
+    channelId:callState.roomId,
+    muted:callState.micTrack ? !callState.micTrack.enabled : true,
+    cameraOff:callState.cameraTrack ? !callState.cameraTrack.enabled : true,
+    screenShare:Boolean(callState.screenTrack)
+  });
+}
+
 async function waitForSocket(timeout=5000) {
   if (socket?.connected) return true;
   if (!socket) throw new Error("Realtime connection is not ready yet.");
@@ -581,8 +611,13 @@ async function startCall(mode = "video") {
     leaveCall();
   }
 
+  callState.scope = "channel";
   callState.mode = mode;
   callState.roomId = currentChannel.id;
+  callState.dmId = null;
+  callState.callId = null;
+  callState.joined = true;
+  callState.remoteUser = null;
   callStartedAt = Date.now();
   callState.active = true;
   $("#call-panel").classList.remove("hidden");
@@ -590,6 +625,8 @@ async function startCall(mode = "video") {
   $("#call-title").textContent = currentChannel.name;
   $("#call-subtitle").textContent = mode === "voice" ? "Voice room · live audio" : "Video room · live audio & video";
   document.body.classList.add("call-open");
+  document.body.classList.remove("private-dm-call");
+  $("#call-panel")?.classList.remove("dm-private-mode");
 
   try {
     await waitForSocket();
@@ -598,7 +635,7 @@ async function startCall(mode = "video") {
     await setupLocalMedia(mode);
     ensureSelfTile();
     socket.emit("call:join", { channelId: callState.roomId, mode });
-    socket.emit("call:media-state", { channelId: callState.roomId, muted: false, cameraOff: mode === "voice", screenShare: false });
+    emitCallMediaState();
     setCallIndicator("LIVE");
     startCallTelemetry();
     updateVoiceDock();
@@ -607,6 +644,91 @@ async function startCall(mode = "video") {
   } catch (err) {
     leaveCall();
     showError(err.name === "NotAllowedError" ? "Permission denied. Allow your camera/microphone in the browser." : err.message);
+  }
+}
+
+async function startDMCall(mode="video"){
+  const dmId=String(dmState.activeId||"");
+  const other=dmCurrentOther();
+  if(!dmId||!other)return orbitToast("Private call","Open a conversation first.","error");
+  if(!navigator.mediaDevices?.getUserMedia)return orbitToast("Private call","Microphone and camera access require HTTPS.","error");
+  if(callState.active){
+    if(callState.scope==="dm"&&String(callState.dmId)===dmId)return;
+    leaveCall();
+  }
+  callState.scope="dm";
+  callState.mode=mode;
+  callState.dmId=dmId;
+  callState.callId=null;
+  callState.roomId=null;
+  callState.joined=false;
+  callState.remoteUser=other;
+  callStartedAt=Date.now();
+  callState.active=true;
+  document.body.classList.add("call-open","private-dm-call");
+  $("#call-panel")?.classList.remove("hidden","minimized");
+  $("#call-panel")?.classList.add("dm-private-mode");
+  $("#call-title").textContent=other.display_name||other.username||"Private call";
+  $("#call-subtitle").textContent=mode==="voice"?"Private voice call · Direct message":"Private video call · Direct message";
+  $("#call-quality-indicator").textContent="RINGING";
+  $("#call-network-indicator").textContent="PRIVATE • WEBRTC";
+  updateDMCallSurface("Calling…");
+  try{
+    await waitForSocket();
+    await loadRealtimeConfig();
+    await setupLocalMedia(mode);
+    ensureSelfTile();
+    socket.emit("dm:call",{dmId,mode},response=>{
+      if(response?.ok){
+        callState.callId=response.callId;
+        callState.roomId=response.roomId;
+        startCallTelemetry();
+      }else{
+        const message=response?.error||"The other person is unavailable.";
+        leaveCall();
+        orbitToast("Private call",message,"error");
+      }
+    });
+    playUiTone("call");
+  }catch(err){
+    leaveCall();
+    showError(err.name==="NotAllowedError"?"Permission denied. Allow your microphone/camera.":err.message||"Unable to start the private call.");
+  }
+}
+
+async function acceptDMCall(pending){
+  if(!pending?.callId)return;
+  if(callState.active)leaveCall();
+  callState.scope="dm";
+  callState.mode=pending.mode||"video";
+  callState.dmId=String(pending.dmId);
+  callState.callId=pending.callId;
+  callState.roomId=pending.roomId||null;
+  callState.joined=true;
+  callState.remoteUser=pending.fromUser||{username:pending.username||"Guest"};
+  callStartedAt=Date.now();
+  callState.active=true;
+  document.body.classList.add("call-open","private-dm-call");
+  $("#call-panel")?.classList.remove("hidden","minimized");
+  $("#call-panel")?.classList.add("dm-private-mode");
+  const name=callState.remoteUser.display_name||callState.remoteUser.username||"Private call";
+  $("#call-title").textContent=name;
+  $("#call-subtitle").textContent=callState.mode==="voice"?"Private voice call · Direct message":"Private video call · Direct message";
+  $("#call-quality-indicator").textContent="CONNECTING";
+  $("#call-network-indicator").textContent="PRIVATE • WEBRTC";
+  updateDMCallSurface("Connecting…");
+  try{
+    await waitForSocket();
+    await loadRealtimeConfig();
+    await setupLocalMedia(callState.mode);
+    ensureSelfTile();
+    socket.emit("dm:call:accept",{callId:pending.callId});
+    emitCallMediaState();
+    startCallTelemetry();
+    playUiTone("join");
+  }catch(err){
+    leaveCall();
+    showError(err.name==="NotAllowedError"?"Permission denied. Allow your microphone/camera.":err.message||"Unable to join the private call.");
   }
 }
 
@@ -678,7 +800,7 @@ async function ensurePeer(socketId, initiator, info = {}) {
   }
 
   pc.onicecandidate = ev => {
-    if (ev.candidate && socket) socket.emit("rtc:ice", { to: socketId, candidate: ev.candidate });
+    if (ev.candidate && socket) socket.emit(callSignalEvent("ice"), { to: socketId, candidate: ev.candidate });
   };
 
   pc.ontrack = ev => {
@@ -704,7 +826,7 @@ async function ensurePeer(socketId, initiator, info = {}) {
         offerToReceiveVideo: true
       });
       await pc.setLocalDescription(offer);
-      socket.emit("rtc:offer", { to: socketId, offer: pc.localDescription });
+      socket.emit(callSignalEvent("offer"), { to: socketId, offer: pc.localDescription });
     } catch (err) {
       console.error("offer create", err);
     }
@@ -753,7 +875,14 @@ function removePeer(socketId) {
 }
 function leaveCall() {
   if (!callState.active) return;
-  try { if (socket && callState.roomId) socket.emit("call:leave", callState.roomId); } catch {}
+  try{
+    if(socket&&callState.scope==="dm"){
+      if(callState.joined&&callState.callId)socket.emit("dm:call:leave",{callId:callState.callId,dmId:callState.dmId});
+      else if(callState.callId)socket.emit("dm:call:cancel",{callId:callState.callId});
+    }else if(socket&&callState.roomId){
+      socket.emit("call:leave",callState.roomId);
+    }
+  }catch{}
   for (const [, item] of callState.peers) item.pc.close();
   callState.peers.clear();
   if (callState.screenTrack) {
@@ -767,10 +896,17 @@ function leaveCall() {
   callState.cameraTrack = null;
   callState.micTrack = null;
   callState.active = false;
+  callState.scope = "channel";
   callState.roomId = null;
+  callState.dmId = null;
+  callState.callId = null;
+  callState.joined = false;
+  callState.remoteUser = null;
   document.querySelectorAll(".call-tile").forEach(t => t.remove());
   $("#call-panel").classList.add("hidden");
-  document.body.classList.remove("call-open");
+  document.body.classList.remove("call-open","private-dm-call");
+  $("#call-panel")?.classList.remove("dm-private-mode");
+  updateDMCallSurface("");
   stopCallTelemetry();
   updateVoiceDock();
   setCallIndicator("IDLE");
