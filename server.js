@@ -743,24 +743,35 @@ function sanitizeLive(session) {
   };
 }
 function localOrbitReply(message) {
-  const q = String(message || "").trim().toLowerCase();
-  if (!q) return "Tell me what you want to do in Orbit.";
-  if (q.includes("open settings")) return "Opening Settings.";
-  if (q.includes("show files")) return "Opening Files.";
-  if (q.includes("open calls") || q === "calls") return "Opening Calls.";
-  if (q.includes("open events") || q === "events") return "Opening Events.";
-  if (q.includes("open projects") || q === "projects") return "Opening Projects.";
-  if (q.includes("open communities") || q.includes("communities")) return "Opening Communities.";
-  if (q.includes("open live") || q === "live") return "Opening Live.";
-  if (q.startsWith("search ")) return "Opening global search for: " + String(message).trim().slice(7);
-  return "I can navigate and organize Orbit locally. Add an AI provider on the server to enable full generative answers, summaries, translations and document analysis.";
+  const raw = String(message || "").trim();
+  const q = raw.toLowerCase();
+  if (!q) return "قولي عايز تعمل إيه في ORBIT.";
+  if (/^(hi|hello|hey|سلام|السلام عليكم|اهلا|أهلا|هاي)/i.test(raw)) return "أهلاً 👋 أنا NEXUS. أقدر أساعدك في التنقل داخل ORBIT وتنظيم المساحات، المكالمات، الملفات، المشاريع والأحداث.";
+  if (q.includes("open settings") || q.includes("settings") || q.includes("الإعدادات") || q.includes("اعدادات")) return "Opening Settings.";
+  if (q.includes("show files") || q.includes("files") || q.includes("الملفات")) return "Opening Files.";
+  if (q.includes("open calls") || q === "calls" || q.includes("مكالمات") || q.includes("call")) return "Opening Calls.";
+  if (q.includes("open events") || q === "events" || q.includes("الأحداث") || q.includes("احداث")) return "Opening Events.";
+  if (q.includes("open projects") || q === "projects" || q.includes("المشاريع") || q.includes("مشاريع")) return "Opening Projects.";
+  if (q.includes("open communities") || q.includes("communities") || q.includes("المجتمعات")) return "Opening Communities.";
+  if (q.includes("open live") || q === "live" || q.includes("البث") || q.includes("البث المباشر")) return "Opening Live.";
+  if (q.includes("world") || q.includes("world generator") || q.includes("العالم") || q.includes("توليد عالم")) return "NEXUS World Generator جاهز. أقدر أبني لك مساحة Gaming أو Study أو Party أو Meeting من الـ CORE.";
+  if (q.includes("theme") || q.includes("شكل") || q.includes("ثيم") || q.includes("الوان") || q.includes("ألوان")) return "افتح NEXUS Experience Lab لاختيار Atmosphere وSurface وتغيير شكل ORBIT بالكامل.";
+  if (q.includes("what can you do") || q.includes("what can you") || q.includes("تقدر تعمل ايه") || q.includes("ماذا تستطيع")) return "أقدر أوجّهك لـ Settings, Files, Calls, Events, Projects, Communities, Live، وأساعدك في إدارة الـ NEXUS World والـ workspace.";
+  if (q.includes("status") || q.includes("حالة") || q.includes("اخبار") || q.includes("الأخبار")) return "NEXUS local intelligence شغال بدون اعتماد على Pollinations أو أي رصيد خارجي.";
+  if (q.startsWith("search ")) return "Opening global search for: " + raw.slice(7).trim();
+  if (q.startsWith("ابحث ") || q.startsWith("بحث ")) return "Opening global search for: " + raw.slice(raw.indexOf(" ") + 1).trim();
+  return "أنا NEXUS المحلي. أقدر أنفذ أوامر التنقل وإدارة الـ workspace من غير API credits. لو محتاج إجابة توليدية كاملة، فعّل نموذج Local AI عبر ORBIT_AI_ENABLE_LOCAL_MODEL=true على سيرفر بذاكرة مناسبة.";
 }
+
+const localModelEnabled = String(process.env.ORBIT_AI_ENABLE_LOCAL_MODEL || "false").trim().toLowerCase() === "true";
 let nexusLocalPipeline = null;
 let nexusLocalPipelinePromise = null;
 
 async function requestLocalOrbitModel(messages) {
+  if (!localModelEnabled) return null;
   if (!nexusLocalPipelinePromise) {
     nexusLocalPipelinePromise = (async () => {
+      hfEnv.backends.onnx.wasm.numThreads = 1;
       hfEnv.cacheDir = String(process.env.ORBIT_AI_CACHE_DIR || path.join(__dirname, ".cache", "nexus-ai"));
       return await pipeline(
         "text-generation",
@@ -773,9 +784,9 @@ async function requestLocalOrbitModel(messages) {
     });
   }
   nexusLocalPipeline = await nexusLocalPipelinePromise;
-  const output = await nexusLocalPipeline(messages.slice(-10), {
-    max_new_tokens: Math.max(32, Math.min(220, Number(process.env.ORBIT_AI_LOCAL_MAX_TOKENS || 180))),
-    temperature: 0.7,
+  const output = await nexusLocalPipeline(messages.slice(-8), {
+    max_new_tokens: Math.max(32, Math.min(96, Number(process.env.ORBIT_AI_LOCAL_MAX_TOKENS || 64))),
+    temperature: 0.65,
     do_sample: true
   });
   const generated = output?.[0]?.generated_text;
@@ -787,32 +798,37 @@ async function requestLocalOrbitModel(messages) {
 }
 
 async function requestOrbitModel(messages) {
-  const url=String(process.env.ORBIT_AI_API_URL || "").trim();
-  const key=String(process.env.ORBIT_AI_API_KEY || "").trim();
-  const model=String(process.env.ORBIT_AI_MODEL || "orbit").trim();
-  if(url && key){
-    try{
-      const response=await fetch(url,{
-        method:"POST",
-        headers:{"content-type":"application/json","authorization":"Bearer "+key},
-        body:JSON.stringify({model,messages})
+  const url = String(process.env.ORBIT_AI_API_URL || "").trim();
+  const key = String(process.env.ORBIT_AI_API_KEY || "").trim();
+  const model = String(process.env.ORBIT_AI_MODEL || "orbit").trim();
+
+  if (url && key && !/pollinations\\.ai/i.test(url)) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {"content-type": "application/json", "authorization": "Bearer " + key},
+        body: JSON.stringify({model, messages})
       });
-      if(!response.ok) throw new Error("AI provider returned HTTP "+response.status);
-      const data=await response.json();
-      const content=data?.choices?.[0]?.message?.content;
-      if(typeof content==="string"&&content.trim()) return {content:content.trim(),provider:"external"};
-    }catch(error){
-      console.error("[orbit] configured AI provider failed, using local NEXUS model:", error.message);
+      if (!response.ok) throw new Error("AI provider returned HTTP " + response.status);
+      const data = await response.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content === "string" && content.trim()) return {content: content.trim(), provider: "external"};
+    } catch (error) {
+      console.error("[orbit] configured AI provider failed:", error.message);
     }
   }
-  try {
-    const local = await requestLocalOrbitModel(messages);
-    return local ? {content:local,provider:"local"} : null;
-  } catch (error) {
-    console.error("[orbit] local NEXUS model unavailable:", error.message);
-    return null;
+
+  if (localModelEnabled) {
+    try {
+      const local = await requestLocalOrbitModel(messages);
+      return local ? {content: local, provider: "local-model"} : null;
+    } catch (error) {
+      console.error("[orbit] local NEXUS model unavailable:", error.message);
+    }
   }
+  return null;
 }
+
 app.get("/api/servers/:id/nexus/world", auth, (req, res) => {
   const access = member(req.params.id, req.user.id);
   if (!access) return res.status(403).json({ error: "Not a member" });
