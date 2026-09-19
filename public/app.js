@@ -1715,7 +1715,17 @@ function renderHomePage(){
           (dm.unreadCount?'<b>'+escapeHtml(dm.unreadCount)+'</b>':"")+
         '</button>';
       }).join(""):'<div class="od-dm-empty">No direct messages yet.</div>';
-      document.querySelectorAll("[data-od-dm]").forEach(btn=>btn.onclick=()=>openHomeDirectMessage(btn.dataset.odDm));
+      const dmListRoot=$("#od-dm-list");
+      if(dmListRoot && !dmListRoot.dataset.bound){
+        dmListRoot.dataset.bound="1";
+        dmListRoot.addEventListener("click",e=>{
+          const btn=e.target.closest("[data-od-dm]");
+          if(!btn || !dmListRoot.contains(btn))return;
+          e.preventDefault();
+          e.stopPropagation();
+          openHomeDirectMessage(btn.dataset.odDm);
+        });
+      }
     };
 
     const renderActive=()=>{
