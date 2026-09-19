@@ -800,13 +800,13 @@ async function requestOrbitModel(messages) {
       if(!response.ok) throw new Error("AI provider returned HTTP "+response.status);
       const data=await response.json();
       const content=data?.choices?.[0]?.message?.content;
-      if(typeof content==="string"&&content.trim()) return content.trim();
+      if(typeof content==="string"&&content.trim()) return {content:content.trim(),provider:"external"};
     }catch(error){
       console.error("[orbit] configured AI provider failed, using local NEXUS model:", error.message);
     }
   }
   try {
-    return await requestLocalOrbitModel(messages);
+    const local = await requestLocalOrbitModel(messages);\n    return local ? {content:local,provider:"local"} : null;
   } catch (error) {
     console.error("[orbit] local NEXUS model unavailable:", error.message);
     return null;
@@ -1494,8 +1494,11 @@ app.post("/api/ai/chat", auth, async (req,res)=>{
       {role:"system",content:"You are ORBIT, an optional assistant inside a community communication platform. Respect server/member permissions. Never claim access to private data that is not present in this conversation."},
       ...conversation.messages.slice(-20).map(m=>({role:m.role,content:m.content}))
     ];
-    reply=await requestOrbitModel(modelMessages);
-    usedProvider=Boolean(reply);
+    const modelResult=await requestOrbitModel(modelMessages);
+    if(modelResult?.content){
+      reply=modelResult.content;
+      usedProvider=modelResult.provider||"local";
+    }
   }catch(error){
     console.error("[orbit] AI provider failed:",error.message);
   }
@@ -1503,7 +1506,7 @@ app.post("/api/ai/chat", auth, async (req,res)=>{
   conversation.messages.push({role:"assistant",content:reply,createdAt:now()});
   conversation.updatedAt=now();
   audit(req.user.id,"AI_CHAT",conversation.id,{serverId:conversation.serverId||null,provider:usedProvider});
-  res.json({conversation:{id:conversation.id,title:conversation.title,serverId:conversation.serverId||null,messages:conversation.messages},reply,provider:usedProvider?"external":"local"});
+  res.json({conversation:{id:conversation.id,title:conversation.title,serverId:conversation.serverId||null,messages:conversation.messages},reply,provider:usedProvider||"local"});
 });
 
 app.get("/api/servers/:id/live", auth, (req,res)=>{
