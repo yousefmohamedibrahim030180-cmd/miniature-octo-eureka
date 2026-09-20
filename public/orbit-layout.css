@@ -2,8 +2,8 @@
 /* ORBIT STRUCTURE LOCK — clean spatial hierarchy */
 *{box-sizing:border-box}
 html,body{min-width:0;min-height:0}
-body.orbit-prism{overflow:hidden!important}
-body.orbit-prism .app.aether-app{
+body.orbit-aether{overflow:hidden!important}
+body.orbit-aether .app.aether-app{
   display:grid!important;
   grid-template-columns:72px 276px minmax(0,1fr) 340px!important;
   grid-template-rows:minmax(0,1fr)!important;
@@ -12,40 +12,40 @@ body.orbit-prism .app.aether-app{
   min-width:0!important;min-height:0!important;
   padding:9px!important;overflow:hidden!important;
 }
-body.orbit-prism .server-rail,
-body.orbit-prism #sidebar,
-body.orbit-prism .content,
-body.orbit-prism #aether-inspector{
+body.orbit-aether .server-rail,
+body.orbit-aether #sidebar,
+body.orbit-aether .content,
+body.orbit-aether #aether-inspector{
   min-width:0!important;min-height:0!important;
   max-width:none!important;max-height:none!important;
 }
-body.orbit-prism .server-rail{
+body.orbit-aether .server-rail{
   display:flex!important;flex-direction:column!important;
   overflow:hidden!important;
 }
-body.orbit-prism .server-rail .global-nav{
+body.orbit-aether .server-rail .global-nav{
   display:flex!important;flex-direction:column!important;
   min-height:0!important;
   overflow-y:auto!important;overflow-x:hidden!important;
   flex:0 1 auto!important;
 }
-body.orbit-prism #sidebar{
+body.orbit-aether #sidebar{
   display:flex!important;flex-direction:column!important;
   overflow:hidden!important;
 }
-body.orbit-prism .aether-pane-scroll{
+body.orbit-aether .aether-pane-scroll{
   flex:1 1 auto!important;
   min-height:0!important;
   overflow-y:auto!important;
   overflow-x:hidden!important;
   overscroll-behavior:contain!important;
 }
-body.orbit-prism .aether-workspace-top,
-body.orbit-prism .aether-profile-dock,
-body.orbit-prism .aether-rail-footer{
+body.orbit-aether .aether-workspace-top,
+body.orbit-aether .aether-profile-dock,
+body.orbit-aether .aether-rail-footer{
   flex:0 0 auto!important;
 }
-body.orbit-prism .content.aether-content{
+body.orbit-aether .content.aether-content{
   display:flex!important;
   flex-direction:column!important;
   align-items:stretch!important;
@@ -54,23 +54,23 @@ body.orbit-prism .content.aether-content{
   min-width:0!important;
   min-height:0!important;
 }
-body.orbit-prism .aether-topline{
+body.orbit-aether .aether-topline{
   flex:0 0 72px!important;
   min-height:72px!important;
   min-width:0!important;
   position:relative!important;
   z-index:20!important;
 }
-body.orbit-prism .aether-hero-strip{
+body.orbit-aether .aether-hero-strip{
   flex:0 0 auto!important;
   min-width:0!important;
   position:relative!important;
   z-index:3!important;
 }
-body.orbit-prism .aether-hero-strip.aether-hide{
+body.orbit-aether .aether-hero-strip.aether-hide{
   display:none!important;
 }
-body.orbit-prism #global-page{
+body.orbit-aether #global-page{
   flex:1 1 auto!important;
   min-width:0!important;
   min-height:0!important;
@@ -81,15 +81,15 @@ body.orbit-prism #global-page{
   contain:layout paint!important;
   scrollbar-gutter:stable;
 }
-body.orbit-prism #global-page.hidden{
+body.orbit-aether #global-page.hidden{
   display:none!important;
 }
-body.orbit-prism .global-page .page-body{
+body.orbit-aether .global-page .page-body{
   min-width:0!important;
   max-width:none!important;
   overflow:visible!important;
 }
-body.orbit-prism #chat-view.aether-chat{
+body.orbit-aether #chat-view.aether-chat{
   flex:1 1 auto!important;
   min-width:0!important;
   min-height:0!important;
@@ -101,15 +101,15 @@ body.orbit-prism #chat-view.aether-chat{
   position:relative!important;
   z-index:4!important;
 }
-body.orbit-prism #chat-view.hidden{display:none!important}
-body.orbit-prism .aether-chat-head{
+body.orbit-aether #chat-view.hidden{display:none!important}
+body.orbit-aether .aether-chat-head{
   flex:0 0 69px!important;
   min-height:69px!important;
   min-width:0!important;
   position:relative!important;
   z-index:10!important;
 }
-body.orbit-prism .aether-chat-body{
+body.orbit-aether .aether-chat-body{
   flex:1 1 auto!important;
   min-height:0!important;
   min-width:0!important;
@@ -117,11 +117,11 @@ body.orbit-prism .aether-chat-body{
   display:flex!important;
   flex-direction:column!important;
 }
-body.orbit-prism .aether-chat-banner{
+body.orbit-aether .aether-chat-banner{
   flex:0 0 auto!important;
   min-width:0!important;
 }
-body.orbit-prism #messages{
+body.orbit-aether #messages{
   flex:1 1 auto!important;
   min-width:0!important;
   min-height:0!important;
@@ -129,102 +129,102 @@ body.orbit-prism #messages{
   overflow-x:hidden!important;
   overscroll-behavior:contain!important;
 }
-body.orbit-prism #typing{
+body.orbit-aether #typing{
   flex:0 0 auto!important;
   min-height:0!important;
 }
-body.orbit-prism .aether-composer{
+body.orbit-aether .aether-composer{
   flex:0 0 auto!important;
   min-width:0!important;
   position:relative!important;
   z-index:10!important;
 }
-body.orbit-prism #aether-inspector{
+body.orbit-aether #aether-inspector{
   display:flex!important;
   flex-direction:column!important;
   overflow:hidden!important;
 }
-body.orbit-prism #aether-inspector-body{
+body.orbit-aether #aether-inspector-body{
   flex:1 1 auto!important;
   min-height:0!important;
   overflow-y:auto!important;
   overflow-x:hidden!important;
   overscroll-behavior:contain!important;
 }
-body.orbit-prism .aether-inspector-tabs{flex:0 0 auto!important}
-body.orbit-prism .aether-radar,
-body.orbit-prism .aether-inspector-card,
-body.orbit-prism .aether-feed-card,
-body.orbit-prism .aether-metric-grid{min-width:0!important}
-body.orbit-prism .aether-top-actions,
-body.orbit-prism .aether-head-actions{min-width:0!important}
-body.orbit-prism .aether-top-actions{
+body.orbit-aether .aether-inspector-tabs{flex:0 0 auto!important}
+body.orbit-aether .aether-radar,
+body.orbit-aether .aether-inspector-card,
+body.orbit-aether .aether-feed-card,
+body.orbit-aether .aether-metric-grid{min-width:0!important}
+body.orbit-aether .aether-top-actions,
+body.orbit-aether .aether-head-actions{min-width:0!important}
+body.orbit-aether .aether-top-actions{
   flex:0 1 auto!important;overflow-x:auto!important;scrollbar-width:none!important;
 }
-body.orbit-prism .aether-top-actions::-webkit-scrollbar,
-body.orbit-prism .aether-head-actions::-webkit-scrollbar{display:none!important}
-body.orbit-prism .aether-context-trail{
+body.orbit-aether .aether-top-actions::-webkit-scrollbar,
+body.orbit-aether .aether-head-actions::-webkit-scrollbar{display:none!important}
+body.orbit-aether .aether-context-trail{
   min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;
 }
-body.orbit-prism .aether-head-actions{flex:0 1 auto!important;overflow-x:auto!important}
-body.orbit-prism .members-panel,
-body.orbit-prism .thread-panel,
-body.orbit-prism #call-panel,
-body.orbit-prism #incoming-call,
-body.orbit-prism #modal,
-body.orbit-prism #command-palette,
-body.orbit-prism #context-menu{isolation:isolate}
-body.orbit-prism .members-panel,
-body.orbit-prism .thread-panel{z-index:120!important}
-body.orbit-prism #call-panel{z-index:140!important}
-body.orbit-prism #orbit-control-launcher{z-index:145!important}
-body.orbit-prism #orbit-control-panel{z-index:160!important}
-body.orbit-prism #toast-stack{z-index:180!important}
-body.orbit-prism #modal{z-index:200!important}
-body.orbit-prism #command-palette{z-index:205!important}
-body.orbit-prism #incoming-call{z-index:210!important}
+body.orbit-aether .aether-head-actions{flex:0 1 auto!important;overflow-x:auto!important}
+body.orbit-aether .members-panel,
+body.orbit-aether .thread-panel,
+body.orbit-aether #call-panel,
+body.orbit-aether #incoming-call,
+body.orbit-aether #modal,
+body.orbit-aether #command-palette,
+body.orbit-aether #context-menu{isolation:isolate}
+body.orbit-aether .members-panel,
+body.orbit-aether .thread-panel{z-index:120!important}
+body.orbit-aether #call-panel{z-index:140!important}
+body.orbit-aether #orbit-control-launcher{z-index:145!important}
+body.orbit-aether #orbit-control-panel{z-index:160!important}
+body.orbit-aether #toast-stack{z-index:180!important}
+body.orbit-aether #modal{z-index:200!important}
+body.orbit-aether #command-palette{z-index:205!important}
+body.orbit-aether #incoming-call{z-index:210!important}
 
 @media(max-width:1280px){
-  body.orbit-prism .app.aether-app{grid-template-columns:64px 230px minmax(0,1fr)!important}
-  body.orbit-prism #aether-inspector{display:none!important}
+  body.orbit-aether .app.aether-app{grid-template-columns:64px 230px minmax(0,1fr)!important}
+  body.orbit-aether #aether-inspector{display:none!important}
 }
 @media(max-width:980px){
-  body.orbit-prism .app.aether-app{grid-template-columns:62px minmax(0,1fr)!important}
-  body.orbit-prism #sidebar{
+  body.orbit-aether .app.aether-app{grid-template-columns:62px minmax(0,1fr)!important}
+  body.orbit-aether #sidebar{
     position:absolute!important;left:0!important;top:0!important;bottom:0!important;
     width:250px!important;height:100%!important;transform:translateX(-108%)!important;
     transition:transform .22s ease!important;z-index:120!important;
   }
-  body.orbit-prism #app.server-sidebar-open #sidebar,
-  body.orbit-prism #sidebar.open{transform:translateX(0)!important}
+  body.orbit-aether #app.server-sidebar-open #sidebar,
+  body.orbit-aether #sidebar.open{transform:translateX(0)!important}
 }
 @media(max-width:700px){
-  body.orbit-prism .app.aether-app{
+  body.orbit-aether .app.aether-app{
     display:block!important;width:100vw!important;height:100dvh!important;padding:7px!important;
   }
-  body.orbit-prism .content.aether-content{width:100%!important;height:calc(100dvh - 14px)!important;border-radius:20px!important}
-  body.orbit-prism .server-rail{
+  body.orbit-aether .content.aether-content{width:100%!important;height:calc(100dvh - 14px)!important;border-radius:20px!important}
+  body.orbit-aether .server-rail{
     position:fixed!important;left:8px!important;right:8px!important;bottom:8px!important;top:auto!important;
     width:auto!important;height:58px!important;padding:7px!important;z-index:150!important;
     flex-direction:row!important;align-items:center!important;overflow-x:auto!important;overflow-y:hidden!important;
   }
-  body.orbit-prism .server-rail .aether-brand,
-  body.orbit-prism .server-rail .aether-command-button,
-  body.orbit-prism .server-rail .aether-rail-label,
-  body.orbit-prism .server-rail .aether-community-label,
-  body.orbit-prism .server-rail .aether-server-list,
-  body.orbit-prism .server-rail .aether-rail-actions,
-  body.orbit-prism .server-rail .aether-rail-footer{display:none!important}
-  body.orbit-prism .server-rail .global-nav{
+  body.orbit-aether .server-rail .aether-brand,
+  body.orbit-aether .server-rail .aether-command-button,
+  body.orbit-aether .server-rail .aether-rail-label,
+  body.orbit-aether .server-rail .aether-community-label,
+  body.orbit-aether .server-rail .aether-server-list,
+  body.orbit-aether .server-rail .aether-rail-actions,
+  body.orbit-aether .server-rail .aether-rail-footer{display:none!important}
+  body.orbit-aether .server-rail .global-nav{
     flex-direction:row!important;align-items:center!important;gap:5px!important;
     overflow-x:auto!important;overflow-y:hidden!important;width:max-content!important;flex:1 1 auto!important;
   }
-  body.orbit-prism .aether-nav{flex:0 0 auto!important;width:44px!important;height:44px!important;padding:0!important}
-  body.orbit-prism .aether-nav>span:not(.aether-nav-glyph),
-  body.orbit-prism .aether-nav>i{display:none!important}
-  body.orbit-prism .aether-nav-glyph{margin:auto!important}
-  body.orbit-prism .aether-topline{flex-basis:58px!important;min-height:58px!important;height:58px!important;padding:0 10px!important}
-  body.orbit-prism .aether-hero-strip{margin:9px!important;min-height:0!important;padding:18px!important}
-  body.orbit-prism .aether-chat{padding:0 9px 70px!important}
-  body.orbit-prism #global-page{padding-bottom:65px!important}
+  body.orbit-aether .aether-nav{flex:0 0 auto!important;width:44px!important;height:44px!important;padding:0!important}
+  body.orbit-aether .aether-nav>span:not(.aether-nav-glyph),
+  body.orbit-aether .aether-nav>i{display:none!important}
+  body.orbit-aether .aether-nav-glyph{margin:auto!important}
+  body.orbit-aether .aether-topline{flex-basis:58px!important;min-height:58px!important;height:58px!important;padding:0 10px!important}
+  body.orbit-aether .aether-hero-strip{margin:9px!important;min-height:0!important;padding:18px!important}
+  body.orbit-aether .aether-chat{padding:0 9px 70px!important}
+  body.orbit-aether #global-page{padding-bottom:65px!important}
 }
