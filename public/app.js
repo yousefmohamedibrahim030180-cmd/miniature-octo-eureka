@@ -1,33 +1,5 @@
 const $ = s => document.querySelector(s);
 
-const ORBIT_LOCALES={
-  en:{dir:"ltr",name:"English",search:"Search",channels:"CHANNELS",voice:"VOICE",write:"Write a message...",send:"Send",chat:"Chat",more:"More",discover:"Discover",notifications:"Notifications",home:"Home",security:"Security",language:"Language"},
-  ar:{dir:"rtl",name:"العربية",search:"بحث",channels:"القنوات",voice:"الصوت",write:"اكتب رسالة...",send:"إرسال",chat:"الدردشة",more:"المزيد",discover:"استكشاف",notifications:"الإشعارات",home:"الرئيسية",security:"الأمان",language:"اللغة"}
-};
-function applyOrbitLocale(locale){
-  const key=ORBIT_LOCALES[locale]?locale:"en";
-  const t=ORBIT_LOCALES[key];
-  document.documentElement.lang=key;
-  document.documentElement.dir=t.dir;
-  document.body.classList.toggle("orbit-rtl",t.dir==="rtl");
-  localStorage.setItem("orbit_locale",key);
-  const search=$("#quick-search"); if(search)search.placeholder=t.search;
-  const message=$("#message"); if(message)message.placeholder=t.write;
-  const send=document.querySelector(".composer .send"); if(send)send.textContent=t.send;
-  const channelMeta=$("#channel-meta"); if(channelMeta && (!channelMeta.dataset.dynamic || channelMeta.dataset.dynamic!=="voice"))channelMeta.textContent=t.chat;
-  const more=$("#channel-more-btn"); if(more){const span=more.querySelector("span");more.childNodes[0].nodeValue=t.more+" "; if(span)span.textContent="⋯";}
-  const sectionTitles=document.querySelectorAll(".section-title span");
-  if(sectionTitles[0])sectionTitles[0].textContent=t.channels;
-  if(sectionTitles[1])sectionTitles[1].textContent=t.voice;
-  const navMap={home:t.home,notifications:t.notifications};
-  document.querySelectorAll(".global-nav .rail-nav").forEach(btn=>{if(navMap[btn.dataset.view])btn.title=navMap[btn.dataset.view]});
-  return key;
-}
-function applySavedOrbitLocale(){
-  applyOrbitLocale(localStorage.getItem("orbit_locale")||"en");
-}
-applySavedOrbitLocale();
-
 let token = localStorage.getItem("orbit_guest_token") || "";
 let guestId = localStorage.getItem("orbit_guest_id") || "";
 let guestName = localStorage.getItem("orbit_guest_name") || "";
@@ -93,36 +65,17 @@ const QUALITY_PRESETS = {
   "1080p60": { width: 1920, height: 1080, frameRate: 60 }
 };
 
-let refreshInFlight=null;
-async function refreshAccountSession(){
-  if(!token||refreshInFlight)return refreshInFlight||false;
-  refreshInFlight=(async()=>{
-    try{
-      const r=await fetch("/api/v1/auth/refresh",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"}});
-      if(!r.ok)return false;
-      const data=await r.json().catch(()=>({}));
-      if(!data.token)return false;
-      saveAccountSession(data);
-      return true;
-    }catch{return false}
-    finally{refreshInFlight=null}
-  })();
-  return refreshInFlight;
-}
-async function api(url, opts = {}, allowRefresh = true) {
-  const headers={
+function api(url, opts = {}) {
+  opts.headers = {
     ...(opts.headers || {}),
     ...(token ? { Authorization: "Bearer " + token } : {})
   };
-  if (opts.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
-  const request={...opts,headers,credentials:"same-origin"};
-  const response=await fetch(url,request);
-  if(response.status===401 && allowRefresh && token && !String(url).includes("/api/v1/auth/refresh")){
-    if(await refreshAccountSession()) return api(url,opts,false);
-  }
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok){ const error=new Error(data.error || "Request failed"); error.code=data.code||null; throw error; }
-  return data;
+  if (opts.body && !opts.headers["Content-Type"]) opts.headers["Content-Type"] = "application/json";
+  return fetch(url, opts).then(async r => {
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || "Request failed");
+    return data;
+  });
 }
 function fmt(ts) { return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
 function avatar(name) { return (name || "G").slice(0, 1).toUpperCase(); }
@@ -196,14 +149,6 @@ function saveAccountSession(data){
   localStorage.setItem("orbit_guest_name",guestName);
 }
 
-async function syncAccountPreferences(){
-  try{
-    const data=await api("/api/v1/me/preferences");
-    if(data?.locale) applyOrbitLocale(data.locale);
-    return data;
-  }catch{return null}
-}
-
 function hideAuthScreen(){
   const screen=$("#orbit-auth-screen");
   screen?.remove();
@@ -232,7 +177,6 @@ function showAuthScreen(mode="signin", legacy=false){
         ((mode==="register"&&!convertMode)?'<label><span>Display name</span><input id="orbit-auth-display" maxlength="24" placeholder="Your name" autocomplete="name"></label>':'')+
         '<label><span>Username</span><div class="orbit-auth-input-wrap"><b>@</b><input id="orbit-auth-username" maxlength="20" placeholder="username" autocomplete="username" required></div></label>'+
         '<label><span>Password</span><input id="orbit-auth-password" type="password" minlength="8" maxlength="72" placeholder="At least 8 characters" autocomplete="'+((mode==="signin"&&!convertMode)?"current-password":"new-password")+'" required></label>'+
-        '<label id="orbit-auth-2fa-wrap" hidden><span>Authenticator code or recovery code</span><input id="orbit-auth-2fa" maxlength="10" inputmode="text" autocomplete="one-time-code" placeholder="6-digit code or 10-character recovery code"></label>'+
         '<div id="orbit-auth-error" class="orbit-auth-error" aria-live="polite"></div>'+
         '<button class="orbit-auth-submit" type="submit"><span>'+(convertMode?"Create account":mode==="signin"?"Sign in":"Create account")+'</span><i>→</i></button>'+
       '</form>'+
@@ -252,12 +196,10 @@ function showAuthScreen(mode="signin", legacy=false){
     if(submit){submit.disabled=true;submit.classList.add("loading");submit.querySelector("span").textContent=convertMode?"Securing…":mode==="signin"?"Signing in…":"Creating…";}
     if(error)error.textContent="";
     try{
-      const endpoint=convertMode?"/api/auth/convert-legacy":mode==="signin"?"/api/v1/auth/login":"/api/v1/auth/register";
-      const twoFactorCode=$("#orbit-auth-2fa")?.value.trim()||"";
-      const body=convertMode?{username,password}:{username,password,twoFactorCode,...(mode==="register"?{displayName}:{})};
+      const endpoint=convertMode?"/api/auth/convert-legacy":mode==="signin"?"/api/auth/login":"/api/auth/register";
+      const body=convertMode?{username,password}:{username,password,...(mode==="register"?{displayName}:{})};
       const data=await api(endpoint,{method:"POST",body:JSON.stringify(body)});
       saveAccountSession(data);
-      await syncAccountPreferences();
       hideAuthScreen();
       $("#me-name").textContent=me.display_name||me.username;
       renderOwnAvatar();
@@ -266,10 +208,7 @@ function showAuthScreen(mode="signin", legacy=false){
       await loadServers();
       orbitToast(mode==="signin"?"Welcome back":"Account created","You're now connected to ORBIT.","success");
     }catch(err){
-      if(err.code==="TWO_FACTOR_REQUIRED"){
-        const wrap=$("#orbit-auth-2fa-wrap"); if(wrap){wrap.hidden=false;$("#orbit-auth-2fa")?.focus();}
-        if(error)error.textContent="Enter the 6-digit authenticator code, or one of your recovery codes.";
-      }else if(error)error.textContent=err.message||"Authentication failed.";
+      if(error)error.textContent=err.message||"Authentication failed.";
       if(submit){submit.disabled=false;submit.classList.remove("loading");submit.querySelector("span").textContent=convertMode?"Create account":mode==="signin"?"Sign in":"Create account";}
     }
   });
@@ -285,7 +224,6 @@ async function enterAsGuest() {
         guestId=me.id;
         guestName=me.username;
         saveAccountSession({token,user:me});
-        await syncAccountPreferences();
         $("#me-name").textContent=me.display_name||me.username;
         renderOwnAvatar();
         $("#me-status").textContent="online · @"+me.username;
@@ -306,11 +244,7 @@ async function enterAsGuest() {
 }
 
 function connectRealtime() {
-  if(window.__orbitRealtimeBooting || window.__orbitRealtimeStarted){
-    if(window.__orbitRealtimeSocket){socket=window.__orbitRealtimeSocket;}
-    return socket;
-  }
-  window.__orbitRealtimeBooting=true;
+  if (socket) socket.disconnect();
   socket = io({
     auth: { token },
     path: "/socket.io",
@@ -324,20 +258,6 @@ function connectRealtime() {
     withCredentials: true
   });
 
-  window.__orbitRealtimeSocket=socket;
-  window.__orbitRealtimeStarted=true;
-  window.__orbitRealtimeBooting=false;
-  socket.on("connect_error", () => {
-    window.__orbitRealtimeStarted=false;
-    window.__orbitRealtimeBooting=false;
-  });
-  socket.on("disconnect", reason => {
-    if(reason==="io client disconnect"){
-      window.__orbitRealtimeStarted=false;
-      window.__orbitRealtimeBooting=false;
-      window.__orbitRealtimeSocket=null;
-    }
-  });
   socket.on("message:new", m => {
     const active = currentChannel && String(m.channel_id) === String(currentChannel.id);
     if (active) {
@@ -405,40 +325,6 @@ function connectRealtime() {
     }
   });
   socket.on("live:ended", () => refreshSharedSurface("live"));
-  socket.on("channel:created", payload => {
-    if (payload?.channel?.serverId && currentServer && String(payload.channel.serverId)===String(currentServer.id)) {
-      channels=[...channels.filter(c=>String(c.id)!==String(payload.channel.id)),payload.channel].sort((a,b)=>Number(a.position||0)-Number(b.position||0));
-      renderChannels();
-    }
-  });
-  socket.on("channel:updated", payload => {
-    if (!payload?.channel)return;
-    const index=channels.findIndex(c=>String(c.id)===String(payload.channel.id));
-    if(index!==-1){channels[index]=payload.channel;renderChannels();if(String(currentChannel?.id)===String(payload.channel.id))$("#channel-name").textContent=payload.channel.name;}
-    if(orbitUI.view==="chat"&&currentChannel?.type==="forum"&&String(currentChannel?.id)===String(payload.channel.id))renderForumChannel(payload.channel);
-  });
-  socket.on("channel:deleted", payload => {
-    if(!payload?.channelId)return;
-    channels=channels.filter(c=>String(c.id)!==String(payload.channelId));
-    if(String(currentChannel?.id)===String(payload.channelId)){
-      currentChannel=channels.find(c=>!isRealtimeChannel(c.type))||null;
-      if(currentChannel)selectChannel(currentChannel);
-    }
-    renderChannels();
-  });
-  socket.on("forum:post-created", payload => {
-    if(currentChannel?.type==="forum" && String(currentChannel.id)===String(payload?.post?.channelId)){
-      renderForumChannel(currentChannel);
-      if(String(payload?.post?.authorId)!==String(me?.id))orbitToast("New discussion",payload.post.title||"A new post was created.");
-    }
-  });
-  socket.on("forum:comment-created", payload => {
-    if(currentChannel?.type==="forum" && String(payload?.postId)===String(currentChannel?.id)) return;
-    if(payload?.comment?.authorId && String(payload.comment.authorId)!==String(me?.id)) orbitToast("Forum reply","A discussion received a new reply.");
-  });
-  socket.on("forum:post-reaction", payload => {
-    if(currentChannel?.type==="forum" && payload?.postId)renderForumChannel(currentChannel);
-  });
 
   socket.on("call:incoming", call => {
     if (callState.active || String(call.userId) === String(me?.id)) return;
@@ -692,19 +578,12 @@ function closeServerSidebar() {
   document.body.classList.remove("mobile-sidebar-open");
 }
 function renderServers() {
-  const host = $("#server-list");
-  if (!host) return;
-  host.innerHTML = servers.map(s => {
-    const active = String(currentServer?.id) === String(s.id) ? "active" : "";
-    const initials = escapeHtml((s.name || "OR").slice(0, 2).toUpperCase());
-    const name = escapeHtml(s.name || "Community");
-    return '<button class="server-item ' + active + '" data-id="' + s.id + '" title="' + name + '">' +
-      '<span class="server-icon" aria-hidden="true">' + initials + '</span>' +
-      '<span class="server-name">' + name + '</span>' +
-      '<span class="server-arrow" aria-hidden="true">›</span>' +
-    '</button>';
-  }).join("");
-  host.querySelectorAll(".server-item").forEach(btn => {
+  $("#server-list").innerHTML = servers.map(s =>
+    '<button class="server-item ' + (String(currentServer?.id) === String(s.id) ? "active" : "") +
+    '" data-id="' + s.id + '" title="' + escapeHtml(s.name) + '">' +
+    escapeHtml(s.name.slice(0, 2).toUpperCase()) + "</button>"
+  ).join("");
+  document.querySelectorAll(".server-item").forEach(btn => {
     btn.onclick = () => selectServer(servers.find(s => String(s.id) === btn.dataset.id));
   });
 }
@@ -725,73 +604,19 @@ async function selectServer(serverItem) {
   if (firstVisibleChannel) await selectChannel(firstVisibleChannel);
   await loadMembers();
 }
-function channelIcon(type){
-  return ({announcement:"!",forum:"≡",media:"▧",video:"▣",stage:"◉",stream:"▶",voice:"◉",text:"#"}[String(type||"text")]||"#");
-}
-function isRealtimeChannel(type){return ["voice","video","stage","stream"].includes(String(type))}
-async function renderForumChannel(channel){
-  $("#messages").innerHTML='<div class="orbit-forum-toolbar"><div><span class="eyebrow">FORUM</span><h2>'+escapeHtml(channel.name)+'</h2><p>'+escapeHtml(channel.topic||"Community discussion")+'</p></div><button class="primary" id="forum-new-post">New post</button></div><div id="orbit-forum-list" class="orbit-forum-list"><div class="os-empty"><strong>Loading discussions…</strong><span>Fetching live forum posts.</span></div></div>';
-  $("#composer")?.classList.add("hidden");
-  $("#forum-new-post").onclick=()=>openForumComposer(channel);
-  try{
-    const data=await api("/api/v1/channels/"+encodeURIComponent(channel.id)+"/posts?limit=40");
-    const rows=data.posts||[];
-    const root=$("#orbit-forum-list");
-    root.innerHTML=rows.length?rows.map(renderForumPostCard).join(""):'<div class="os-empty"><strong>No discussions yet</strong><span>Start the first conversation in this forum.</span></div>';
-    root.querySelectorAll("[data-forum-post]").forEach(btn=>btn.onclick=()=>openForumPost(btn.dataset.forumPost));
-  }catch(err){
-    $("#orbit-forum-list").innerHTML='<div class="os-empty"><strong>Forum unavailable</strong><span>'+escapeHtml(err.message)+'</span></div>';
-  }
-}
-function renderForumPostCard(post){
-  const reactions=Object.entries(post.reactions||{}).slice(0,4).map(([emoji,users])=>'<span>'+escapeHtml(emoji)+' '+(Array.isArray(users)?users.length:0)+'</span>').join("");
-  return '<article class="orbit-forum-card" data-forum-post="'+escapeHtml(post.id)+'"><div class="orbit-forum-card-main"><div class="eyebrow">'+(post.pinned?"PINNED · ":"")+'DISCUSSION</div><h3>'+escapeHtml(post.title)+'</h3><p>'+escapeHtml(post.body).slice(0,260)+'</p><div class="orbit-forum-meta"><span>'+escapeHtml(post.author?.display_name||post.author?.username||"Member")+'</span><span>'+Number(post.commentCount||0)+' replies</span><span>'+new Date(post.updatedAt||post.createdAt).toLocaleString()+'</span>'+reactions+'</div></div><div class="orbit-forum-open">Open →</div></article>';
-}
-function openForumComposer(channel){
-  openModal("Create forum post",
-    '<div class="orbit-form-stack"><input id="forum-post-title" maxlength="180" placeholder="Post title"><textarea id="forum-post-body" maxlength="10000" placeholder="Start the discussion..."></textarea><input id="forum-post-tags" maxlength="240" placeholder="Tags (comma separated)"><button class="primary" id="forum-post-submit">Publish post</button></div>');
-  $("#forum-post-submit").onclick=async()=>{
-    const title=$("#forum-post-title").value.trim(), body=$("#forum-post-body").value.trim(), tags=$("#forum-post-tags").value.split(",").map(x=>x.trim()).filter(Boolean);
-    if(!title||!body)return orbitToast("Forum post","Title and body are required.","error");
-    try{
-      await api("/api/v1/channels/"+encodeURIComponent(channel.id)+"/posts",{method:"POST",body:JSON.stringify({title,body,tags})});
-      closeModal();
-      await renderForumChannel(channel);
-      orbitToast("Post published","Your discussion is now live.","success");
-    }catch(err){orbitToast("Post failed",err.message,"error")}
-  };
-}
-async function openForumPost(postId){
-  try{
-    const postData=await api("/api/v1/posts/"+encodeURIComponent(postId)+"/comments");
-    const postMeta=await api("/api/v1/channels/"+encodeURIComponent(currentChannel.id)+"/posts?limit=50");
-    const found=(postMeta.posts||[]).find(x=>String(x.id)===String(postId));
-    if(!found)return;
-    const comments=postData.comments||[];
-    openModal(found.title,
-      '<div class="orbit-forum-detail"><p>'+escapeHtml(found.body)+'</p><div class="orbit-forum-meta"><span>'+escapeHtml(found.author?.display_name||found.author?.username||"Member")+'</span><span>'+comments.length+' replies</span></div><div class="orbit-forum-comments">'+(comments.length?comments.map(c=>'<div class="orbit-forum-comment"><strong>'+escapeHtml(c.author?.display_name||c.author?.username||"Member")+'</strong><p>'+escapeHtml(c.body)+'</p></div>').join(""):'<div class="os-empty"><span>No replies yet.</span></div>')+'</div><textarea id="forum-comment-body" maxlength="4000" placeholder="Reply to this discussion..."></textarea><button class="primary" id="forum-comment-submit">Reply</button></div>');
-    $("#forum-comment-submit").onclick=async()=>{
-      const body=$("#forum-comment-body").value.trim(); if(!body)return;
-      try{await api("/api/v1/posts/"+encodeURIComponent(postId)+"/comments",{method:"POST",body:JSON.stringify({body})});closeModal();await openForumPost(postId);orbitToast("Reply posted","Your reply is live.","success")}
-      catch(err){orbitToast("Reply failed",err.message,"error")}
-    };
-  }catch(err){orbitToast("Forum post",err.message,"error")}
-}
-
 function renderChannels() {
-  const visibleTextChannels = channels.filter(c => !isRealtimeChannel(c.type) && String(c.name||"").trim().toLowerCase() !== "notifications");
+  const visibleTextChannels = channels.filter(c => c.type !== "voice" && String(c.name||"").trim().toLowerCase() !== "notifications");
   $("#channel-list").innerHTML = visibleTextChannels.map(c => {
     const unread = Number(unreadChannels[c.id] || 0);
-    const icon = channelIcon(c.type);
-    const tag = c.type==="forum"?"FORUM":c.type==="announcement"?"ANN":c.type==="media"?"MEDIA":"TEXT";
+    const icon = c.type === "announcement" ? "!" : "#";
     return '<button class="channel ' + (String(currentChannel?.id) === String(c.id) ? "active" : "") +
-      '" data-id="' + c.id + '" title="'+escapeHtml(tag)+'"><span class="hash channel-type-icon">' + icon + '</span><span class="channel-name-text">' + escapeHtml(c.name) + '</span>' +
+      '" data-id="' + c.id + '"><span class="hash">' + icon + '</span><span class="channel-name-text">' + escapeHtml(c.name) + '</span>' +
       (unread ? '<b class="channel-unread">' + (unread > 99 ? "99+" : unread) + '</b>' : '') +
       '</button>';
   }).join("");
-  $("#voice-channel-list").innerHTML = channels.filter(c => isRealtimeChannel(c.type)).map(c =>
-    '<button class="channel voice-channel" data-id="' + c.id + '"><span class="voice-icon">' + channelIcon(c.type) + '</span><span class="channel-name-text">' +
-    escapeHtml(c.name) + '</span><small class="channel-kind-label">'+escapeHtml(String(c.type).toUpperCase())+'</small></button>'
+  $("#voice-channel-list").innerHTML = channels.filter(c => c.type === "voice").map(c =>
+    '<button class="channel voice-channel" data-id="' + c.id + '"><span class="voice-icon">◉</span><span class="channel-name-text">' +
+    escapeHtml(c.name) + '</span></button>'
   ).join("");
   document.querySelectorAll(".channel").forEach(btn => {
     btn.onclick = () => {
@@ -803,15 +628,15 @@ function renderChannels() {
 }
 async function selectChannel(channel) {
   if (!channel) return;
-  if (isRealtimeChannel(channel.type)) {
+  if (channel.type === "voice") {
     if (callState.active && String(callState.roomId) === String(channel.id)) return;
     if (callState.active) leaveCall();
     currentChannel = channel;
     renderChannels();
     $("#channel-name").textContent = channel.name;
-    $("#channel-meta").textContent = channel.type === "stage" ? "Stage room" : channel.type === "stream" ? "Live stream room" : channel.type === "video" ? "Video room" : "Voice room";
-    $("#message").placeholder = "Live room";
-    await startCall(channel.type==="voice"||channel.type==="stage" ? "voice" : "video");
+    $("#channel-meta").textContent = "Voice room";
+    $("#message").placeholder = "Voice room";
+    await startCall("voice");
     return;
   }
   if (callState.active && String(callState.roomId) !== String(channel.id)) leaveCall();
@@ -820,19 +645,13 @@ async function selectChannel(channel) {
   localStorage.setItem("orbit_unread_channels", JSON.stringify(unreadChannels));
   renderChannels();
   $("#channel-name").textContent = channel.name;
-  $("#channel-meta").textContent = channel.type === "announcement" ? "Announcement channel" : channel.type === "forum" ? "Forum discussions" : channel.type === "media" ? "Media channel" : "Realtime conversation";
-  if(channel.type==="forum"){
-    if(socket) socket.emit("channel:join",channel.id);
-    await renderForumChannel(channel);
-  }else{
-    $("#composer")?.classList.remove("hidden");
-    $("#message").placeholder = "Message #" + channel.name;
-    $("#messages").innerHTML = "";
-    const data = await api("/api/channels/" + channel.id + "/messages");
-    data.messages.forEach(appendMessage);
-    if (socket) socket.emit("channel:join", channel.id);
-    $("#messages").scrollTop = $("#messages").scrollHeight;
-  }
+  $("#channel-meta").textContent = channel.type === "announcement" ? "Announcement channel" : "Realtime conversation";
+  $("#message").placeholder = "Message #" + channel.name;
+  $("#messages").innerHTML = "";
+  const data = await api("/api/channels/" + channel.id + "/messages");
+  data.messages.forEach(appendMessage);
+  if (socket) socket.emit("channel:join", channel.id);
+  $("#messages").scrollTop = $("#messages").scrollHeight;
 }
 function renderMessageAttachment(att){
   if(!att?.id) return "";
@@ -1716,6 +1535,7 @@ const dmState = {
 
 const orbitUI = {
   view: "home",
+  saved: JSON.parse(localStorage.getItem("orbit_saved") || "[]"),
   profile: JSON.parse(localStorage.getItem("orbit_profile") || "null") || {
     displayName: "",
     status: "Online",
@@ -1790,6 +1610,7 @@ function renderPage(view) {
     "server-home":["SERVER / HOME",currentServer?.name||"Server Home","Your community command center, members, roles, and channels."],
     discover:["DISCOVER","Discover communities","Explore spaces, categories, and new conversations."],
     dms:["DIRECT MESSAGES","Messages","Private conversations, groups, and recent contacts."],
+    friends:["SOCIAL GRAPH","Friends","Online people, requests, suggestions, and connections."],
     notifications:["INBOX","Notifications","Mentions, replies, calls, requests, and system events."],
     saved:["LIBRARY","Saved","Messages and media you deliberately kept."],
     explore:["EXPLORE","Explore","Events, polls, files, media, and community activity."],
@@ -1800,7 +1621,7 @@ function renderPage(view) {
     projects:["PROJECTS","Projects","Tasks, boards and team collaboration inside communities."],
     files:["FILES","Files","Shared workspace files and attachments."],
     ai:["ORBIT AI","AI","Your optional AI workspace assistant."],
-    settings:["PREFERENCES","Settings","Appearance, privacy, voice, notifications, accessibility and security."],
+    settings:["PREFERENCES","Settings","Appearance, privacy, voice, notifications, accessibility and security."]
   }[view] || ["ORBIT","Home",""];
   $("#page-eyebrow").textContent=cfg[0];
   $("#page-title").textContent=cfg[1];
@@ -1812,15 +1633,16 @@ function renderPage(view) {
   if(view==="communities")renderCommunitiesPage();
   if(view==="discover")renderDiscoverPage();
   if(view==="dms")renderHomePage();
+  if(view==="friends")renderFriendsPage();
   if(view==="calls")renderCallsPage();
   if(view==="live")renderLivePage();
   if(view==="events")renderEventsPage();
   if(view==="projects")renderProjectsPage();
   if(view==="files")renderFilesPage();
   if(view==="ai")renderAIPage();
-  if(view==="saved")renderSavedPage();
-  if(view==="settings")renderSettingsPage();
+    if(view==="saved")renderSavedPage();
   if(view==="explore")renderExplorePage();
+  if(view==="settings")renderSettingsPage();
 }
 function setView(view){
   if(view==="dms"){view="home";}
@@ -1835,7 +1657,7 @@ function setView(view){
     $("#sidebar")?.classList.remove("open");
     document.body.classList.remove("mobile-sidebar-open");
   }
-  const globalViews=["space","home","server-home","communities","discover","dms","calls","live","events","projects","files","ai","notifications","saved","explore","settings"];
+  const globalViews=["space","home","server-home","communities","discover","dms","friends","calls","live","events","projects","files","ai","notifications","saved","explore","settings"];
   if(globalViews.includes(view)){
     global.classList.remove("hidden");
     chat.classList.add("hidden");
@@ -3026,52 +2848,23 @@ async function renderAIPage(){
       }catch(err){orbitToast("ORBIT failed",err.message,"error")}finally{btn.disabled=false}
     };
   }catch(err){$("#page-body").innerHTML='<div class="os-empty"><strong>Could not load ORBIT</strong><span>'+escapeHtml(err.message)+'</span></div>'}
-}async function renderDiscoverPage(query=""){
-  $("#page-actions").innerHTML='<label class="platform-inline-search"><span>⌕</span><input id="discover-query" value="'+escapeHtml(query)+'" placeholder="Search communities..."><button id="discover-search-btn">Search</button></label><button id="discover-refresh-btn">Refresh</button>';
-  $("#page-body").innerHTML='<div class="os-empty"><strong>Loading communities…</strong><span>Fetching live communities from ORBIT.</span></div>';
-  const search=async()=>{
-    const q=$("#discover-query")?.value.trim()||"";
-    renderDiscoverPage(q);
-  };
-  $("#discover-search-btn").onclick=search;
-  $("#discover-query").onkeydown=e=>{if(e.key==="Enter")search()};
-  $("#discover-refresh-btn").onclick=()=>renderDiscoverPage($("#discover-query")?.value.trim()||"");
-  try{
-    const data=await api("/api/discover/communities?limit=60"+(query?"&q="+encodeURIComponent(query):""));
-    const communities=data.communities||[];
-    const cards=communities.map(c=>{
-      const joined=Boolean(c.role);
-      return '<article class="platform-community-card">'+
-        '<div class="platform-community-orb">'+escapeHtml(String(c.name||"O").slice(0,2).toUpperCase())+'</div>'+
-        '<div class="platform-community-main"><div class="eyebrow">COMMUNITY</div><h3>'+escapeHtml(c.name)+'</h3>'+
-        '<p>'+Number(c.memberCount||0)+' members · '+Number(c.onlineCount||0)+' online · '+Number(c.channelCount||0)+' channels</p>'+
-        '<div class="platform-community-meta"><span>'+escapeHtml(joined?String(c.role).toUpperCase():"PUBLIC")+'</span><span>'+escapeHtml(c.type||"community")+'</span></div></div>'+
-        '<div class="platform-community-action">'+
-        '<button class="hero-action" data-community-open="'+escapeHtml(c.id)+'">'+(joined?"Open":"Join")+'</button>'+
-        '</div></article>';
-    }).join("");
-    $("#page-body").innerHTML=
-      '<div class="platform-discover-hero"><div><span class="eyebrow">DISCOVER ORBIT</span><h2>Real communities. Live data.</h2><p>Browse communities currently known to ORBIT. Joining changes your real membership and appears in your navigation immediately.</p></div><div class="os-stat"><strong>'+communities.length+'</strong><span>available</span></div></div>'+
-      '<div class="platform-community-grid">'+(cards||'<div class="os-empty"><strong>No communities found</strong><span>Try a different search or create a community of your own.</span></div>')+'</div>';
-    document.querySelectorAll("[data-community-open]").forEach(btn=>btn.onclick=async()=>{
-      const idValue=btn.dataset.communityOpen;
-      try{
-        const community=communities.find(c=>String(c.id)===String(idValue));
-        if(!community)return;
-        if(!community.role){
-          await api("/api/servers/"+encodeURIComponent(idValue)+"/join",{method:"POST",body:"{}"});
-          orbitToast("Community joined",community.name+" is now in your navigation.","success");
-          await loadServers();
-        }
-        const target=servers.find(s=>String(s.id)===String(idValue));
-        if(target){await selectServer(target);goChat();}
-        else renderDiscoverPage(query);
-      }catch(err){orbitToast("Community action failed",err.message,"error")}
-    });
-  }catch(err){
-    $("#page-body").innerHTML='<div class="os-empty"><strong>Could not load Discover</strong><span>'+escapeHtml(err.message)+'</span></div>';
-  }
+}function renderDiscoverPage(){
+  $("#page-actions").innerHTML='<button id="discover-search-btn">Search</button>';
+  const cards=[
+    ["Nebula Arena","Gaming","12.4k members","1.2k online"],
+    ["Build in Public","Technology","7.8k members","620 online"],
+    ["Creative Lab","Art & Media","4.2k members","402 online"],
+    ["Code Foundry","Programming","9.1k members","880 online"],
+    ["Study Hall","Education","5.6k members","301 online"],
+    ["Night Shift","Community","3.3k members","288 online"]
+  ];
+  $("#page-body").innerHTML='<div class="card-grid">'+cards.map(c=>
+    '<div class="hero-card"><span class="eyebrow">'+c[1].toUpperCase()+'</span><h2>'+c[0]+'</h2><p>Public community preview. Connect it to a real server later from Control Center.</p><span class="chip">'+c[2]+'</span><span class="chip">'+c[3]+'</span><button class="hero-action discover-view" data-name="'+escapeHtml(c[0])+'">Open preview</button></div>'
+  ).join("")+'</div>';
+  $("#discover-search-btn").onclick=openCommandPalette;
+  document.querySelectorAll(".discover-view").forEach(b=>b.onclick=()=>orbitToast("Community preview",b.dataset.name));
 }
+
 function formatDMTime(ts){
   if(!ts)return "";
   const d=new Date(ts), nowDate=new Date();
@@ -3341,21 +3134,12 @@ async function renderNotificationsPage(){
   }catch(e){$("#page-body").innerHTML='<div class="content-card"><h4>Notifications unavailable</h4><p>'+escapeHtml(e.message)+'</p></div>'}
 }
 
-async function renderSavedPage(){
-  $("#page-actions").innerHTML='<button id="refresh-saved">Refresh</button>';
-  $("#page-body").innerHTML='<div class="os-empty"><strong>Loading saved messages…</strong><span>Syncing your bookmarks from ORBIT.</span></div>';
-  try{
-    const data=await api("/api/v1/bookmarks");
-    const rows=data.bookmarks||[];
-    $("#page-body").innerHTML='<div class="os-list">'+(rows.length?rows.map(item=>{
-      const m=item.message||{};
-      return '<div class="list-row saved-message-row"><div class="chip">⌑</div><div><strong>'+escapeHtml(m.username||"Message")+'</strong><span>'+escapeHtml(String(m.content||""))+'</span><small>'+escapeHtml(item.channelId||"channel")+' · '+escapeHtml(orbitDate(item.createdAt))+'</small></div><button data-remove-bookmark="'+escapeHtml(item.messageId)+'">Remove</button></div>';
-    }).join(""):'<div class="content-card"><h4>Nothing saved</h4><p>Use the bookmark action on a message. Saved items follow your account across devices.</p></div>')+'</div>';
-    $("#refresh-saved").onclick=renderSavedPage;
-    document.querySelectorAll("[data-remove-bookmark]").forEach(btn=>btn.onclick=async()=>{try{await api("/api/v1/messages/"+encodeURIComponent(btn.dataset.removeBookmark)+"/bookmark",{method:"POST",body:"{}"});renderSavedPage()}catch(err){orbitToast("Remove failed",err.message,"error")}});
-  }catch(err){
-    $("#page-body").innerHTML='<div class="os-empty"><strong>Saved unavailable</strong><span>'+escapeHtml(err.message)+'</span></div>';
-  }
+function renderSavedPage(){
+  $("#page-actions").innerHTML='<button id="clear-saved">Clear all</button>';
+  const rows=orbitUI.saved||[];
+  $("#page-body").innerHTML='<div class="list-card">'+(rows.length?rows.map((m,i)=>'<div class="list-row"><div class="chip">⌑</div><div><strong>'+escapeHtml(m.title||"Message")+'</strong><span>'+escapeHtml(m.text||"")+'</span></div><button data-remove-saved="'+i+'">Remove</button></div>').join(""):'<div class="content-card"><h4>Nothing saved</h4><p>Use the bookmark action on a message.</p></div>')+'</div>';
+  $("#clear-saved").onclick=()=>{orbitUI.saved=[];localStorage.setItem("orbit_saved","[]");renderSavedPage()};
+  document.querySelectorAll("[data-remove-saved]").forEach(b=>b.onclick=()=>{orbitUI.saved.splice(Number(b.dataset.removeSaved),1);localStorage.setItem("orbit_saved",JSON.stringify(orbitUI.saved));renderSavedPage()});
 }
 
 function renderExplorePage(){
@@ -3463,12 +3247,12 @@ function renderSpacePage(){
         '<section class="space-panel"><header><span>LIVE ROOMS</span><b>'+calls.length+'</b></header><div class="space-call-list">'+(calls.length?calls.map(c=>'<button data-space-action="calls"><span class="call-wave">◉</span><div><strong>'+escapeHtml(c.channelName||"Live room")+'</strong><small>'+escapeHtml(c.mode||"voice")+' · '+((c.participants||[]).length||1)+' people</small></div><b>JOIN</b></button>').join(""):'<span class="space-empty">No live rooms right now.</span>')+'</div></section>'+
       '</div>'+
     '</div>';
-  body.querySelectorAll("[data-space-action]").forEach(el=>el.onclick=()=>{const a=el.dataset.spaceAction;if(a==="home"){setView("home");return}if(a==="calls"){setView("calls");return}if(a==="discover"){setView("discover")}});
+  body.querySelectorAll("[data-space-action]").forEach(el=>el.onclick=()=>{const a=el.dataset.spaceAction;if(a==="home"){setView("home");return}if(a==="friends"){setView("friends");return}if(a==="calls"){setView("calls");return}if(a==="discover"){setView("discover")}});
   body.querySelectorAll("[data-space-server]").forEach(el=>el.onclick=async()=>{const sv=servers.find(x=>String(x.id)===String(el.dataset.spaceServer));if(sv){await selectServer(sv);setView("server-home")}});
 }
 
 function renderSettingsPage(section="appearance"){
-  const sections=[["appearance","Appearance"],["profile","Profile"],["privacy","Privacy"],["voice","Voice & Video"],["sound","Sounds"],["notifications","Notifications"],["accessibility","Accessibility"],["performance","Performance"],["files","Files & Sharing"],["security","Security"],["developer","Developer"],["language","Language"],["advanced","Advanced"]];
+  const sections=[["appearance","Appearance"],["profile","Profile"],["privacy","Privacy"],["voice","Voice & Video"],["sound","Sounds"],["notifications","Notifications"],["accessibility","Accessibility"],["performance","Performance"],["files","Files & Sharing"],["security","Security"],["advanced","Advanced"]];
   $("#page-actions").innerHTML="";
   $("#page-body").innerHTML='<div class="settings-layout"><nav class="settings-nav">'+sections.map(s=>'<button class="'+(s[0]===section?"active":"")+'" data-settings-section="'+s[0]+'">'+s[1]+'</button>').join("")+'</nav><div id="settings-card" class="settings-card"></div></div>';
   document.querySelectorAll("[data-settings-section]").forEach(b=>b.onclick=()=>renderSettingsPage(b.dataset.settingsSection));
@@ -3708,175 +3492,13 @@ function renderSettingsPage(section="appearance"){
   }else if(section==="privacy"){
     card.innerHTML=setting("Friend requests","Allow requests from guests.",true,"privacy-friends")+setting("Direct messages","Allow private messages from shared communities.",true,"privacy-dms")+setting("Read receipts","Show when messages are opened.",false,"privacy-receipts");
   }else if(section==="notifications"){
-    card.innerHTML='<h3>Notifications</h3><p>Choose what ORBIT should notify you about. Preferences are saved to your account.</p><div id="orbit-notification-preferences"><div class="content-card"><h4>Loading preferences…</h4></div></div>';
-    (async()=>{
-      const host=$("#orbit-notification-preferences");
-      try{
-        const data=await api("/api/v1/me/preferences");
-        const n=data.notifications||{};
-        const pref=[["mentions","Mentions","Notify when someone mentions you."],["directMessages","Direct messages","Notify when a new private message arrives."],["friendRequests","Friend requests","Notify when someone sends you a friend request."],["replies","Replies","Notify when someone replies to your message or forum post."],["events","Events","Notify about community events and RSVP activity."],["streams","Live streams","Notify when a creator or community goes live."],["security","Security","Keep account and security notifications enabled."]];
-        host.innerHTML=pref.map(x=>setting(x[1],x[2],n[x[0]]!==false,"server-notify-"+x[0])).join("");
-        document.querySelectorAll("[data-setting-toggle^='server-notify-']").forEach(btn=>btn.onclick=async()=>{
-          btn.classList.toggle("on");
-          const key=btn.dataset.settingToggle.replace("server-notify-","");
-          const payload={notifications:{}}; payload.notifications[key]=btn.classList.contains("on");
-          try{
-            const saved=await api("/api/v1/me/preferences",{method:"PATCH",body:JSON.stringify(payload)});
-            const state=saved.notifications||{};
-            document.querySelectorAll("[data-setting-toggle^='server-notify-']").forEach(other=>{
-              const otherKey=other.dataset.settingToggle.replace("server-notify-","");
-              other.classList.toggle("on",state[otherKey]!==false);
-            });
-            orbitToast("Notification preference saved","This preference follows your account.","success");
-          }catch(err){
-            btn.classList.toggle("on");
-            orbitToast("Could not save preference",err.message,"error");
-          }
-        });
-      }catch(err){
-        host.innerHTML='<div class="content-card"><h4>Notification preferences unavailable</h4><p>'+escapeHtml(err.message)+'</p></div>';
-      }
-    })();
+    card.innerHTML=setting("Desktop alerts","Show important alerts.",true,"notify-desktop")+setting("Mentions","Notify on mentions.",true,"notify-mentions")+setting("Calls","Notify for incoming calls.",true,"notify-calls");
   }else if(section==="accessibility"){
     card.innerHTML=setting("Reduced motion","Minimize animation.",false,"a11y-motion")+setting("High contrast","Increase contrast.",false,"a11y-contrast")+setting("Larger text","Scale the interface.",false,"a11y-large");
   }else if(section==="performance"){
     card.innerHTML=setting("Performance mode","Reduce expensive visual effects.",false,"perf-mode")+setting("Lazy media","Load rich media on demand.",true,"perf-lazy");
   }else if(section==="security"){
-    card.innerHTML='<h3>Security center</h3><p>Manage active sessions, devices and two-factor authentication.</p><div class="list-card" id="orbit-session-list"><div class="content-card"><h4>Loading sessions…</h4><p>Checking active devices.</p></div></div><div class="setting-block" id="orbit-2fa-panel"><div class="content-card"><h4>Loading 2FA…</h4><p>Checking authenticator status.</p></div></div><div class="setting-row"><div><strong>Session policy</strong><span>New account sessions use short-lived access tokens with revocable refresh sessions.</span></div><span class="setting-status-badge">V1 SECURITY</span></div><div class="setting-row"><div><strong>Sign out other devices</strong><span>Immediately revoke every other active session.</span></div><button class="primary" id="revoke-other-sessions">Revoke others</button></div>';
-    (async()=>{
-      try{
-        const data=await api("/api/v1/auth/sessions");
-        const list=data.sessions||[];
-        const current=String(data.currentSessionId||"");
-        const root=$("#orbit-session-list");
-        root.innerHTML=list.length?list.map(session=>{
-          const active=String(session.id)===current;
-          const when=new Date(session.lastSeenAt||session.createdAt).toLocaleString();
-          return '<div class="list-row"><div class="chip">'+(active?"●":"◎")+'</div><div><strong>'+escapeHtml(active?"This device":"Other device")+'</strong><span>'+escapeHtml(session.device||"Unknown browser")+' · '+escapeHtml(session.ip||"unknown IP")+' · last active '+escapeHtml(when)+'</span></div><span>'+(active?"Current":'<button class="session-revoke" data-session-id="'+escapeHtml(session.id)+'">Revoke</button>')+'</span></div>';
-        }).join(""):'<div class="content-card"><h4>No active account sessions</h4><p>You are using a legacy guest session or the account has no v1 session yet.</p></div>';
-        document.querySelectorAll(".session-revoke").forEach(btn=>btn.onclick=async()=>{
-          try{
-            await api("/api/v1/auth/sessions/"+encodeURIComponent(btn.dataset.sessionId)+"/revoke",{method:"POST",body:"{}"});
-            orbitToast("Session revoked","That device can no longer use its ORBIT account session.","success");
-            renderSettingsPage("security");
-          }catch(err){orbitToast("Could not revoke session",err.message,"error")}
-        });
-        $("#revoke-other-sessions")?.addEventListener("click",async()=>{
-          try{
-            const result=await api("/api/v1/auth/sessions/revoke-others",{method:"POST",body:"{}"});
-            orbitToast("Other sessions revoked",String(result.revoked||0)+" session(s) were signed out.","success");
-            renderSettingsPage("security");
-          }catch(err){orbitToast("Could not revoke sessions",err.message,"error")}
-        });
-      }catch{
-        $("#orbit-session-list").innerHTML='<div class="content-card"><h4>Legacy guest session</h4><p>Account security sessions activate after you sign in with an ORBIT account. Your current connection is still protected by the compatibility session system.</p></div>';
-        $("#revoke-other-sessions")?.setAttribute("disabled","disabled");
-      }
-    })();
-    (async()=>{
-      const panel=$("#orbit-2fa-panel");
-      if(!panel)return;
-      try{
-        const state=await api("/api/v1/security/2fa");
-        if(state.enabled){
-          panel.innerHTML='<div class="setting-row"><div><strong>Two-factor authentication</strong><span>Authenticator protection is enabled. '+Number(state.recoveryCodesRemaining||0)+' recovery code(s) remain.</span></div><span class="setting-status-badge">ENABLED</span></div><div class="setting-row"><div><strong>Disable 2FA</strong><span>Requires an authenticator code or recovery code.</span></div><button class="primary" id="orbit-2fa-disable-btn">Disable</button></div>';
-          $("#orbit-2fa-disable-btn").onclick=()=>{
-            openModal("Disable two-factor authentication",'<div class="orbit-form-stack"><input id="orbit-2fa-disable-code" inputmode="numeric" maxlength="6" placeholder="Authenticator code"><input id="orbit-2fa-recovery-code" maxlength="20" placeholder="Or recovery code"><button class="primary" id="orbit-2fa-disable-submit">Disable 2FA</button></div>');
-            $("#orbit-2fa-disable-submit").onclick=async()=>{
-              try{
-                await api("/api/v1/security/2fa/disable",{method:"POST",body:JSON.stringify({code:$("#orbit-2fa-disable-code").value.trim(),recoveryCode:$("#orbit-2fa-recovery-code").value.trim()})});
-                closeModal();orbitToast("2FA disabled","Two-factor authentication has been turned off.","success");renderSettingsPage("security");
-              }catch(err){orbitToast("Could not disable 2FA",err.message,"error")}
-            };
-          };
-        }else{
-          panel.innerHTML='<div class="setting-row"><div><strong>Two-factor authentication</strong><span>Protect sign-ins with an authenticator app. The secret is encrypted and recovery codes are one-time.</span></div><span class="setting-status-badge">OFF</span></div><div class="setting-row"><div><strong>Enable 2FA</strong><span>Start setup, add the secret to your authenticator, then verify one code.</span></div><button class="primary" id="orbit-2fa-start">Enable</button></div>';
-          $("#orbit-2fa-start").onclick=async()=>{
-            try{
-              const setup=await api("/api/v1/security/2fa/setup",{method:"POST",body:"{}"});
-              openModal("Set up two-factor authentication",'<div class="orbit-form-stack"><p>Enter this secret manually in your authenticator app, or use the provisioning URI with an app that supports it:</p><code class="orbit-secret-code">'+escapeHtml(setup.secret)+'</code><p class="hint">'+escapeHtml(setup.otpauthUri)+'</p><input id="orbit-2fa-verify-code" inputmode="numeric" maxlength="6" placeholder="6-digit authenticator code"><button class="primary" id="orbit-2fa-verify-btn">Verify & enable</button></div>');
-              $("#orbit-2fa-verify-btn").onclick=async()=>{
-                try{
-                  const result=await api("/api/v1/security/2fa/verify",{method:"POST",body:JSON.stringify({code:$("#orbit-2fa-verify-code").value.trim()})});
-                  closeModal();
-                  openModal("Save your recovery codes",'<p>These codes are shown once. Store them somewhere safe before closing this window.</p><div class="orbit-recovery-codes">'+(result.recoveryCodes||[]).map(code=>'<code>'+escapeHtml(code)+'</code>').join("")+'</div><button class="primary" id="orbit-2fa-recovery-done">I saved them</button>');
-                  $("#orbit-2fa-recovery-done").onclick=()=>{closeModal();orbitToast("2FA enabled","Authenticator protection is now active.","success");renderSettingsPage("security")};
-                }catch(err){orbitToast("2FA verification failed",err.message,"error")}
-              };
-            }catch(err){orbitToast("2FA setup failed",err.message,"error")}
-          };
-        }
-      }catch(err){
-        panel.innerHTML='<div class="content-card"><h4>2FA unavailable</h4><p>'+escapeHtml(err.message)+'</p></div>';
-      }
-    })();
-  }else if(section==="developer"){
-    card.innerHTML='<div class="developer-head"><div><span class="eyebrow">DEVELOPER PLATFORM</span><h3>Build with ORBIT</h3><p>Create scoped API keys and developer applications. Secrets are shown once and are never displayed again.</p></div><span class="setting-status-badge">API v1</span></div><div id="orbit-developer-panel"><div class="content-card"><h4>Loading developer tools…</h4></div></div>';
-    (async()=>{
-      const root=$("#orbit-developer-panel");
-      const render=async()=>{
-        try{
-          const [keysData,appsData]=await Promise.all([api("/api/v1/developer/api-keys"),api("/api/v1/developer/applications")]);
-          const scopes=keysData.scopes||[];
-          const keys=keysData.keys||[],apps=appsData.applications||[];
-          root.innerHTML=
-            '<div class="developer-section"><div class="developer-section-head"><div><h4>API keys</h4><p>Use scoped keys for server-to-server integrations.</p></div><button class="primary" id="orbit-dev-new-key">Create key</button></div>'+
-            '<div class="developer-list">'+(keys.length?keys.map(k=>'<div class="developer-row"><div><strong>'+escapeHtml(k.name)+'</strong><span>'+escapeHtml((k.scopes||[]).join(" · "))+'</span></div><div><small>'+escapeHtml(k.lastUsedAt?"Last used "+new Date(k.lastUsedAt).toLocaleString():"Never used")+'</small><button class="danger developer-revoke-key" data-key-id="'+escapeHtml(k.id)+'">Revoke</button></div></div>').join(""):'<div class="content-card"><h4>No API keys</h4><p>Create a key only when an integration actually needs API access.</p></div>')+'</div></div>'+
-            '<div class="developer-section"><div class="developer-section-head"><div><h4>Developer applications</h4><p>Client IDs and redirect URIs for future OAuth integrations.</p></div><button class="primary" id="orbit-dev-new-app">Create app</button></div>'+
-            '<div class="developer-list">'+(apps.length?apps.map(app=>'<div class="developer-row"><div><strong>'+escapeHtml(app.name)+'</strong><span>Client ID · '+escapeHtml(app.clientId)+'<br>'+escapeHtml((app.redirectUris||[]).join(" · ")||"No redirect URIs")+'</span></div><div><small>'+escapeHtml(new Date(app.createdAt).toLocaleString())+'</small><button class="danger developer-revoke-app" data-app-id="'+escapeHtml(app.id)+'">Revoke</button></div></div>').join(""):'<div class="content-card"><h4>No applications</h4><p>Create an application when you need OAuth-style integration credentials.</p></div>')+'</div></div>';
-          
-          $("#orbit-dev-new-key").onclick=()=>{
-            openModal("Create API key",'<div class="orbit-form-stack"><input id="orbit-dev-key-name" maxlength="100" placeholder="Key name"><div class="developer-scope-grid">'+scopes.map(scope=>'<label><input type="checkbox" class="orbit-scope" value="'+escapeHtml(scope)+'"> '+escapeHtml(scope)+'</label>').join("")+'</div><button class="primary" id="orbit-dev-key-submit">Create key</button></div>');
-            $("#orbit-dev-key-submit").onclick=async()=>{
-              const name=$("#orbit-dev-key-name").value.trim()||"Integration key";
-              const selected=[...document.querySelectorAll(".orbit-scope:checked")].map(x=>x.value);
-              try{
-                const out=await api("/api/v1/developer/api-keys",{method:"POST",body:JSON.stringify({name,scopes:selected})});
-                closeModal();
-                openModal("Store your API key",'<p>This secret is displayed once. Store it in a secrets manager and never commit it to source control.</p><code class="orbit-secret-code">'+escapeHtml(out.key.secret)+'</code><button class="primary" id="orbit-dev-key-done">I saved it</button>');
-                $("#orbit-dev-key-done").onclick=()=>{closeModal();render()};
-              }catch(err){orbitToast("API key failed",err.message,"error")}
-            };
-          };
-          $("#orbit-dev-new-app").onclick=()=>{
-            openModal("Create developer application",'<div class="orbit-form-stack"><input id="orbit-dev-app-name" maxlength="120" placeholder="Application name"><textarea id="orbit-dev-app-desc" maxlength="500" placeholder="What does your app do?"></textarea><input id="orbit-dev-app-redirects" maxlength="800" placeholder="Redirect URLs, one per line"><button class="primary" id="orbit-dev-app-submit">Create application</button></div>');
-            $("#orbit-dev-app-submit").onclick=async()=>{
-              const name=$("#orbit-dev-app-name").value.trim()||"ORBIT App";
-              const description=$("#orbit-dev-app-desc").value.trim();
-              const redirectUris=$("#orbit-dev-app-redirects").value.split("\n").map(x=>x.trim()).filter(Boolean);
-              try{
-                const out=await api("/api/v1/developer/applications",{method:"POST",body:JSON.stringify({name,description,redirectUris})});
-                closeModal();
-                openModal("Application created",'<p>Save the client secret now. It will not be shown again.</p><div class="developer-credential-card"><strong>Client ID</strong><code>'+escapeHtml(out.application.clientId)+'</code><strong>Client secret</strong><code>'+escapeHtml(out.clientSecret)+'</code></div><button class="primary" id="orbit-dev-app-done">I saved it</button>');
-                $("#orbit-dev-app-done").onclick=()=>{closeModal();render()};
-              }catch(err){orbitToast("Application failed",err.message,"error")}
-            };
-          };
-          document.querySelectorAll(".developer-revoke-key").forEach(btn=>btn.onclick=async()=>{
-            try{await api("/api/v1/developer/api-keys/"+encodeURIComponent(btn.dataset.keyId)+"/revoke",{method:"POST",body:"{}"});orbitToast("API key revoked","The key can no longer authenticate.","success");render()}catch(err){orbitToast("Could not revoke key",err.message,"error")}
-          });
-          document.querySelectorAll(".developer-revoke-app").forEach(btn=>btn.onclick=async()=>{
-            try{await api("/api/v1/developer/applications/"+encodeURIComponent(btn.dataset.appId)+"/revoke",{method:"POST",body:"{}"});orbitToast("Application revoked","The application credentials are now disabled.","success");render()}catch(err){orbitToast("Could not revoke app",err.message,"error")}
-          });
-        }catch(err){
-          root.innerHTML='<div class="content-card"><h4>Developer platform unavailable</h4><p>'+escapeHtml(err.message)+'</p></div>';
-        }
-      };
-      await render();
-    })();
-  }else if(section==="language"){
-    const active=localStorage.getItem("orbit_locale")||"en";
-    card.innerHTML='<h3>Language & Region</h3><p>ORBIT is prepared for English and Arabic, including RTL layout support.</p><div class="setting-row"><div><strong>Interface language</strong><span>Choose the language used by the core navigation and controls.</span></div><select id="orbit-language-select"><option value="en">English</option><option value="ar">العربية</option></select></div><div class="setting-row"><div><strong>Layout direction</strong><span>Arabic automatically mirrors the main navigation.</span></div><span class="setting-status-badge" id="orbit-direction-badge">'+(active==="ar"?"RTL":"LTR")+'</span></div><button class="primary" id="save-orbit-language">Save language</button>';
-    $("#orbit-language-select").value=active;
-    $("#save-orbit-language").onclick=async()=>{
-      const locale=$("#orbit-language-select").value;
-      applyOrbitLocale(locale);
-      try{
-        await api("/api/v1/me/preferences",{method:"PATCH",body:JSON.stringify({locale})});
-        orbitToast("Language saved",locale==="ar"?"تم حفظ العربية وتفعيل RTL.":"English is now active.","success");
-      }catch(err){orbitToast("Language saved locally",err.message,"error")}
-      renderSettingsPage("language");
-    };
+    card.innerHTML='<h3>Security center</h3><p>Current guest session and moderation visibility.</p><div class="list-card"><div class="list-row"><div class="chip">✓</div><div><strong>Guest session</strong><span>Signed session token</span></div><span>Active</span></div><div class="list-row"><div class="chip">◎</div><div><strong>Persistent storage</strong><span>PostgreSQL</span></div><span>Pending setup</span></div></div>';
   }else if(section==="advanced"){
     card.innerHTML='<h3>Advanced</h3><p>Platform owner tools and advanced Orbit controls.</p>'+setting("Command palette","Enable Ctrl+K.",true,"advanced-palette")+setting("Developer diagnostics","Expose realtime diagnostics.",false,"advanced-dev")+'<div class="setting-row owner-console-row"><div><strong>ORBIT Owner Command</strong><span>Platform-level control for users, messages, calls, communities and security. Protected by a separate owner key.</span></div><button type="button" class="primary" id="open-owner-console">Open Owner Command</button></div>';
     $("#open-owner-console").onclick=()=>{location.href="/owner.html"};
@@ -3910,10 +3532,7 @@ function openPoll(){
   openModal("Create poll",'<input id="poll-q" placeholder="Question"><input id="poll-a" placeholder="Option A"><input id="poll-b" placeholder="Option B"><input id="poll-c" placeholder="Option C (optional)"><button class="primary" id="publish-poll">Publish poll</button>');
 }
 function openEvent(){
-  if(!currentServer)return orbitToast("Create event","Select a community first.","error");
-  const min=new Date(Date.now()+10*60*1000);
-  const defaultWhen=new Date(min.getTime()-min.getTimezoneOffset()*60000).toISOString().slice(0,16);
-  openModal("Create event",'<div class="orbit-form-stack"><input id="event-title" maxlength="140" placeholder="Event title"><input id="event-time" type="datetime-local" value="'+defaultWhen+'"><select id="event-type"><option>Community</option><option>Gaming</option><option>Class</option><option>Meeting</option><option>Watch party</option><option>Voice</option><option>Video</option></select><textarea id="event-description" maxlength="800" placeholder="What is happening?"></textarea><button class="primary" id="publish-event">Create event</button></div>');
+  openModal("Create event",'<input id="event-title" placeholder="Event title"><input id="event-time" placeholder="Date & time"><select id="event-type"><option>Voice</option><option>Video</option><option>Community</option></select><textarea id="event-description" placeholder="Description"></textarea><button class="primary" id="publish-event">Create event</button>');
 }
 function openCommandPalette(){
   $("#command-palette").classList.remove("hidden");
@@ -3922,7 +3541,7 @@ function openCommandPalette(){
 function closeCommandPalette(){$("#command-palette").classList.add("hidden")}
 function renderCommandResults(q){
   const commands=[
-    ["⌂","Home","home"],["☎","Calls","calls"],["●","Live","live"],["◷","Events","events"],["◫","Projects","projects"],["□","Files","files"],["✧","ORBIT AI","ai"],["✦","Discover","discover"],["◎","Friends","friends"],["⌑","Saved","saved"],["⌖","Explore","explore"],["⚙","Settings","settings"],["⌘","Developer Portal","developer"],["+","Create server","create-server"],["#","Create channel","create-channel"],["☎","Start voice call","voice"],["▣","Start video call","video"],["↗","Share screen","share"],["⌕","Search","search"]
+    ["⌂","Home","home"],["☎","Calls","calls"],["●","Live","live"],["◷","Events","events"],["◫","Projects","projects"],["□","Files","files"],["✧","ORBIT AI","ai"],["✦","Discover","discover"],["◎","Friends","friends"],["⌑","Saved","saved"],["⌖","Explore","explore"],["⚙","Settings","settings"],["+","Create server","create-server"],["#","Create channel","create-channel"],["☎","Start voice call","voice"],["▣","Start video call","video"],["↗","Share screen","share"],["⌕","Search","search"]
   ].filter(x=>(x[1]+" "+x[2]).toLowerCase().includes(String(q||"").toLowerCase()));
   $("#command-results").innerHTML=(commands.length?commands:[["⌕","No matches",""]]).map((x,i)=>'<button class="command-item" data-command-index="'+i+'"><span class="command-icon">'+x[0]+'</span><div><strong>'+x[1]+'</strong><span>'+x[2]+'</span></div><span>↵</span></button>').join("");
   document.querySelectorAll("[data-command-index]").forEach((b,i)=>b.onclick=()=>runCommand(commands[i]));
@@ -3931,7 +3550,7 @@ function runCommand(item){
   if(!item)return;
   closeCommandPalette();
   const a=item[2];
-  if(["home","discover","dms","calls","live","events","projects","files","ai","notifications","saved","explore","settings"].includes(a))return setView(a);
+  if(["home","discover","dms","friends","calls","live","events","projects","files","ai","notifications","saved","explore","settings"].includes(a))return setView(a);
   if(a==="create-server")return $("#new-server").click();
   if(a==="create-channel")return $("#new-channel").click();
   if(a==="voice")return goChat(),startCall("voice");
@@ -4127,21 +3746,7 @@ $("#join-server")?.addEventListener("click",openJoinCommunityModal);
       const options=["#poll-a","#poll-b","#poll-c"].map(s=>$(s)?.value.trim()).filter(Boolean);
       try{const d=await api("/api/channels/"+currentChannel.id+"/polls",{method:"POST",body:JSON.stringify({question:$("#poll-q").value.trim(),options})});closeModal();orbitToast("Poll published","Vote collection is live.","success");renderPoll(d.poll)}catch(err){orbitToast("Poll failed",err.message,"error")}
     }
-    if(e.target.id==="publish-event"){
-      const title=$("#event-title")?.value.trim(),when=$("#event-time")?.value,type=$("#event-type")?.value,description=$("#event-description")?.value.trim();
-      if(!title||!when)return orbitToast("Create event","Add a title and date/time.","error");
-      if(!currentServer)return orbitToast("Create event","Select a community first.","error");
-      const btn=$("#publish-event"); if(btn){btn.disabled=true;btn.textContent="Creating…";}
-      try{
-        await api("/api/servers/"+encodeURIComponent(currentServer.id)+"/events",{method:"POST",body:JSON.stringify({title,when,type,description})});
-        closeModal();
-        orbitToast("Event created","Members can now RSVP.","success");
-        if(orbitUI.view==="events")renderEventsPage();
-      }catch(err){
-        if(btn){btn.disabled=false;btn.textContent="Create event";}
-        orbitToast("Create event failed",err.message,"error");
-      }
-    }
+    if(e.target.id==="publish-event"){closeModal();orbitToast("Event created","Event controls are ready in Explore.","success")}
   });
   document.addEventListener("keydown",e=>{
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openCommandPalette()}
@@ -4264,7 +3869,7 @@ appendMessage=function(m){
   actions.querySelector('[data-msg="react"]').onclick=async()=>{try{await api("/api/messages/"+encodeURIComponent(m.id)+"/reaction",{method:"POST",body:JSON.stringify({emoji:"👍"})})}catch(e){orbitToast("Reaction failed",e.message,"error")}};
   actions.querySelector('[data-msg="reply"]').onclick=()=>{$("#message").value="@"+m.username+" ";$("#message").focus()};
   actions.querySelector('[data-msg="thread"]').onclick=()=>openThread(el);
-  actions.querySelector('[data-msg="save"]').onclick=async()=>{try{const out=await api("/api/v1/messages/"+encodeURIComponent(m.id)+"/bookmark",{method:"POST",body:"{}"});orbitToast(out.bookmarked?"Saved":"Removed","Message bookmark updated on your account.","success");if(orbitUI.view==="saved")renderSavedPage()}catch(e){orbitToast("Save failed",e.message,"error")}};
+  actions.querySelector('[data-msg="save"]').onclick=()=>{orbitUI.saved.unshift({title:m.username,meta:"#"+(currentChannel?.name||"channel")+" · "+new Date().toLocaleString(),text:m.content});localStorage.setItem("orbit_saved",JSON.stringify(orbitUI.saved));orbitToast("Saved","Message added to Saved.","success")};
   actions.querySelector('[data-msg="more"]').onclick=()=>openMessageMore(el);
 };
 async function openThread(el){
@@ -4408,10 +4013,10 @@ closeServerSidebar();
    Direct Messages remain available as people in the Home sidebar. */
 (function hideStandaloneMessagesNav(){
   function hide(){
-    document.querySelectorAll('[data-od-social="dms"], [data-dm-nav="messages"], [data-view="dms"]:not(.aether-nav)').forEach(el=>el.remove());
+    document.querySelectorAll('[data-od-social="dms"], [data-dm-nav="messages"], [data-view="dms"]').forEach(el=>el.remove());
   }
   hide();
-  if(!window.__orbitLegacyDmHideTimer)window.__orbitLegacyDmHideTimer=setInterval(hide,2000);
+  new MutationObserver(hide).observe(document.body,{subtree:true,childList:true});
 })();
 
 
@@ -4458,11 +4063,11 @@ closeServerSidebar();
 /* Never allow the legacy standalone Messages screen/nav to remain active. */
 (function enforceHomeDmMode(){
   function scrub(){
-    document.querySelectorAll('[data-view="dms"]:not(.aether-nav),[data-od-social="dms"],[data-dm-nav="messages"]').forEach(el=>el.remove());
+    document.querySelectorAll('[data-view="dms"],[data-od-social="dms"],[data-dm-nav="messages"]').forEach(el=>el.remove());
     if(window.orbitUI && orbitUI.view==="dms") setView("home");
   }
   scrub();
-  if(!window.__orbitHomeDmScrubTimer)window.__orbitHomeDmScrubTimer=setInterval(scrub,2000);
+  new MutationObserver(scrub).observe(document.body,{subtree:true,childList:true});
 })();
 
 
