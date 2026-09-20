@@ -1,105 +1,178 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#080b10">
-<title>Orbit — Community, Chat & Calls</title>
+<meta name="theme-color" content="#05060b">
+<title>ORBIT — Aether Community OS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css?v=orbit-pro-v8-20260918">
 <link rel="stylesheet" href="/orbit-next.css?v=orbit-nexus-v9-20260918">
 <link rel="stylesheet" href="/orbit-spatial.css?v=orbit-spatial-v10-20260918-clean">
 <link rel="stylesheet" href="/orbit-desk.css?v=orbit-space-v63-20260919">
-<link rel="stylesheet" href="/orbit-adaptive.css?v=adaptive-v1-20260919">
-<link rel="stylesheet" href="/orbit-nexus.css?v=nexus-v4-20260919">
-<link rel="stylesheet" href="/orbit-core.css?v=core-v3-20260919">
+<link rel="stylesheet" href="/orbit-adaptive.css?v=adaptive-v2-20260919">
+<link rel="stylesheet" href="/orbit-nexus.css?v=nexus-v6-20260919">
+<link rel="stylesheet" href="/orbit-core.css?v=core-v6-20260919">
 <link rel="stylesheet" href="/orbit-call-fix.css?v=call-fix-v1-20260920">
 <link rel="stylesheet" href="/orbit-pro-ui.css?v=orbit-pro-ui-v4-20260920">
-<link rel="stylesheet" href="/orbit-easy-ui.css?v=orbit-easy-v1-20260920">
-<link rel="stylesheet" href="/orbit-redesign.css?v=orbit-simple-v1-20260920">
 <link rel="stylesheet" href="/orbit-platform.css?v=orbit-platform-v1-20260920">
 <link rel="stylesheet" href="/orbit-forum.css?v=orbit-forum-v1-20260920">
-<link rel="stylesheet" href="/orbit-nebula.css?v=orbit-nebula-v1-20260920">
 <link rel="stylesheet" href="/orbit-ascension.css?v=orbit-ascension-v1-20260920">
-<link rel="stylesheet" href="/orbit-interface-v3.css?v=nebula-v3-20260920">
-<link rel="stylesheet" href="/orbit-nebula-v4.css?v=nebula-v4-20260920">
+<link rel="stylesheet" href="/orbit-aether.css?v=aether-v1-20260920">
 </head>
-<body class="orbit-redesign">
-<div id="app" class="app">
-  <aside class="server-rail">
-    <div class="brand-shell"><div class="rail-logo">◈</div><span class="brand-name">ORBIT</span></div>
-    <nav class="global-nav" aria-label="Global">
-      <button class="rail-nav active" data-view="home" title="Home">⌂</button>
-      <button class="rail-nav" data-view="notifications" title="Notifications">◇</button>
-      <button class="rail-nav space-nav" data-view="space" title="Space">◈</button>
+<body class="orbit-aether">
+<div id="aether-stars" aria-hidden="true"></div>
+<div id="aether-noise" aria-hidden="true"></div>
+
+<div id="app" class="app aether-app">
+  <aside class="server-rail aether-rail">
+    <div class="aether-brand">
+      <div class="aether-logo"><span>◈</span><i></i></div>
+      <div><b>ORBIT</b><small>AETHER OS</small></div>
+    </div>
+
+    <button class="aether-command-button" id="aether-command" type="button">
+      <span class="aether-command-icon">⌕</span>
+      <span><b>Command</b><small>Search the universe</small></span>
+      <kbd>⌘K</kbd>
+    </button>
+
+    <div class="aether-rail-label">NAVIGATION</div>
+    <nav class="global-nav aether-global-nav" aria-label="Primary">
+      <button class="rail-nav aether-nav active" data-view="home" title="Home"><span class="aether-nav-glyph">⌂</span><span>Home</span><i></i></button>
+      <button class="rail-nav aether-nav" data-view="dms" title="Messages"><span class="aether-nav-glyph">✉</span><span>Messages</span><i></i></button>
+      <button class="rail-nav aether-nav" data-view="space" title="Orbit Space"><span class="aether-nav-glyph">◈</span><span>Space</span><i></i></button>
+      <button class="rail-nav aether-nav" data-view="communities" title="Communities"><span class="aether-nav-glyph">◉</span><span>Worlds</span><i></i></button>
+      <button class="rail-nav aether-nav" data-view="calls" title="Live"><span class="aether-nav-glyph">●</span><span>Live</span><i></i></button>
+      <button class="rail-nav aether-nav" data-view="discover" title="Discover"><span class="aether-nav-glyph">✦</span><span>Discover</span><i></i></button>
+      <button class="rail-nav aether-nav" data-view="events" title="Events"><span class="aether-nav-glyph">◷</span><span>Events</span><i></i></button>
+      <button class="rail-nav aether-nav" data-view="projects" title="Projects"><span class="aether-nav-glyph">◫</span><span>Projects</span><i></i></button>
+      <button class="rail-nav aether-nav" data-view="files" title="Files"><span class="aether-nav-glyph">□</span><span>Files</span><i></i></button>
+      <button class="rail-nav aether-nav" data-view="ai" title="AI"><span class="aether-nav-glyph">✧</span><span>AI</span><i></i></button>
     </nav>
-    <div class="rail-divider"></div>
-    <div id="server-list" class="server-list"></div>
-    <button id="new-server" class="rail-btn" title="Create server">+</button>
-    <button id="join-server" class="rail-btn join" title="Join server">↗</button>
+
+    <div class="aether-rail-label aether-community-label">COMMUNITIES</div>
+    <div id="server-list" class="server-list aether-server-list"></div>
+    <div class="aether-rail-actions">
+      <button id="new-server" class="rail-btn aether-square-action" title="Create server">+</button>
+      <button id="join-server" class="rail-btn join aether-square-action" title="Join server">↗</button>
+    </div>
+
+    <div class="aether-rail-footer">
+      <button id="aether-theme-btn" type="button">◌ <span>Atmosphere</span></button>
+      <button id="aether-settings-btn" type="button">⚙ <span>Settings</span></button>
+    </div>
   </aside>
 
-  <aside id="sidebar" class="sidebar">
-    <div class="workspace-head">
-      <div class="workspace-brand"><div class="workspace-avatar" id="workspace-avatar">O</div><div><strong id="workspace-name">Orbit Lobby</strong><span id="workspace-role">guest</span></div></div>
-      <button id="workspace-menu" class="icon-btn" title="Community menu">⋯</button>
+  <aside id="sidebar" class="sidebar aether-workspace-panel">
+    <div class="aether-workspace-top">
+      <div class="workspace-head aether-workspace-head">
+        <div class="workspace-brand">
+          <div class="workspace-avatar" id="workspace-avatar">O</div>
+          <div><strong id="workspace-name">Orbit Lobby</strong><span id="workspace-role">guest</span></div>
+        </div>
+        <button id="workspace-menu" class="icon-btn aether-icon-button" title="Community menu">⋯</button>
+      </div>
+
+      <div class="aether-presence">
+        <span class="aether-status-dot"></span>
+        <div><b id="aether-presence-title">Connected</b><small id="aether-presence-sub">Realtime network</small></div>
+        <strong id="aether-presence-ms">LIVE</strong>
+      </div>
+
+      <div class="sidebar-search aether-search" id="sidebar-search">
+        <span>⌕</span><input id="quick-search" placeholder="Search this space"><kbd>Ctrl K</kbd>
+      </div>
     </div>
 
-    <div class="sidebar-search" id="sidebar-search"><span>⌕</span><input id="quick-search" placeholder="Search"><kbd>Ctrl K</kbd></div>
+    <div class="aether-pane-scroll">
+      <div class="aether-section-heading"><span>CHANNEL MATRIX</span><button id="new-channel" title="Create channel">+</button></div>
+      <div class="channel-list aether-channel-list" id="channel-list"></div>
 
-    <div class="section-title"><span>CHANNELS</span><button id="new-channel" title="Create channel">+</button></div>
-    <div class="channel-list" id="channel-list"></div>
+      <div class="aether-section-heading aether-voice-heading"><span>VOICE GRID</span><button id="new-voice-channel" title="Create voice channel">+</button></div>
+      <div class="channel-list voice-list aether-channel-list" id="voice-channel-list"></div>
 
-    <div class="section-title voice-section-title"><span>VOICE</span><button id="new-voice-channel" title="Create voice channel">+</button></div>
-    <div class="channel-list voice-list" id="voice-channel-list"></div>
+      <div id="voice-dock" class="voice-dock hidden aether-voice-dock">
+        <div class="voice-dock-status"><span class="dock-dot"></span><div><strong>Live connection</strong><span id="voice-dock-name">Lounge</span></div></div>
+        <div class="voice-dock-actions"><button id="dock-mic">🎙</button><button id="dock-screen">▣</button><button id="dock-leave" class="dock-danger">×</button></div>
+      </div>
 
-    <div id="voice-dock" class="voice-dock hidden">
-      <div class="voice-dock-status"><span class="dock-dot"></span><div><strong>Voice connected</strong><span id="voice-dock-name">Lounge</span></div></div>
-      <div class="voice-dock-actions"><button id="dock-mic">🎙</button><button id="dock-screen">▣</button><button id="dock-leave" class="dock-danger">×</button></div>
+      <div class="aether-shortcuts">
+        <button type="button" id="aether-shortcut-unread"><span>✉</span><div><b>Unread</b><small>Pick up the signal</small></div><kbd>U</kbd></button>
+        <button type="button" id="aether-shortcut-people"><span>◉</span><div><b>People</b><small>See active presence</small></div><kbd>P</kbd></button>
+        <button type="button" id="aether-shortcut-space"><span>◈</span><div><b>Orbit Space</b><small>Open social graph</small></div><kbd>S</kbd></button>
+      </div>
     </div>
 
-    <div class="sidebar-bottom">
-      <button id="profile-card-btn" class="profile">
+    <div class="sidebar-bottom aether-profile-dock">
+      <button id="profile-card-btn" class="profile aether-profile">
         <div class="avatar" id="me-avatar">G</div>
         <div><strong id="me-name">Guest</strong><span id="me-status">online · guest</span></div>
         <span class="profile-spark">✦</span>
       </button>
+      <div class="aether-profile-actions"><button type="button" id="aether-profile-more">•••</button></div>
     </div>
   </aside>
 
-  <main class="content">
-    <div id="drop-overlay" class="drop-overlay hidden">
-      <div class="drop-card"><div class="drop-icon">↥</div><strong>Drop files into this channel</strong><span>Images, video, audio, PDF and common documents · up to 4.5 MB each</span></div>
+  <main class="content aether-content">
+    <div class="aether-canvas-glow" aria-hidden="true"></div>
+    <div class="aether-topline">
+      <div class="aether-context-trail">
+        <span class="aether-trail-mark">ORBIT</span><b>/</b><span id="aether-context-name">Command Center</span>
+      </div>
+      <div class="aether-top-actions">
+        <button type="button" id="aether-top-search">Search <kbd>⌘K</kbd></button>
+        <button type="button" id="aether-top-notify">◇ <span class="aether-live-badge">3</span></button>
+        <button type="button" id="aether-top-call">☎</button>
+        <button type="button" id="aether-top-ai">✧ AI</button>
+      </div>
     </div>
-    <div id="upload-overlay" class="upload-overlay hidden">
-      <div class="upload-card"><div class="upload-icon">↥</div><div class="upload-copy"><strong>Uploading <span id="upload-file-name">file</span></strong><span id="upload-progress-value">Reading…</span></div><div class="upload-progress"><i id="upload-progress-bar"></i></div></div>
+
+    <div id="drop-overlay" class="drop-overlay hidden"><div class="drop-card"><div class="drop-icon">↥</div><strong>Drop files into this channel</strong><span>Images, video, audio, PDF and common documents · up to 4.5 MB each</span></div></div>
+    <div id="upload-overlay" class="upload-overlay hidden"><div class="upload-card"><div class="upload-icon">↥</div><div class="upload-copy"><strong>Uploading <span id="upload-file-name">file</span></strong><span id="upload-progress-value">Reading…</span></div><div class="upload-progress"><i id="upload-progress-bar"></i></div></div></div>
+
+    <div class="aether-hero-strip" id="aether-hero-strip">
+      <div class="aether-hero-copy">
+        <span class="aether-eyebrow">AETHER / SOCIAL RUNTIME</span>
+        <h1>One network.<br><em>Infinite worlds.</em></h1>
+        <p>Messages, communities, live rooms, shared work and intelligence — orchestrated in one spatial interface.</p>
+        <div class="aether-hero-actions">
+          <button type="button" id="aether-hero-space">Enter Orbit Space <span>↗</span></button>
+          <button type="button" id="aether-hero-live">Open Live <span>●</span></button>
+        </div>
+      </div>
+      <div class="aether-orbit-visual" aria-hidden="true">
+        <div class="aether-orbit-plane p1"></div><div class="aether-orbit-plane p2"></div><div class="aether-orbit-plane p3"></div>
+        <div class="aether-core"></div>
+        <span class="aether-node n1"></span><span class="aether-node n2"></span><span class="aether-node n3"></span><span class="aether-node n4"></span>
+        <div class="aether-orbit-caption"><b id="aether-signal-count">—</b><span>LIVE SIGNALS</span></div>
+      </div>
     </div>
+
     <div id="global-page" class="global-page hidden">
-      <div class="page-head">
+      <div class="page-head aether-page-head">
         <div><span class="eyebrow" id="page-eyebrow">ORBIT</span><h1 id="page-title">Home</h1><p id="page-subtitle">Your communities, conversations, and live rooms in one place.</p></div>
         <div class="page-actions" id="page-actions"></div>
       </div>
       <div id="page-body" class="page-body"></div>
     </div>
 
-    <div id="chat-view" class="chat">
-      <header class="chat-head">
+    <div id="chat-view" class="chat aether-chat">
+      <header class="chat-head aether-chat-head">
         <button id="mobile-sidebar-btn" class="mobile-sidebar-btn" title="Channels" aria-label="Open channels">☰</button>
-        <div class="channel-title">
-          <span class="hash" id="channel-symbol">#</span>
+        <div class="aether-channel-identity">
+          <span class="aether-channel-glyph" id="channel-symbol">#</span>
           <div><strong id="channel-name">general</strong><span id="channel-meta">Chat</span></div>
         </div>
-        <div class="head-actions" aria-label="Channel actions">
+        <div class="aether-channel-health"><i></i><span>CHANNEL LIVE</span></div>
+        <div class="head-actions aether-head-actions" aria-label="Channel actions">
           <button id="voice-call-btn" class="head-action call-action" title="Start voice call" aria-label="Start voice call"><span>☎</span><b>Voice</b></button>
           <button id="video-call-btn" class="head-action primary-soft call-action" title="Start video call" aria-label="Start video call"><span>▣</span><b>Video</b></button>
-          <button id="quick-screen-share-btn" class="head-action screen-head-action secondary-channel-action" title="Share your screen" aria-label="Share your screen"><span>▣</span><b>Share screen</b></button>
+          <button id="quick-screen-share-btn" class="head-action screen-head-action secondary-channel-action" title="Share your screen" aria-label="Share your screen"><span>▣</span><b>Share</b></button>
           <button id="channel-more-btn" class="head-action channel-more-btn" title="More channel actions" aria-label="More channel actions">More <span>⋯</span></button>
           <div id="channel-more-menu" class="channel-more-menu hidden" role="menu">
-            <button type="button" data-action="quick-share">Share channel link</button>
-            <button type="button" data-action="invite">Invite people</button>
-            <button type="button" data-action="members">View members</button>
-            <button type="button" data-action="admin">Channel control</button>
+            <button type="button" data-action="quick-share">Share channel link</button><button type="button" data-action="invite">Invite people</button><button type="button" data-action="members">View members</button><button type="button" data-action="admin">Channel control</button>
           </div>
           <button id="quick-share-btn" class="head-action utility-hidden" aria-hidden="true" tabindex="-1">Share link</button>
           <button id="invite-btn" class="head-action utility-hidden" aria-hidden="true" tabindex="-1">Invite</button>
@@ -108,66 +181,86 @@
         </div>
       </header>
 
-      <div class="chat-body">
-        <section id="messages" class="messages">
-          <div class="empty"><div class="empty-icon">✦</div><h2>Your community is waiting.</h2><p>Start with a message. Voice, video and screen sharing are always one click away.</p></div>
-        </section>
+      <div class="aether-chat-body chat-body">
+        <div class="aether-chat-banner">
+          <span class="aether-banner-orbit">◈</span>
+          <div><b id="aether-chat-title">Welcome to the live channel</b><span>Everything here is synchronized to the ORBIT runtime.</span></div>
+          <button type="button" id="aether-chat-details">Details</button>
+        </div>
+        <section id="messages" class="messages"><div class="empty"><div class="empty-icon">✦</div><h2>Your community is waiting.</h2><p>Start with a message. Voice, video and screen sharing are always one click away.</p></div></section>
         <div id="typing" class="typing"></div>
       </div>
 
-      <form id="composer" class="composer">
-        <button type="button" id="attach" class="composer-icon" title="More tools">+</button>
-        <button type="button" id="poll-btn" class="composer-tool" title="Create poll">◫</button>
+      <form id="composer" class="composer aether-composer">
+        <div class="aether-compose-tools">
+          <button type="button" id="attach" class="composer-icon" title="More tools">+</button>
+          <button type="button" id="poll-btn" class="composer-tool" title="Create poll">◫</button>
+        </div>
         <input id="message" placeholder="Write a message..." autocomplete="off">
-        <button class="send">Send</button>
+        <div class="aether-compose-end"><span>⌘↵</span><button class="send">Send</button></div>
       </form>
     </div>
 
-    <div id="members-panel" class="members-panel hidden">
-      <div class="panel-head"><strong>Members</strong><button id="close-members">×</button></div>
-      <div class="member-tools"><input id="member-filter" placeholder="Search members"></div>
-      <div id="member-list"></div>
+    <div id="members-panel" class="members-panel hidden"><div class="panel-head"><strong>Members</strong><button id="close-members">×</button></div><div class="member-tools"><input id="member-filter" placeholder="Search members"></div><div id="member-list"></div></div>
+    <aside id="thread-panel" class="thread-panel hidden"><div class="panel-head"><div><strong>Thread</strong><span id="thread-meta">0 replies</span></div><button id="close-thread">×</button></div><div id="thread-root" class="thread-root"></div><div id="thread-messages" class="thread-messages"></div><form id="thread-composer" class="thread-composer"><input id="thread-input" placeholder="Reply in thread"><button>Send</button></form></aside>
+  </main>
+
+  <aside id="aether-inspector" class="aether-inspector">
+    <div class="aether-inspector-head">
+      <div><span>LIVE LAYER</span><b id="aether-inspector-title">Command Pulse</b></div>
+      <button type="button" id="aether-inspector-close">×</button>
     </div>
 
-    <aside id="thread-panel" class="thread-panel hidden">
-      <div class="panel-head"><div><strong>Thread</strong><span id="thread-meta">0 replies</span></div><button id="close-thread">×</button></div>
-      <div id="thread-root" class="thread-root"></div>
-      <div id="thread-messages" class="thread-messages"></div>
-      <form id="thread-composer" class="thread-composer"><input id="thread-input" placeholder="Reply in thread"><button>Send</button></form>
-    </aside>
-  </main>
+    <div class="aether-radar">
+      <div class="aether-radar-grid"></div><div class="aether-radar-sweep"></div><div class="aether-radar-core">◈</div>
+      <div class="aether-radar-label"><b id="aether-radar-number">LIVE</b><span>NETWORK PULSE</span></div>
+    </div>
+
+    <div class="aether-inspector-tabs">
+      <button class="active" data-aether-tab="overview">Overview</button>
+      <button data-aether-tab="people">People</button>
+      <button data-aether-tab="signals">Signals</button>
+      <button data-aether-tab="space">Space</button>
+    </div>
+
+    <div id="aether-inspector-body" class="aether-inspector-body">
+      <section class="aether-inspector-card">
+        <span class="aether-card-kicker">CURRENT SURFACE</span>
+        <h3 id="aether-current-surface">ORBIT / HOME</h3>
+        <p id="aether-current-description">Your live context, activity and network state appear here.</p>
+      </section>
+      <section class="aether-metric-grid">
+        <div><b id="aether-metric-people">—</b><span>People</span></div>
+        <div><b id="aether-metric-live">—</b><span>Live rooms</span></div>
+        <div><b id="aether-metric-worlds">—</b><span>Worlds</span></div>
+        <div><b id="aether-metric-dms">—</b><span>Threads</span></div>
+      </section>
+      <section class="aether-inspector-card aether-inspector-actions">
+        <button id="aether-inspect-members">Open members</button>
+        <button id="aether-inspect-video">Start video</button>
+        <button id="aether-inspect-share">Share screen</button>
+        <button id="aether-inspect-space">Open Space</button>
+      </section>
+      <section class="aether-feed-card">
+        <div class="aether-card-heading"><span>RECENT SIGNAL</span><small>LIVE</small></div>
+        <div class="aether-signal-line"><i></i><div><b id="aether-signal-title">Waiting for activity</b><span id="aether-signal-copy">Signals will surface as people interact.</span></div></div>
+        <div class="aether-signal-line"><i></i><div><b>Realtime transport</b><span>Socket channel is monitored automatically.</span></div></div>
+        <div class="aether-signal-line"><i></i><div><b>Context engine</b><span>Current surface follows your navigation.</span></div></div>
+      </section>
+    </div>
+  </aside>
 </div>
 
 <section id="call-panel" class="call-panel hidden" aria-label="Orbit call">
-  <div class="call-topbar">
-    <div class="call-room"><div class="call-live-dot"></div><div><strong id="call-title">Lounge</strong><span id="call-subtitle">Voice & video room</span></div><div class="call-duration" id="call-duration">00:00</div></div>
-    <div class="call-top-actions"><div class="live-stat" id="call-quality-indicator">CONNECTING</div><div class="live-stat muted-stat" id="call-network-indicator">NETWORK —</div><button id="minimize-call" class="glass-btn">—</button><button id="close-call" class="glass-btn danger">×</button></div>
-  </div>
-  <div id="call-stage" class="call-stage layout-grid frame-soft"></div>
-  <div id="call-toast" class="call-toast hidden"></div>
-  <div class="call-empty hidden" id="call-empty"><div class="call-empty-icon">◉</div><strong>You're the first one here</strong><span>Invite someone or share the room link.</span></div>
-  <div class="call-toolbar">
-    <div class="toolbar-left"><button id="mic-btn" class="call-btn active" title="Mute microphone">🎙</button><button id="camera-btn" class="call-btn active" title="Turn camera off">◉</button><button id="share-btn" class="call-btn share-screen-btn" title="Share screen">▣ <span class="share-label">Share screen</span></button></div>
-    <div class="toolbar-center"><button id="layout-btn" class="call-btn wide">Layout</button><button id="quality-btn" class="call-btn wide">Quality</button><button id="frames-btn" class="call-btn wide">Frame</button><button id="settings-btn" class="call-btn wide">Settings</button><button id="more-call-btn" class="call-btn wide">More</button></div>
-    <div class="toolbar-right"><button id="participants-btn" class="call-btn wide">People <span id="participant-count">1</span></button><button id="hangup-btn" class="hangup-btn">Leave</button></div>
-  </div>
-  <div id="call-popover" class="call-popover hidden"></div>
+  <div class="call-topbar"><div class="call-room"><div class="call-live-dot"></div><div><strong id="call-title">Lounge</strong><span id="call-subtitle">Voice & video room</span></div><div class="call-duration" id="call-duration">00:00</div></div><div class="call-top-actions"><div class="live-stat" id="call-quality-indicator">CONNECTING</div><div class="live-stat muted-stat" id="call-network-indicator">NETWORK —</div><button id="minimize-call" class="glass-btn">—</button><button id="close-call" class="glass-btn danger">×</button></div></div>
+  <div id="call-stage" class="call-stage layout-grid frame-soft"></div><div id="call-toast" class="call-toast hidden"></div><div class="call-empty hidden" id="call-empty"><div class="call-empty-icon">◉</div><strong>You're the first one here</strong><span>Invite someone or share the room link.</span></div>
+  <div class="call-toolbar"><div class="toolbar-left"><button id="mic-btn" class="call-btn active">🎙</button><button id="camera-btn" class="call-btn active">◉</button><button id="share-btn" class="call-btn share-screen-btn">▣ <span class="share-label">Share screen</span></button></div><div class="toolbar-center"><button id="layout-btn" class="call-btn wide">Layout</button><button id="quality-btn" class="call-btn wide">Quality</button><button id="frames-btn" class="call-btn wide">Frame</button><button id="settings-btn" class="call-btn wide">Settings</button><button id="more-call-btn" class="call-btn wide">More</button></div><div class="toolbar-right"><button id="participants-btn" class="call-btn wide">People <span id="participant-count">1</span></button><button id="hangup-btn" class="hangup-btn">Leave</button></div></div><div id="call-popover" class="call-popover hidden"></div>
 </section>
 
 <div id="incoming-call" class="incoming-call hidden"><div class="incoming-avatar" id="incoming-avatar">G</div><div class="incoming-copy"><strong id="incoming-title">Incoming call</strong><span id="incoming-subtitle">Someone is calling</span></div><div class="incoming-actions"><button id="incoming-accept">Accept</button><button id="incoming-decline">Decline</button></div></div>
-
 <div id="context-menu" class="context-menu hidden"></div>
-
-<div id="command-palette" class="command-palette hidden">
-  <div class="command-card">
-    <div class="command-search"><span>⌕</span><input id="command-input" placeholder="Search commands, pages, channels..."><kbd>ESC</kbd></div>
-    <div id="command-results" class="command-results"></div>
-    <div class="command-footer"><span>Navigate</span><span>Enter to open</span><span>Ctrl K</span></div>
-  </div>
-</div>
-
+<div id="command-palette" class="command-palette hidden"><div class="command-card"><div class="command-search"><span>⌕</span><input id="command-input" placeholder="Search commands, pages, channels..."><kbd>ESC</kbd></div><div id="command-results" class="command-results"></div><div class="command-footer"><span>Navigate</span><span>Enter to open</span><span>Ctrl K</span></div></div></div>
 <div id="toast-stack" class="toast-stack"></div>
-
 <div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><div><strong id="modal-title"></strong><span id="modal-subtitle"></span></div><button id="modal-close">×</button></div><div id="modal-body"></div></div></div>
 
 <script src="/socket.io/socket.io.js?v=4.8"></script>
@@ -176,12 +269,8 @@
 <script src="/orbit-adaptive.js?v=adaptive-v2-20260919"></script>
 <script src="/orbit-nexus.js?v=nexus-v6-20260919"></script>
 <script src="/orbit-core.js?v=core-v6-20260919"></script>
-<a href="/store.html" class="orbit-store-launch" aria-label="Open ORBIT Store">STORE <span>↗</span></a>
-<style>.orbit-store-launch{position:fixed;right:20px;bottom:20px;z-index:99999;padding:11px 14px;border:1px solid rgba(139,233,255,.22);border-radius:999px;background:rgba(8,12,20,.82);backdrop-filter:blur(16px);color:#eefaff;text-decoration:none;font:800 10px/1 Inter,system-ui;letter-spacing:.16em;box-shadow:0 12px 35px rgba(0,0,0,.28)}.orbit-store-launch span{color:#8be9ff;margin-left:5px}</style>
 <script src="/orbit-call-fix.js?v=call-fix-v1-20260920"></script>
 <script src="/orbit-ui-v2.js?v=orbit-ui-v2-20260920"></script>
-<script src="/orbit-ascension.js?v=orbit-ascension-v1-20260920"></script>
-<script src="/orbit-interface-v3.js?v=nebula-v3-20260920"></script>
-<script src="/orbit-nebula-v4.js?v=nebula-v4-20260920"></script>
+<script src="/orbit-aether.js?v=aether-v1-20260920"></script>
 </body>
 </html>
