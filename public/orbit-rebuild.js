@@ -224,7 +224,7 @@
         if(sender)await sender.replaceTrack(track);
         await makeOffer(id);
       }
-      const self=document.querySelector('.tile[data-peer="self"] video"); if(self){self.srcObject=ds;self.muted=true;self.play().catch(()=>{})}
+      const self=document.querySelector('.tile[data-peer="self"] video'); if(self){self.srcObject=ds;self.muted=true;self.play().catch(()=>{})}
       track.onended=()=>{if(S.call?.screen===track){S.call.screen=null;syncCall()}}
       syncCall();
       const payload=S.call.scope==="dm"?{callId:S.call.callId,dmId:S.call.dmId}:{channelId:S.call.roomId};
