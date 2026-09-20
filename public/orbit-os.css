@@ -68,11 +68,53 @@ body.orbit-aether .nav-item.active{
   background:linear-gradient(100deg,rgba(100,114,255,.17),rgba(52,211,232,.035))!important;border-color:rgba(121,139,230,.14)!important;
   color:#f0f4ff!important;box-shadow:inset 0 1px rgba(255,255,255,.025),0 10px 24px rgba(31,42,93,.16)!important;
 }
+body.orbit-aether .nav-item.active{position:relative!important}
+body.orbit-aether .nav-item.active::before{
+  content:""!important;position:absolute!important;left:-5px!important;top:9px!important;bottom:9px!important;width:2px!important;
+  border-radius:999px!important;background:linear-gradient(180deg,#8c95ff,#4fdae4)!important;box-shadow:0 0 12px rgba(106,126,255,.55)!important;
+}
 body.orbit-aether .nav-item.active .ico{color:#aeb7ff!important}
 body.orbit-aether .nav-item em{margin-left:auto;font-style:normal;font-size:7px;min-width:16px;height:16px;display:grid;place-items:center;border-radius:6px;background:rgba(116,132,255,.18);color:#afb7ff}
 body.orbit-aether .nav-item em.hot{background:rgba(255,93,122,.17);color:#ff9cb4}
 body.orbit-aether .live-dot{margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--os-good);box-shadow:0 0 14px rgba(88,228,165,.6)}
 body.orbit-aether .ai-badge{margin-left:auto;font:800 6px/1 ui-monospace,monospace!important;color:#80e5ec!important;letter-spacing:.12em!important}
+body.orbit-aether .rail-subsection-head{
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  margin:12px 4px 7px!important;color:#52607a!important;
+  font:800 6px/1 ui-monospace,monospace!important;letter-spacing:.15em!important;
+}
+body.orbit-aether .rail-subsection-head i{
+  font-style:normal!important;font:800 5px/1 ui-monospace,monospace!important;letter-spacing:.08em!important;
+  color:#62dfb3!important;padding:3px 5px!important;border:1px solid rgba(88,228,165,.16)!important;
+  border-radius:999px!important;background:rgba(88,228,165,.05)!important;
+}
+body.orbit-aether .aether-server-list{
+  display:flex!important;flex-direction:column!important;align-items:center!important;gap:6px!important;
+  max-height:172px!important;overflow:auto!important;padding:1px 2px 2px!important;scrollbar-width:none!important;
+}
+body.orbit-aether .aether-server-list::-webkit-scrollbar{display:none!important}
+body.orbit-aether .aether-server-list .server-item{
+  position:relative!important;width:46px!important;height:39px!important;min-height:39px!important;flex:0 0 39px!important;
+  display:grid!important;place-items:center!important;padding:0!important;border:1px solid rgba(128,148,214,.09)!important;
+  border-radius:12px!important;background:linear-gradient(145deg,rgba(18,28,47,.88),rgba(7,13,23,.96))!important;
+  color:#8996b1!important;font:800 8px/1 "Space Grotesk",sans-serif!important;letter-spacing:.04em!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.025),0 8px 18px rgba(0,0,0,.16)!important;
+  cursor:pointer!important;transition:transform .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease!important;
+}
+body.orbit-aether .aether-server-list .server-item:hover{
+  transform:translateY(-1px) scale(1.035)!important;color:#eef3ff!important;
+  border-color:rgba(124,143,236,.26)!important;background:linear-gradient(145deg,rgba(31,42,71,.98),rgba(8,14,25,.98))!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.04),0 12px 24px rgba(50,67,145,.19)!important;
+}
+body.orbit-aether .aether-server-list .server-item.active{
+  color:#fff!important;border-color:rgba(126,143,245,.42)!important;
+  background:linear-gradient(145deg,rgba(108,121,255,.27),rgba(34,189,213,.08))!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.08),0 0 0 1px rgba(91,108,229,.10),0 12px 28px rgba(69,84,195,.24)!important;
+}
+body.orbit-aether .aether-server-list .server-item.active::before{
+  content:""!important;position:absolute!important;left:-5px!important;top:9px!important;width:2px!important;height:21px!important;
+  border-radius:999px!important;background:linear-gradient(180deg,#929bff,#4fe0e5)!important;box-shadow:0 0 12px rgba(105,130,255,.6)!important;
+}
 body.orbit-aether .rail-spacer{flex:1 1 auto!important;min-height:8px!important}
 body.orbit-aether .mini-card{
   display:flex!important;align-items:center!important;gap:8px!important;padding:9px!important;margin-top:10px!important;
@@ -245,7 +287,15 @@ body.orbit-aether .command-grid button:hover{background:rgba(103,118,235,.09)!im
     position:fixed!important;left:8px!important;right:8px!important;bottom:8px!important;top:auto!important;height:58px!important;z-index:600!important;
     flex-direction:row!important;align-items:center!important;border-radius:18px!important;padding:6px 8px!important;
   }
-  body.orbit-aether .rail .brand,.rail .global-search,.rail .rail-section-label,.rail .rail-spacer,.rail .mini-card,.rail .aether-rail-mini-actions,.rail .profile-chip{display:none!important}
+  body.orbit-aether .rail .brand,
+body.orbit-aether .rail .global-search,
+body.orbit-aether .rail .rail-section-label,
+body.orbit-aether .rail .rail-subsection-head,
+body.orbit-aether .rail .aether-server-list,
+body.orbit-aether .rail .rail-spacer,
+body.orbit-aether .rail .mini-card,
+body.orbit-aether .rail .aether-rail-mini-actions,
+body.orbit-aether .rail .profile-chip{display:none!important}
   body.orbit-aether #mainNav{flex-direction:row!important;width:max-content!important;overflow:auto!important;gap:4px!important}
   body.orbit-aether .nav-item{width:45px!important;height:45px!important;min-height:45px!important;padding:0!important;justify-content:center!important}
   body.orbit-aether .nav-item>span:nth-child(2),body.orbit-aether .nav-item>em,body.orbit-aether .nav-item>.live-dot,body.orbit-aether .nav-item>.ai-badge{display:none!important}
@@ -253,6 +303,10 @@ body.orbit-aether .command-grid button:hover{background:rgba(103,118,235,.09)!im
   body.orbit-aether .main{height:calc(100dvh - 14px)!important;border-radius:21px!important}
   body.orbit-aether .context-panel{position:fixed!important;z-index:500!important;left:7px!important;top:7px!important;bottom:7px!important;width:290px!important;transform:translateX(-110%)!important;transition:transform .2s ease!important}
   body.orbit-aether #app.server-sidebar-open #sidebar,body.orbit-aether #sidebar.open{transform:translateX(0)!important}
+body.orbit-aether .aether-server-list .server-item:focus-visible,
+body.orbit-aether .nav-item:focus-visible{
+  outline:2px solid rgba(115,211,231,.72)!important;outline-offset:1px!important;
+}
   body.orbit-aether .topbar{padding:0 10px!important}
   body.orbit-aether .top-btn{display:none!important}
   body.orbit-aether .top-actions{gap:4px!important}
