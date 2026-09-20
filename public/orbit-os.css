@@ -258,3 +258,14 @@ body.orbit-aether .command-grid button:hover{background:rgba(103,118,235,.09)!im
   body.orbit-aether .top-actions{gap:4px!important}
   body.orbit-aether #chat-view,.aether-hero-strip,#global-page{margin:7px!important}
 }
+
+body.orbit-aether #app.os-context-collapsed{grid-template-columns:82px minmax(0,1fr) 326px!important}
+body.orbit-aether #app.os-context-collapsed #sidebar{width:0!important;min-width:0!important;opacity:0!important;pointer-events:none!important;overflow:hidden!important;border-color:transparent!important}
+body.orbit-aether #app.os-context-collapsed .right-panel{grid-column:3}
+body.orbit-aether #app.os-right-collapsed{grid-template-columns:82px 292px minmax(0,1fr) 0!important}
+body.orbit-aether #app.os-right-collapsed .right-panel{width:0!important;min-width:0!important;opacity:0!important;pointer-events:none!important;overflow:hidden!important;border-color:transparent!important}
+body.orbit-aether #app.os-context-collapsed.os-right-collapsed{grid-template-columns:82px minmax(0,1fr)!important}
+body.orbit-aether #app.os-context-collapsed.os-right-collapsed .right-panel{display:none!important}
+@media(max-width:1280px){
+  body.orbit-aether #app.os-right-collapsed{grid-template-columns:72px 250px minmax(0,1fr)!important}
+}
