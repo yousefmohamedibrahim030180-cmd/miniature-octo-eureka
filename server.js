@@ -1084,7 +1084,7 @@ app.post("/api/v1/uploads/presign", authV1, async (req,res)=>{
       contentType:req.body?.contentType,
       size:req.body?.size
     },req.user.id);
-    res.status(201).json({upload:{...result,completeEndpoint:"/api/v1/uploads/complete"}});
+    res.status(201).json({upload:result});
   }catch(error){
     res.status(400).json({error:error.message});
   }
