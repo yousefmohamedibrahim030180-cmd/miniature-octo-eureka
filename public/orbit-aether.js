@@ -56,7 +56,7 @@
     for(let i=0;i<55;i++){const s=document.createElement("i");s.style.left=(Math.random()*100)+"%";s.style.top=(Math.random()*100)+"%";s.style.animationDelay=(-Math.random()*6)+"s";s.style.animationDuration=(4+Math.random()*7)+"s";root.appendChild(s)}
   }
   function boot(){
-    stars();wire();sync();setInterval(sync,1800);
+    stars();wire();bindRescue();sync();setInterval(sync,1800);
     const ob=new MutationObserver(()=>sync());ob.observe($("#app")||document.body,{subtree:true,childList:true});
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});else boot();
