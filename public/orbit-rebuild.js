@@ -46,6 +46,10 @@
 
   function renderContext(){
     const c=$("#ctx-body");
+    if(!S.server){
+      c.innerHTML='<div class="ctx-section"><div class="workspace">' + avatar({username:"O",display_name:"ORBIT"}) + '<div><strong>Home</strong><small>Select a server to open its workspace.</small></div></div></div>';
+      return;
+    }
     if(S.view==="messages"){renderDMContext(c);return}
     c.innerHTML='<div class="ctx-section"><div class="ctx-row"><span>WORKSPACE</span><button id="create-server">+</button></div><div class="workspace">'+avatar(S.server||{username:"O"})+'<div><strong>'+esc(S.server?.name||"Choose a community")+'</strong><small>'+esc(S.server?.role||"No workspace")+'</small></div></div></div>'+
       '<div class="ctx-section"><input class="ctx-input" id="ctx-filter" placeholder="Search channels"></div>'+
@@ -154,7 +158,7 @@
   function openSearch(){openModal("Search ORBIT",'<input class="input" id="search-input" placeholder="Search users, channels and content"><div id="search-out" style="margin-top:10px"></div>');$("#search-input").oninput=async e=>{const q=e.target.value.trim(),out=$("#search-out");if(!q){out.innerHTML="";return}try{const d=await api("/api/search?q="+encodeURIComponent(q));out.innerHTML=(d.results||d.hits||d.users||[]).map(x=>'<div class="row"><span class="row-main"><strong>'+esc(x.username||x.name||x.title||"Result")+'</strong><span>'+esc(x.content||x.preview||"Orbit result")+'</span></span></div>').join("")||'<span class="muted" style="font-size:8px">No results.</span>'}catch(x){out.innerHTML='<span class="muted" style="font-size:8px">'+esc(x.message)+'</span>'}};$("#search-input").focus()}
   function openCommand(){openModal("Command center",'<div class="list">'+NAV.concat([["friends","◎","Friends"],["notifications","♢","Notifications"]]).map(n=>'<button class="row" data-command="'+n[0]+'"><span class="row-main"><strong>'+n[1]+" "+n[2]+'</strong><span>Open surface</span></span></button>').join("")+"</div>");$$("[data-command]").forEach(b=>b.onclick=()=>{closeModal();setView(b.dataset.command)})}
 
-  async function loadServers(){const d=await api("/api/servers");S.servers=d.servers||[];if(!S.server&&S.servers[0])await selectServer(S.servers[0].id,false)}
+  async function loadServers(){const d=await api("/api/servers");S.servers=d.servers||[]}
   async function selectServer(id){const s=S.servers.find(x=>String(x.id)===String(id));if(!s)return;S.server=s;const d=await api("/api/servers/"+encodeURIComponent(s.id)+"/channels");S.channels=d.channels||[];S.channel=S.channels.find(c=>c.type==="text")||S.channels[0]||null;renderContext()}
   async function loadDMs(){try{const d=await api("/api/dms");S.dms=d.dms||[];chrome()}catch{}}
   async function loadNotifications(){try{const d=await api("/api/notifications");S.notifications=d.notifications||[];chrome()}catch{}}
