@@ -4383,7 +4383,7 @@ closeServerSidebar();
    Direct Messages remain available as people in the Home sidebar. */
 (function hideStandaloneMessagesNav(){
   function hide(){
-    document.querySelectorAll('[data-od-social="dms"], [data-dm-nav="messages"], [data-view="dms"]').forEach(el=>el.remove());
+    document.querySelectorAll('[data-od-social="dms"], [data-dm-nav="messages"], [data-view="dms"]:not(.aether-nav)').forEach(el=>el.remove());
   }
   hide();
   new MutationObserver(hide).observe(document.body,{subtree:true,childList:true});
@@ -4433,7 +4433,7 @@ closeServerSidebar();
 /* Never allow the legacy standalone Messages screen/nav to remain active. */
 (function enforceHomeDmMode(){
   function scrub(){
-    document.querySelectorAll('[data-view="dms"],[data-od-social="dms"],[data-dm-nav="messages"]').forEach(el=>el.remove());
+    document.querySelectorAll('[data-view="dms"]:not(.aether-nav),[data-od-social="dms"],[data-dm-nav="messages"]').forEach(el=>el.remove());
     if(window.orbitUI && orbitUI.view==="dms") setView("home");
   }
   scrub();
