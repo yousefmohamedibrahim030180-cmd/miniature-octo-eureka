@@ -107,7 +107,7 @@
     renderHomeDMs();loadPeople()
   }
   function renderHomeDMs(){const r=$("#home-dm-list");if(!r)return;r.innerHTML=S.dms.slice(0,5).map(d=>'<button class="row" data-home-dm="'+esc(d.id)+'">'+avatar(d.otherUser||{})+'<span class="row-main"><strong>'+esc(d.otherUser?.display_name||d.otherUser?.username||"Conversation")+'</strong><span>'+esc(d.lastMessage?.content||"No messages yet")+'</span></span></button>').join("")||'<span class="muted" style="font-size:8px;padding:10px">No direct messages yet.</span>';$$("[data-home-dm]").forEach(b=>b.onclick=()=>openDM(b.dataset.homeDm))}
-  async function loadPeople(){try{const d=await api("/api/pulse"),r=$("#home-people");if(r)r.innerHTML=(d.users||[]).filter(u=>u.status!=="offline").slice(0,6).map(u=>row(u)).join("")||'<span class="muted" style="font-size:8px;padding:10px">No active people.</span>}catch{}}
+  async function loadPeople(){try{const d=await api("/api/pulse"),r=$("#home-people");if(r)r.innerHTML=(d.users||[]).filter(u=>u.status!=="offline").slice(0,6).map(u=>row(u)).join("")||'<span class="muted" style="font-size:8px;padding:10px">No active people.</span>'}catch{}}
 
   async function renderChannel(root){
     if(!S.channel){root.innerHTML=empty("Choose a channel","Select a community channel.");return}
