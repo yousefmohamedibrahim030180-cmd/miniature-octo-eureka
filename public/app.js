@@ -1,8 +1,8 @@
 const $ = s => document.querySelector(s);
 
 const ORBIT_LOCALES={
-  en:{dir:"ltr",name:"English",search:"Search",channels:"CHANNELS",voice:"VOICE",write:"Write a message...",send:"Send",chat:"Chat",more:"More",discover:"Discover",friends:"Friends",notifications:"Notifications",settings:"Settings",home:"Home",security:"Security",language:"Language"},
-  ar:{dir:"rtl",name:"العربية",search:"بحث",channels:"القنوات",voice:"الصوت",write:"اكتب رسالة...",send:"إرسال",chat:"الدردشة",more:"المزيد",discover:"استكشاف",friends:"الأصدقاء",notifications:"الإشعارات",settings:"الإعدادات",home:"الرئيسية",security:"الأمان",language:"اللغة"}
+  en:{dir:"ltr",name:"English",search:"Search",channels:"CHANNELS",voice:"VOICE",write:"Write a message...",send:"Send",chat:"Chat",more:"More",discover:"Discover",notifications:"Notifications",settings:"Settings",home:"Home",security:"Security",language:"Language"},
+  ar:{dir:"rtl",name:"العربية",search:"بحث",channels:"القنوات",voice:"الصوت",write:"اكتب رسالة...",send:"إرسال",chat:"الدردشة",more:"المزيد",discover:"استكشاف",notifications:"الإشعارات",settings:"الإعدادات",home:"الرئيسية",security:"الأمان",language:"اللغة"}
 };
 function applyOrbitLocale(locale){
   const key=ORBIT_LOCALES[locale]?locale:"en";
@@ -19,7 +19,7 @@ function applyOrbitLocale(locale){
   const sectionTitles=document.querySelectorAll(".section-title span");
   if(sectionTitles[0])sectionTitles[0].textContent=t.channels;
   if(sectionTitles[1])sectionTitles[1].textContent=t.voice;
-  const navMap={home:t.home,discover:t.discover,friends:t.friends,notifications:t.notifications,settings:t.settings};
+  const navMap={home:t.home,discover:t.discover,notifications:t.notifications,settings:t.settings};
   document.querySelectorAll(".global-nav .rail-nav").forEach(btn=>{if(navMap[btn.dataset.view])btn.title=navMap[btn.dataset.view]});
   return key;
 }
@@ -1765,7 +1765,6 @@ function renderPage(view) {
     "server-home":["SERVER / HOME",currentServer?.name||"Server Home","Your community command center, members, roles, and channels."],
     discover:["DISCOVER","Discover communities","Explore spaces, categories, and new conversations."],
     dms:["DIRECT MESSAGES","Messages","Private conversations, groups, and recent contacts."],
-    friends:["SOCIAL GRAPH","Friends","Online people, requests, suggestions, and connections."],
     notifications:["INBOX","Notifications","Mentions, replies, calls, requests, and system events."],
     saved:["LIBRARY","Saved","Messages and media you deliberately kept."],
     explore:["EXPLORE","Explore","Events, polls, files, media, and community activity."],
@@ -1788,7 +1787,6 @@ function renderPage(view) {
   if(view==="communities")renderCommunitiesPage();
   if(view==="discover")renderDiscoverPage();
   if(view==="dms")renderHomePage();
-  if(view==="friends")renderFriendsPage();
   if(view==="calls")renderCallsPage();
   if(view==="live")renderLivePage();
   if(view==="events")renderEventsPage();
@@ -1812,7 +1810,7 @@ function setView(view){
     $("#sidebar")?.classList.remove("open");
     document.body.classList.remove("mobile-sidebar-open");
   }
-  const globalViews=["space","home","server-home","communities","discover","dms","friends","calls","live","events","projects","files","ai","notifications","saved","explore","settings"];
+  const globalViews=["space","home","server-home","communities","discover","dms","calls","live","events","projects","files","ai","notifications","saved","explore","settings"];
   if(globalViews.includes(view)){
     global.classList.remove("hidden");
     chat.classList.add("hidden");
@@ -3440,7 +3438,7 @@ function renderSpacePage(){
         '<section class="space-panel"><header><span>LIVE ROOMS</span><b>'+calls.length+'</b></header><div class="space-call-list">'+(calls.length?calls.map(c=>'<button data-space-action="calls"><span class="call-wave">◉</span><div><strong>'+escapeHtml(c.channelName||"Live room")+'</strong><small>'+escapeHtml(c.mode||"voice")+' · '+((c.participants||[]).length||1)+' people</small></div><b>JOIN</b></button>').join(""):'<span class="space-empty">No live rooms right now.</span>')+'</div></section>'+
       '</div>'+
     '</div>';
-  body.querySelectorAll("[data-space-action]").forEach(el=>el.onclick=()=>{const a=el.dataset.spaceAction;if(a==="home"){setView("home");return}if(a==="friends"){setView("friends");return}if(a==="calls"){setView("calls");return}if(a==="discover"){setView("discover")}});
+  body.querySelectorAll("[data-space-action]").forEach(el=>el.onclick=()=>{const a=el.dataset.spaceAction;if(a==="home"){setView("home");return}if(a==="calls"){setView("calls");return}if(a==="discover"){setView("discover")}});
   body.querySelectorAll("[data-space-server]").forEach(el=>el.onclick=async()=>{const sv=servers.find(x=>String(x.id)===String(el.dataset.spaceServer));if(sv){await selectServer(sv);setView("server-home")}});
 }
 
@@ -3909,7 +3907,7 @@ function runCommand(item){
   closeCommandPalette();
   const a=item[2];
   if(a==="developer"){setView("settings");return renderSettingsPage("developer")}
-  if(["home","discover","dms","friends","calls","live","events","projects","files","ai","notifications","saved","explore","settings"].includes(a))return setView(a);
+  if(["home","discover","dms","calls","live","events","projects","files","ai","notifications","saved","explore","settings"].includes(a))return setView(a);
   if(a==="create-server")return $("#new-server").click();
   if(a==="create-channel")return $("#new-channel").click();
   if(a==="voice")return goChat(),startCall("voice");
