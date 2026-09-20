@@ -19,8 +19,9 @@
   async function api(url,o={}){
     const h={...(o.headers||{})}; if(S.token)h.Authorization="Bearer "+S.token;
     if(o.body&&!h["Content-Type"])h["Content-Type"]="application/json";
-    const r=await fetch(url,{...o,headers:h,cache:"no-store"}),d=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(d.error||"Request failed"); return d;
+    const r=await fetch(url,{...o,headers:h,credentials:"same-origin",cache:"no-store"}),d=await r.json().catch(()=>({}));
+    if(!r.ok){const e=new Error(d.error||"Request failed");e.status=r.status;throw e}
+    return d;
   }
   function toast(t,b="",kind=""){const n=document.createElement("div");n.className="toast";n.innerHTML="<strong>"+esc(t)+"</strong>"+(b?"<span>"+esc(b)+"</span>":"");$("#toast-stack").appendChild(n);setTimeout(()=>n.remove(),4000)}
   function saveAuth(d){S.token=d.token||"";S.user=d.user||null;persistToken(S.token)}
@@ -266,15 +267,50 @@
 
   function authScreen(mode){$("#boot").innerHTML='<div class="modal-bg"><div class="modal"><div class="modal-body"><span class="eyebrow">ORBIT</span><h1 style="font:700 28px Space Grotesk">Secure access</h1><p class="muted" style="font-size:9px">New frontend. Existing community and realtime backend.</p><div class="actions"><button class="btn '+(mode==="signin"?"primary":"")+'" id="signin-mode">Sign in</button><button class="btn '+(mode==="register"?"primary":"")+'" id="register-mode">Create account</button></div><form id="auth" class="form" style="margin-top:14px"><label>Username<input class="input" id="auth-user" required></label>'+(mode==="register"?'<label>Display name<input class="input" id="auth-display"></label>':"")+'<label>Password<input class="input" id="auth-pass" type="password" minlength="8" required></label><button class="btn primary">Continue</button><span id="auth-error" class="muted" style="font-size:8px"></span></form></div></div></div>';$("#signin-mode").onclick=()=>authScreen("signin");$("#register-mode").onclick=()=>authScreen("register");$("#auth").onsubmit=async e=>{e.preventDefault();try{const body={username:$("#auth-user").value,password:$("#auth-pass").value};if(mode==="register")body.displayName=$("#auth-display").value;const d=await api(mode==="register"?"/api/auth/register":"/api/auth/login",{method:"POST",body:JSON.stringify(body)});saveAuth(d);boot()}catch(x){$("#auth-error").textContent=x.message}}}
   let booting=false;
+  const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  function sessionErrorScreen(message){
+    $("#boot").innerHTML='<div class="modal-bg"><div class="modal"><div class="modal-body"><span class="eyebrow">ORBIT SESSION</span><h1 style="font:700 28px Space Grotesk">Connection interrupted</h1><p class="muted" style="font-size:9px">'+esc(message||"ORBIT could not verify your session right now.")+'</p><div class="actions"><button class="btn primary" id="session-retry">Retry session</button><button class="btn" id="session-signin">Sign in again</button></div></div></div></div>';
+    $("#session-retry").onclick=boot;
+    $("#session-signin").onclick=()=>{clearStoredToken();S.token="";authScreen("signin")};
+  }
+  async function verifySession(){
+    let last=null;
+    for(let attempt=0;attempt<3;attempt++){
+      try{
+        return await api("/api/me");
+      }catch(e){
+        last=e;
+        if(e.status===401 && S.token){
+          clearStoredToken();
+          S.token="";
+          try{return await api("/api/me")}catch(retryError){last=retryError}
+        }
+        if(last?.status===401) throw last;
+        if(attempt<2) await wait(700*(attempt+1));
+      }
+    }
+    throw last||new Error("Session verification failed");
+  }
   async function boot(){
     if(booting)return;
     booting=true;
     try{
-      const d=await api("/api/me");
+      let d;
+      try{d=await verifySession()}catch(e){
+        if(e.status===401){
+          clearStoredToken();
+          S.token="";
+          authScreen("signin");
+          return;
+        }
+        sessionErrorScreen("ORBIT could not reach the session service. Your login has been preserved.");
+        return;
+      }
       if(!d?.user?.account){
         clearStoredToken();
         S.token="";
-        return authScreen("signin");
+        authScreen("signin");
+        return;
       }
       S.user=d.user;
       $("#boot").innerHTML="";
@@ -289,14 +325,8 @@
       renderNav();
       chrome();
       if(S.view==="home")renderHome($("#surface"));
-    }catch(e){
-      clearStoredToken();
-      S.token="";
-      authScreen("signin");
-      return;
     }finally{
       booting=false;
     }
-  }
-  bind(); if(S.token)boot(); else authScreen("signin");
+  }  bind(); boot();
 })();
