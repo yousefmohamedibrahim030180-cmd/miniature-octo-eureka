@@ -1,0 +1,271 @@
+/* ORBIT SOCIAL OS — unified shell, premium desktop geometry */
+:root{
+  --os-bg:#05080f;--os-panel:#0a101b;--os-panel-2:#0d1522;--os-line:rgba(139,160,220,.12);
+  --os-line-strong:rgba(139,160,220,.22);--os-text:#eef3ff;--os-muted:#8390aa;--os-faint:#536079;
+  --os-accent:#7c86ff;--os-cyan:#48d6e9;--os-good:#58e4a5;--os-shadow:0 28px 80px rgba(0,0,0,.34);
+}
+body.orbit-aether{
+  margin:0!important;overflow:hidden!important;background:
+    radial-gradient(circle at 40% 0%,rgba(112,126,255,.08),transparent 28%),
+    radial-gradient(circle at 100% 72%,rgba(52,210,232,.045),transparent 25%),var(--os-bg)!important;
+  color:var(--os-text);
+}
+body.orbit-aether #aether-stars{opacity:.2!important}
+body.orbit-aether .app-shell{
+  display:grid!important;grid-template-columns:82px 292px minmax(0,1fr) 326px!important;
+  gap:9px!important;padding:9px!important;width:100vw!important;height:100vh!important;
+  min-width:0!important;min-height:0!important;box-sizing:border-box!important;
+}
+body.orbit-aether .app-shell>*{
+  min-width:0!important;min-height:0!important;
+}
+body.orbit-aether .app-shell .rail,
+body.orbit-aether .app-shell .context-panel,
+body.orbit-aether .app-shell .main,
+body.orbit-aether .app-shell .right-panel{
+  position:relative!important;overflow:hidden!important;
+  border:1px solid var(--os-line)!important;
+  background:linear-gradient(180deg,rgba(11,18,30,.97),rgba(4,9,16,.99))!important;
+  border-radius:24px!important;box-shadow:var(--os-shadow),inset 0 1px rgba(255,255,255,.03)!important;
+}
+body.orbit-aether .rail{
+  display:flex!important;flex-direction:column!important;padding:14px!important;
+}
+body.orbit-aether .brand{
+  display:flex!important;align-items:center!important;gap:10px!important;height:48px!important;padding:2px 4px 10px!important;
+}
+body.orbit-aether .brand-mark{
+  width:38px!important;height:38px!important;border-radius:13px!important;display:grid!important;place-items:center!important;
+  background:radial-gradient(circle at 30% 20%,rgba(255,255,255,.22),transparent 20%),linear-gradient(145deg,#7884ff,#36cadb)!important;
+  border:1px solid rgba(255,255,255,.18)!important;box-shadow:0 12px 28px rgba(83,94,226,.22)!important;
+  color:#fff!important;font:800 17px/1 "Space Grotesk",sans-serif!important;
+}
+body.orbit-aether .brand strong{display:block;font:800 13px/1 "Space Grotesk",sans-serif!important;letter-spacing:.08em!important}
+body.orbit-aether .brand span{display:block;margin-top:4px;color:var(--os-faint)!important;font:700 7px/1 ui-monospace,monospace!important;letter-spacing:.18em!important;text-transform:uppercase!important}
+body.orbit-aether .global-search{
+  width:100%!important;height:40px!important;padding:0 9px!important;border:1px solid var(--os-line)!important;border-radius:12px!important;
+  display:flex!important;align-items:center!important;gap:8px!important;background:rgba(5,10,18,.72)!important;color:var(--os-muted)!important;cursor:pointer!important;text-align:left!important;
+}
+body.orbit-aether .global-search>span:first-child{font-size:17px!important;color:#a8b2cc!important}
+body.orbit-aether .global-search b{display:block;color:#b9c3da!important;font-size:9px!important}
+body.orbit-aether .global-search small{display:block;margin-top:2px;color:#586681!important;font-size:7px!important}
+body.orbit-aether .global-search kbd{margin-left:auto!important;color:#5d6a83!important;font-size:7px!important;border:1px solid var(--os-line)!important;border-radius:5px!important;padding:3px 5px!important}
+body.orbit-aether .rail-section-label{
+  margin:18px 4px 8px!important;color:#52607a!important;font:800 7px/1 ui-monospace,monospace!important;letter-spacing:.2em!important;
+}
+body.orbit-aether #mainNav{
+  display:flex!important;flex-direction:column!important;gap:4px!important;min-height:0!important;overflow:auto!important;
+}
+body.orbit-aether .nav-item{
+  width:100%!important;min-height:41px!important;padding:0 8px!important;border:1px solid transparent!important;border-radius:12px!important;
+  display:flex!important;align-items:center!important;gap:9px!important;background:transparent!important;color:#71809c!important;
+  cursor:pointer!important;text-align:left!important;transition:.16s ease!important;
+}
+body.orbit-aether .nav-item .ico{width:23px!important;height:23px!important;display:grid!important;place-items:center!important;color:#70809d!important;font-size:14px!important}
+body.orbit-aether .nav-item>span:nth-child(2){font-size:9px!important;font-weight:750!important;min-width:0!important;white-space:nowrap!important}
+body.orbit-aether .nav-item:hover{background:rgba(94,111,185,.08)!important;color:#ccd6ef!important}
+body.orbit-aether .nav-item.active{
+  background:linear-gradient(100deg,rgba(100,114,255,.17),rgba(52,211,232,.035))!important;border-color:rgba(121,139,230,.14)!important;
+  color:#f0f4ff!important;box-shadow:inset 0 1px rgba(255,255,255,.025),0 10px 24px rgba(31,42,93,.16)!important;
+}
+body.orbit-aether .nav-item.active .ico{color:#aeb7ff!important}
+body.orbit-aether .nav-item em{margin-left:auto;font-style:normal;font-size:7px;min-width:16px;height:16px;display:grid;place-items:center;border-radius:6px;background:rgba(116,132,255,.18);color:#afb7ff}
+body.orbit-aether .nav-item em.hot{background:rgba(255,93,122,.17);color:#ff9cb4}
+body.orbit-aether .live-dot{margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--os-good);box-shadow:0 0 14px rgba(88,228,165,.6)}
+body.orbit-aether .ai-badge{margin-left:auto;font:800 6px/1 ui-monospace,monospace!important;color:#80e5ec!important;letter-spacing:.12em!important}
+body.orbit-aether .rail-spacer{flex:1 1 auto!important;min-height:8px!important}
+body.orbit-aether .mini-card{
+  display:flex!important;align-items:center!important;gap:8px!important;padding:9px!important;margin-top:10px!important;
+  border:1px solid var(--os-line)!important;border-radius:11px!important;background:rgba(7,13,22,.72)!important;
+}
+body.orbit-aether .mini-card .pulse{width:7px;height:7px;border-radius:50%;background:var(--os-good);box-shadow:0 0 14px rgba(88,228,165,.55);flex:none}
+body.orbit-aether .mini-card b{display:block;font-size:7px!important;color:#bfc9de!important}
+body.orbit-aether .mini-card small{display:block;margin-top:3px;color:#62708b!important;font-size:6px!important}
+body.orbit-aether .aether-rail-mini-actions{display:flex!important;gap:5px!important;margin-top:7px!important}
+body.orbit-aether .aether-rail-mini-actions button{flex:1!important}
+body.orbit-aether .profile-chip{
+  width:100%!important;margin-top:7px!important;border:1px solid var(--os-line)!important;border-radius:13px!important;background:rgba(8,14,24,.72)!important;
+  display:flex!important;align-items:center!important;gap:8px!important;padding:8px!important;color:#dce5f6!important;cursor:pointer!important;text-align:left!important;
+}
+body.orbit-aether .profile-chip .avatar{width:30px!important;height:30px!important;font-size:9px!important}
+body.orbit-aether .profile-chip b{display:block;font-size:8px!important}
+body.orbit-aether .profile-chip small{display:block;margin-top:2px;color:#61708b!important;font-size:6px!important}
+body.orbit-aether .profile-chip>span{margin-left:auto;color:#66748d!important;font-size:9px!important}
+
+body.orbit-aether .context-panel{display:flex!important;flex-direction:column!important}
+body.orbit-aether .context-head{padding:15px 14px 10px!important;flex:0 0 auto!important}
+body.orbit-aether .aether-workspace-head{display:flex!important;align-items:center!important;justify-content:space-between!important}
+body.orbit-aether .workspace-brand{display:flex!important;align-items:center!important;gap:9px!important;min-width:0!important}
+body.orbit-aether .workspace-avatar{width:34px!important;height:34px!important;border-radius:11px!important;display:grid!important;place-items:center!important;background:linear-gradient(145deg,#7d87ff,#42cedf)!important;color:#fff!important;font:800 10px/1 ui-monospace,monospace!important}
+body.orbit-aether .workspace-brand strong{display:block;font-size:9px!important;color:#eef3ff!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.orbit-aether .workspace-brand span{display:block;margin-top:3px;color:#65728b!important;font-size:6px!important}
+body.orbit-aether .context-panel .icon-btn{width:30px!important;height:30px!important;border-radius:9px!important}
+body.orbit-aether .aether-presence{display:flex!important;align-items:center!important;gap:8px!important;margin-top:11px!important;padding:9px!important;border:1px solid var(--os-line)!important;border-radius:11px!important;background:rgba(8,14,24,.58)!important}
+body.orbit-aether .aether-presence .aether-status-dot{width:7px;height:7px;border-radius:50%;background:var(--os-good);box-shadow:0 0 13px rgba(88,228,165,.65);flex:none}
+body.orbit-aether .aether-presence b{display:block;font-size:7px!important}
+body.orbit-aether .aether-presence small{display:block;margin-top:2px;color:#60708c!important;font-size:6px!important}
+body.orbit-aether .aether-presence>strong{margin-left:auto;font:800 6px/1 ui-monospace,monospace!important;color:#6de9c0!important}
+body.orbit-aether .sidebar-search{height:37px!important;display:flex!important;align-items:center!important;gap:8px!important;padding:0 10px!important;margin-top:9px!important;border-radius:10px!important;border:1px solid var(--os-line)!important;background:rgba(4,9,16,.66)!important}
+body.orbit-aether .sidebar-search input{min-width:0!important;flex:1!important;background:transparent!important;border:0!important;outline:0!important;color:#d9e2f5!important;font-size:8px!important}
+body.orbit-aether .sidebar-search input::placeholder{color:#586783!important}
+body.orbit-aether .sidebar-search kbd{font-size:6px!important;color:#56647d!important}
+body.orbit-aether .aether-pane-scroll{flex:1 1 auto!important;min-height:0!important;overflow:auto!important;padding:0 10px!important}
+body.orbit-aether .aether-section-heading{display:flex!important;align-items:center!important;justify-content:space-between!important;padding:10px 3px 7px!important}
+body.orbit-aether .aether-section-heading span{font:800 6px/1 ui-monospace,monospace!important;letter-spacing:.18em!important;color:#5e6d87!important}
+body.orbit-aether .aether-section-heading button{width:20px!important;height:20px!important;border:1px solid var(--os-line)!important;border-radius:6px!important;background:rgba(8,14,24,.65)!important;color:#8391ae!important;cursor:pointer!important}
+body.orbit-aether .aether-channel-list{display:flex!important;flex-direction:column!important;gap:3px!important}
+body.orbit-aether .channel{
+  min-height:34px!important;border-radius:9px!important;border:1px solid transparent!important;padding:0 9px!important;
+  background:transparent!important;color:#72819d!important;
+}
+body.orbit-aether .channel:hover{background:rgba(91,109,184,.075)!important;color:#cdd6e9!important}
+body.orbit-aether .channel.active{background:linear-gradient(100deg,rgba(100,114,255,.15),rgba(54,212,231,.03))!important;border-color:rgba(114,133,207,.11)!important;color:#f0f4ff!important}
+body.orbit-aether .aether-voice-dock{
+  margin:8px 0!important;border:1px solid rgba(88,228,165,.11)!important;border-radius:11px!important;background:rgba(7,21,19,.62)!important;
+}
+body.orbit-aether .aether-shortcuts{display:flex!important;flex-direction:column!important;gap:5px!important;margin:12px 2px 8px!important}
+body.orbit-aether .aether-shortcuts button{
+  min-height:38px!important;padding:0 8px!important;border:1px solid transparent!important;border-radius:9px!important;background:transparent!important;
+  display:flex!important;align-items:center!important;gap:8px!important;color:#71809c!important;cursor:pointer!important;text-align:left!important;
+}
+body.orbit-aether .aether-shortcuts button:hover{background:rgba(91,109,184,.07)!important}
+body.orbit-aether .aether-shortcuts button>span{width:20px;text-align:center;color:#8190ab!important}
+body.orbit-aether .aether-shortcuts b{display:block;font-size:7px!important;color:#bbc6dd!important}
+body.orbit-aether .aether-shortcuts small{display:block;margin-top:2px;font-size:6px!important;color:#5d6c85!important}
+body.orbit-aether .aether-shortcuts kbd{margin-left:auto;color:#5c6a83!important;font-size:6px!important}
+body.orbit-aether .aether-profile-dock{display:flex!important;align-items:center!important;gap:5px!important;padding:9px 10px!important;border-top:1px solid var(--os-line)!important}
+body.orbit-aether .aether-profile-dock>.profile{flex:1!important;margin:0!important;border:0!important;background:transparent!important}
+body.orbit-aether .aether-profile-actions button{width:28px;height:28px;border:1px solid var(--os-line);border-radius:8px;background:rgba(8,14,24,.7);color:#72819b;cursor:pointer}
+
+body.orbit-aether .main{display:flex!important;flex-direction:column!important;min-width:0!important;min-height:0!important}
+body.orbit-aether .topbar{
+  height:64px!important;flex:0 0 64px!important;padding:0 15px!important;display:flex!important;align-items:center!important;
+  border-bottom:1px solid var(--os-line)!important;background:rgba(7,13,22,.55)!important;backdrop-filter:blur(18px)!important;
+}
+body.orbit-aether .breadcrumbs{display:flex!important;align-items:center!important;gap:7px!important;min-width:0!important}
+body.orbit-aether .breadcrumbs span{font:800 7px/1 ui-monospace,monospace!important;letter-spacing:.16em!important;color:#65728c!important}
+body.orbit-aether .breadcrumbs b{color:#39465c!important;font-size:8px!important}
+body.orbit-aether .breadcrumbs strong{font:800 9px/1 "Space Grotesk",sans-serif!important;color:#dbe4f6!important}
+body.orbit-aether .top-actions{display:flex!important;align-items:center!important;gap:6px!important;margin-left:auto!important}
+body.orbit-aether .top-btn{
+  height:33px!important;padding:0 10px!important;border-radius:10px!important;border:1px solid var(--os-line)!important;background:rgba(9,15,25,.72)!important;color:#a4b0c8!important;font-size:8px!important;cursor:pointer!important;
+}
+body.orbit-aether .circle-btn{
+  position:relative!important;width:33px!important;height:33px!important;border-radius:10px!important;border:1px solid var(--os-line)!important;background:rgba(9,15,25,.72)!important;color:#94a2bd!important;cursor:pointer!important;
+}
+body.orbit-aether .circle-btn i{position:absolute;right:-3px;top:-4px;min-width:13px;height:13px;padding:0 3px;display:grid;place-items:center;border-radius:7px;background:#7885ff;color:#fff;font:800 6px/1 ui-monospace,monospace!important;font-style:normal}
+body.orbit-aether .status-pill{height:33px!important;padding:0 9px!important;border-radius:999px!important;border:1px solid var(--os-line)!important;background:rgba(8,15,25,.72)!important;color:#9aa7c0!important;font-size:7px!important;display:flex!important;align-items:center!important;gap:6px!important}
+body.orbit-aether .status-online{width:6px;height:6px;border-radius:50%;background:var(--os-good);box-shadow:0 0 10px rgba(88,228,165,.55)}
+body.orbit-aether .top-actions>.avatar{width:33px!important;height:33px!important;border:1px solid rgba(126,143,219,.2)!important}
+
+body.orbit-aether .view{
+  flex:1 1 auto!important;min-height:0!important;display:flex!important;flex-direction:column!important;position:relative!important;overflow:hidden!important;
+}
+body.orbit-aether #global-page{margin:11px!important;flex:1!important;min-height:0!important;overflow:auto!important;border-radius:18px!important;background:rgba(5,10,17,.42)!important}
+body.orbit-aether .aether-hero-strip{margin:11px!important;border-radius:19px!important;flex:0 0 auto!important;min-height:246px!important;overflow:hidden!important}
+body.orbit-aether #chat-view{
+  margin:11px!important;flex:1 1 auto!important;min-width:0!important;min-height:0!important;overflow:hidden!important;
+  display:flex!important;flex-direction:column!important;border-radius:18px!important;border:1px solid var(--os-line)!important;
+  background:linear-gradient(180deg,rgba(8,15,26,.78),rgba(3,8,14,.92))!important;
+}
+body.orbit-aether #chat-view.hidden,#global-page.hidden,.aether-hero-strip.aether-hide{display:none!important}
+body.orbit-aether .chat-head{height:62px!important;flex:0 0 62px!important;border-bottom:1px solid var(--os-line)!important;padding:0 12px!important}
+body.orbit-aether .aether-chat-body{display:flex!important;flex-direction:column!important;flex:1 1 auto!important;min-height:0!important;overflow:hidden!important}
+body.orbit-aether .aether-chat-banner{margin:10px!important;padding:10px 12px!important;border:1px solid var(--os-line)!important;border-radius:13px!important;background:linear-gradient(100deg,rgba(92,105,197,.07),rgba(48,206,226,.025))!important}
+body.orbit-aether #messages{flex:1 1 auto!important;min-height:0!important;overflow:auto!important;padding:5px 10px 10px!important}
+body.orbit-aether .composer{flex:0 0 auto!important;margin:8px!important;border-radius:13px!important}
+body.orbit-aether .page-head{padding:22px 22px 10px!important}
+body.orbit-aether .page-head h1{font-size:30px!important;letter-spacing:-.04em!important}
+body.orbit-aether .page-head p{max-width:720px!important;color:#6e7c95!important;font-size:10px!important}
+
+body.orbit-aether .right-panel{display:flex!important;flex-direction:column!important}
+body.orbit-aether .right-head{height:64px!important;flex:0 0 64px!important;padding:0 15px!important;border-bottom:1px solid var(--os-line)!important;display:flex!important;align-items:center!important;justify-content:space-between!important}
+body.orbit-aether .right-head h3{margin:4px 0 0!important;font:800 12px/1 "Space Grotesk",sans-serif!important;color:#e8efff!important}
+body.orbit-aether .eyebrow{font:800 6px/1 ui-monospace,monospace!important;letter-spacing:.18em!important;color:#5f6d87!important}
+body.orbit-aether .right-panel .icon-btn{width:31px!important;height:31px!important;border-radius:9px!important}
+body.orbit-aether .aether-radar{height:165px!important;flex:0 0 165px!important;margin:12px!important;border-radius:16px!important;border:1px solid var(--os-line)!important;background:radial-gradient(circle,rgba(104,120,255,.09),transparent 32%),linear-gradient(180deg,#07101b,#040a11)!important;position:relative!important;overflow:hidden!important}
+body.orbit-aether .aether-radar-grid{position:absolute!important;inset:14%!important;border-radius:50%!important;border:1px solid rgba(108,130,195,.12)!important;box-shadow:0 0 0 26px rgba(108,130,195,.018),0 0 0 52px rgba(108,130,195,.011)!important}
+body.orbit-aether .aether-radar-sweep{position:absolute!important;inset:0!important;background:conic-gradient(from 30deg,rgba(78,218,231,.18),transparent 22%,transparent 100%)!important;animation:osRadar 4.6s linear infinite!important}
+body.orbit-aether .aether-radar-core{position:absolute!important;left:50%;top:50%;transform:translate(-50%,-50%)!important;width:54px;height:54px;border-radius:50%!important;display:grid!important;place-items:center!important;background:radial-gradient(circle,rgba(126,137,255,.3),rgba(5,10,18,.82) 66%)!important;border:1px solid rgba(124,139,246,.23)!important;color:#dfe5ff!important;box-shadow:0 0 36px rgba(105,119,255,.16)!important}
+body.orbit-aether .aether-radar-label{position:absolute!important;left:12px;bottom:10px!important}
+body.orbit-aether .aether-radar-label b{display:block;font:800 9px/1 ui-monospace,monospace!important;color:#e6edff!important}
+body.orbit-aether .aether-radar-label span{display:block;margin-top:4px;font:800 5px/1 ui-monospace,monospace!important;letter-spacing:.16em!important;color:#56647d!important}
+@keyframes osRadar{to{transform:rotate(360deg)}}
+body.orbit-aether .aether-inspector-tabs{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:4px!important;padding:0 12px 10px!important}
+body.orbit-aether .aether-inspector-tabs button{height:28px!important;border:1px solid transparent!important;border-radius:8px!important;background:transparent!important;color:#65728a!important;font-size:6px!important;cursor:pointer!important}
+body.orbit-aether .aether-inspector-tabs button.active{background:rgba(100,113,232,.1)!important;border-color:rgba(119,137,221,.12)!important;color:#c9d2e8!important}
+body.orbit-aether .aether-inspector-body{flex:1 1 auto!important;min-height:0!important;overflow:auto!important;padding:0 12px 12px!important}
+body.orbit-aether .aether-inspector-card,
+body.orbit-aether .aether-feed-card{
+  padding:13px!important;margin-bottom:9px!important;border:1px solid var(--os-line)!important;border-radius:13px!important;background:rgba(7,13,22,.58)!important;
+}
+body.orbit-aether .aether-card-kicker{font:800 6px/1 ui-monospace,monospace!important;letter-spacing:.15em!important;color:#5e6d88!important}
+body.orbit-aether .aether-inspector-card h3{margin:7px 0 5px!important;font:800 11px/1.15 "Space Grotesk",sans-serif!important;color:#dfe7f8!important}
+body.orbit-aether .aether-inspector-card p{margin:0;color:#63718b!important;font-size:7px!important;line-height:1.55!important}
+body.orbit-aether .aether-metric-grid{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:7px!important;margin-bottom:9px!important}
+body.orbit-aether .aether-metric-grid>div{padding:10px!important;border:1px solid var(--os-line)!important;border-radius:11px!important;background:rgba(7,13,22,.6)!important}
+body.orbit-aether .aether-metric-grid b{display:block;font:800 14px/1 "Space Grotesk",sans-serif!important;color:#eaf0ff!important}
+body.orbit-aether .aether-metric-grid span{display:block;margin-top:4px;color:#5e6d85!important;font-size:6px!important}
+body.orbit-aether .aether-inspector-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:6px!important}
+body.orbit-aether .aether-inspector-actions button{height:31px!important;border:1px solid var(--os-line)!important;border-radius:8px!important;background:rgba(11,18,29,.72)!important;color:#93a0ba!important;font-size:6px!important;cursor:pointer!important}
+body.orbit-aether .aether-inspector-actions button:hover{border-color:var(--os-line-strong)!important;color:#dce5f6!important}
+body.orbit-aether .aether-card-heading{display:flex!important;justify-content:space-between!important;color:#66748d!important;font:800 6px/1 ui-monospace,monospace!important;letter-spacing:.12em!important}
+body.orbit-aether .aether-card-heading small{color:#61dfb2!important}
+body.orbit-aether .aether-signal-line{display:flex!important;gap:8px!important;padding-top:10px!important}
+body.orbit-aether .aether-signal-line>i{width:6px;height:6px;border-radius:50%;margin-top:4px;background:#6e80ff;box-shadow:0 0 10px rgba(110,128,255,.5);flex:none}
+body.orbit-aether .aether-signal-line b{display:block;font-size:7px!important;color:#b9c4da!important}
+body.orbit-aether .aether-signal-line span{display:block;margin-top:3px;color:#5b6a83!important;font-size:6px!important;line-height:1.45!important}
+
+body.orbit-aether .overlay{z-index:999!important}
+body.orbit-aether #command-palette .command-modal,
+body.orbit-aether .command-modal{
+  width:min(760px,calc(100vw - 34px))!important;border-radius:20px!important;border:1px solid var(--os-line-strong)!important;
+  background:linear-gradient(180deg,rgba(13,20,33,.98),rgba(4,9,16,.995))!important;box-shadow:0 35px 100px rgba(0,0,0,.52)!important;
+}
+body.orbit-aether .command-top{border-bottom:1px solid var(--os-line)!important}
+body.orbit-aether .command-grid button{border:1px solid var(--os-line)!important;background:rgba(8,14,24,.62)!important;border-radius:12px!important}
+body.orbit-aether .command-grid button:hover{background:rgba(103,118,235,.09)!important;border-color:rgba(118,138,235,.18)!important}
+
+@media(max-width:1280px){
+  body.orbit-aether .app-shell{grid-template-columns:72px 250px minmax(0,1fr)!important}
+  body.orbit-aether .right-panel{display:none!important}
+}
+@media(max-width:980px){
+  body.orbit-aether .app-shell{grid-template-columns:64px minmax(0,1fr)!important}
+  body.orbit-aether #sidebar{
+    position:absolute!important;z-index:500!important;left:0!important;top:0!important;bottom:0!important;width:286px!important;
+    border-radius:0 24px 24px 0!important;transform:translateX(-105%)!important;transition:transform .2s ease!important;
+  }
+  body.orbit-aether #app.server-sidebar-open #sidebar,
+  body.orbit-aether #sidebar.open{transform:translateX(0)!important}
+}
+@media(max-width:700px){
+  body.orbit-aether .app-shell{display:block!important;padding:7px!important;height:100dvh!important}
+  body.orbit-aether .rail{
+    position:fixed!important;left:8px!important;right:8px!important;bottom:8px!important;top:auto!important;height:58px!important;z-index:600!important;
+    flex-direction:row!important;align-items:center!important;border-radius:18px!important;padding:6px 8px!important;
+  }
+  body.orbit-aether .rail .brand,.rail .global-search,.rail .rail-section-label,.rail .rail-spacer,.rail .mini-card,.rail .aether-rail-mini-actions,.rail .profile-chip{display:none!important}
+  body.orbit-aether #mainNav{flex-direction:row!important;width:max-content!important;overflow:auto!important;gap:4px!important}
+  body.orbit-aether .nav-item{width:45px!important;height:45px!important;min-height:45px!important;padding:0!important;justify-content:center!important}
+  body.orbit-aether .nav-item>span:nth-child(2),body.orbit-aether .nav-item>em,body.orbit-aether .nav-item>.live-dot,body.orbit-aether .nav-item>.ai-badge{display:none!important}
+  body.orbit-aether .nav-item .ico{width:auto!important;font-size:15px!important}
+  body.orbit-aether .main{height:calc(100dvh - 14px)!important;border-radius:21px!important}
+  body.orbit-aether .context-panel{position:fixed!important;z-index:500!important;left:7px!important;top:7px!important;bottom:7px!important;width:290px!important;transform:translateX(-110%)!important;transition:transform .2s ease!important}
+  body.orbit-aether #app.server-sidebar-open #sidebar,body.orbit-aether #sidebar.open{transform:translateX(0)!important}
+  body.orbit-aether .topbar{padding:0 10px!important}
+  body.orbit-aether .top-btn{display:none!important}
+  body.orbit-aether .top-actions{gap:4px!important}
+  body.orbit-aether #chat-view,.aether-hero-strip,#global-page{margin:7px!important}
+}
+
+body.orbit-aether #app.os-context-collapsed{grid-template-columns:82px minmax(0,1fr) 326px!important}
+body.orbit-aether #app.os-context-collapsed #sidebar{width:0!important;min-width:0!important;opacity:0!important;pointer-events:none!important;overflow:hidden!important;border-color:transparent!important}
+body.orbit-aether #app.os-context-collapsed .right-panel{grid-column:3}
+body.orbit-aether #app.os-right-collapsed{grid-template-columns:82px 292px minmax(0,1fr) 0!important}
+body.orbit-aether #app.os-right-collapsed .right-panel{width:0!important;min-width:0!important;opacity:0!important;pointer-events:none!important;overflow:hidden!important;border-color:transparent!important}
+body.orbit-aether #app.os-context-collapsed.os-right-collapsed{grid-template-columns:82px minmax(0,1fr)!important}
+body.orbit-aether #app.os-context-collapsed.os-right-collapsed .right-panel{display:none!important}
+@media(max-width:1280px){
+  body.orbit-aether #app.os-right-collapsed{grid-template-columns:72px 250px minmax(0,1fr)!important}
+}
