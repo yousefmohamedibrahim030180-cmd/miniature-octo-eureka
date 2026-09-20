@@ -1775,6 +1775,7 @@ function renderPage(view) {
     projects:["PROJECTS","Projects","Tasks, boards and team collaboration inside communities."],
     files:["FILES","Files","Shared workspace files and attachments."],
     ai:["ORBIT AI","AI","Your optional AI workspace assistant."],
+    settings:["PREFERENCES","Settings","Appearance, privacy, voice, notifications, accessibility and security."],
   }[view] || ["ORBIT","Home",""];
   $("#page-eyebrow").textContent=cfg[0];
   $("#page-title").textContent=cfg[1];
@@ -1792,7 +1793,8 @@ function renderPage(view) {
   if(view==="projects")renderProjectsPage();
   if(view==="files")renderFilesPage();
   if(view==="ai")renderAIPage();
-    if(view==="saved")renderSavedPage();
+  if(view==="saved")renderSavedPage();
+  if(view==="settings")renderSettingsPage();
   if(view==="explore")renderExplorePage();
 }
 function setView(view){
@@ -1808,7 +1810,7 @@ function setView(view){
     $("#sidebar")?.classList.remove("open");
     document.body.classList.remove("mobile-sidebar-open");
   }
-  const globalViews=["space","home","server-home","communities","discover","dms","calls","live","events","projects","files","ai","notifications","saved","explore"];
+  const globalViews=["space","home","server-home","communities","discover","dms","calls","live","events","projects","files","ai","notifications","saved","explore","settings"];
   if(globalViews.includes(view)){
     global.classList.remove("hidden");
     chat.classList.add("hidden");
@@ -3904,7 +3906,7 @@ function runCommand(item){
   if(!item)return;
   closeCommandPalette();
   const a=item[2];
-  if(["home","discover","dms","calls","live","events","projects","files","ai","notifications","saved","explore"].includes(a))return setView(a);
+  if(["home","discover","dms","calls","live","events","projects","files","ai","notifications","saved","explore","settings"].includes(a))return setView(a);
   if(a==="create-server")return $("#new-server").click();
   if(a==="create-channel")return $("#new-channel").click();
   if(a==="voice")return goChat(),startCall("voice");
