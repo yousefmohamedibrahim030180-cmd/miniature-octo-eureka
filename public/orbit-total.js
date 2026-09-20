@@ -1,0 +1,1 @@
+(()=>{const apply=()=>{document.body.classList.add('orbit-total');document.body.classList.remove('orbit-2200');}; if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else apply();})();
