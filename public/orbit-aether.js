@@ -209,8 +209,31 @@
   }
   function boot(){
     document.body.classList.add("orbit-prism");
-    ensureScene();stars();applyVisualPrefs();themeDrawer();syncThemeDrawer();wire();bindRescue();sync();setInterval(sync,1500);
+    ensureScene();stars();applyVisualPrefs();themeDrawer();syncThemeDrawer();wire();sync();setInterval(sync,1500);
     const ob=new MutationObserver(()=>sync());ob.observe($("#app")||document.body,{subtree:true,childList:true});
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});else boot();
+})();
+/* PRISM SAFE EVENT FALLBACK — never intercept the application's normal event flow */
+(function(){
+  "use strict";
+  if(window.__orbitPrismSafeBound)return;
+  window.__orbitPrismSafeBound=true;
+  const $=(s)=>document.querySelector(s);
+  const route=(id)=>{
+    try{
+      if(typeof window.setView==="function"){window.setView(id);return true}
+      const b=document.querySelector('.rail-nav[data-view="'+id+'"]'); if(b){b.click();return true}
+    }catch(err){console.error("ORBIT route",id,err)}
+    return false;
+  };
+  document.addEventListener("click",e=>{
+    const t=e.target.closest?.("[data-prism-route]");
+    if(t){
+      const id=t.getAttribute("data-prism-route");
+      if(id)route(id);
+    }
+    if(e.target.closest?.("#aether-theme-btn,#aether-settings-btn")){e.preventDefault();document.querySelector("#prism-theme-drawer")?.classList.add("open")}
+    if(e.target.closest?.("#aether-top-search,#aether-command")){document.querySelector("#command-palette")?.classList.remove("hidden");setTimeout(()=>document.querySelector("#command-input")?.focus(),20)}
+  },false);
 })();
