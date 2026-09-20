@@ -231,7 +231,7 @@ function ensureHome(u){
 }
 
 app.use(express.json({limit:"6mb"}));
-app.use(express.static(path.join(__dirname,"public"),{setHeaders(res){res.setHeader("Cache-Control","no-store")}}));
+app.use(express.static(path.join(__dirname,"public"),{index:false,setHeaders(res){res.setHeader("Cache-Control","no-store")}}));
 app.get("/",(req,res)=>res.sendFile(path.join(__dirname,"public","orbit-v2.html")));
 app.get("/health",(req,res)=>res.json({ok:true,service:"orbit-v2",version:"2.0.0-aaa",persistence: persistMode,users:memory.users.size,communities:memory.communities.size,conversations:memory.conversations.size,time:now()}));
 
