@@ -25,5 +25,6 @@
     document.addEventListener("keydown",e=>{if(e.key==="Escape")close();});
   }
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",boot,{once:true}); else boot();
-  // Static shell: one boot is enough; avoid a document-wide observer on every DOM change.
+  const observer=new MutationObserver(boot);
+  observer.observe(document.documentElement,{childList:true,subtree:true});
 })();

@@ -7,20 +7,9 @@ const { Server } = require("socket.io");
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
 const { pipeline, env: hfEnv } = require("@huggingface/transformers");
-const { applySecurity, createApiLimiter } = require("./platform/security");
-const { env, assertProductionBasics } = require("./platform/config");
-const platformManifest = require("./platform/manifest");
-const { migrate } = require("./db/migrate");
-const { createSessionManager, cookieMap, setRefreshCookie, clearRefreshCookie } = require("./platform/session");
-const { configureRedisAdapter, closeRedisAdapter } = require("./platform/realtime");
-const { createStorage } = require("./platform/storage");
-const { PERMISSIONS, CHANNEL_TYPES, canManage: canManageRole, hasPermission, canManageMembers, canManageCommunity, canCreateChannel, channelAllowsText, channelAllowsRealtime } = require("./platform/permissions");
-const { generateSecret, verifyTotp, encryptSecret, decryptSecret, makeRecoveryCodes, hashRecoveryCode, consumeRecoveryCode, setupUri } = require("./platform/totp");
-const { API_KEY_SCOPES, hashSecret, safeCredentialName, makeApiKeySecret, makeClientId, makeClientSecret, validScopes } = require("./platform/developer");
 
 const app = express();
 const server = http.createServer(app);
-app.set("trust proxy", 1);
 const io = new Server(server, {
   cors: { origin: true, credentials: true },
   transports: ["polling"],
@@ -54,18 +43,7 @@ const memory = {
   projects: new Map(),
   aiConversations: new Map(),
   liveSessions: new Map(),
-  audit: [],
-  sessions: new Map(),
-  blocks: new Set(),
-  mutes: new Set(),
-  userSettings: new Map(),
-  notificationPreferences: new Map(),
-  apiKeys: new Map(),
-  developerApplications: new Map(),
-  bookmarks: new Map(),
-  posts: new Map(),
-  postComments: new Map(),
-  analyticsEvents: []
+  audit: []
 };
 
 const CALL_EVENT_PREFIX = "call:";
@@ -73,9 +51,6 @@ const callRoomFor = channelId => CALL_EVENT_PREFIX + String(channelId);
 const dmCallRoomFor = callId => "dmcall:" + String(callId);
 const dmCalls = new Map();
 const serverMessageRate = new Map();
-const v1Sessions = createSessionManager({ jwtSecret: JWT_SECRET, sessions: memory.sessions, users: memory.users });
-let realtimeScale = { enabled: false, reason: "Redis adapter not initialized" };
-let objectStorage = { enabled: false, reason: "S3-compatible storage not initialized" };
 
 const DATABASE_URL = String(process.env.DATABASE_URL || "").trim();
 const PERSIST_URL = String(process.env.ORBIT_PERSIST_URL || "").trim().replace(/\/$/, "");
@@ -89,19 +64,6 @@ let persistPending = false;
 let persistMode = "memory";
 
 function now() { return new Date().toISOString(); }
-function trackEvent(name,userId=null,properties={}){
-  const eventName=String(name||"").trim().slice(0,120);
-  if(!eventName)return;
-  const safe={};
-  for(const [key,value] of Object.entries(properties||{}).slice(0,30)){
-    if(["password","token","secret","authorization","content"].includes(String(key).toLowerCase()))continue;
-    const textValue=typeof value==="string"?value.slice(0,300):value;
-    safe[String(key).slice(0,80)]=textValue;
-  }
-  memory.analyticsEvents.push({id:id("ae"),name:eventName,userId:userId?String(userId):null,properties:safe,occurredAt:now()});
-  if(memory.analyticsEvents.length>10000)memory.analyticsEvents=memory.analyticsEvents.slice(-10000);
-  schedulePersist();
-}
 
 function serializeMemory() {
   return {
@@ -123,51 +85,21 @@ function serializeMemory() {
     projects: [...memory.projects.entries()],
     aiConversations: [...memory.aiConversations.entries()],
     liveSessions: [...memory.liveSessions.entries()],
-    audit: memory.audit,
-    sessions: [...memory.sessions.entries()],
-    blocks: [...memory.blocks],
-    mutes: [...memory.mutes],
-    userSettings: [...memory.userSettings.entries()],
-    notificationPreferences: [...memory.notificationPreferences.entries()],
-    posts: [...memory.posts.entries()],
-    postComments: [...memory.postComments.entries()],
-    apiKeys: [...memory.apiKeys.entries()],
-    developerApplications: [...memory.developerApplications.entries()],
-    bookmarks: [...memory.bookmarks.entries()],
-    analyticsEvents: memory.analyticsEvents
+    audit: memory.audit
   };
 }
 
 function hydrateMemory(data) {
   if (!data || typeof data !== "object") return;
-  const restoreMap = name => {
-    const target = memory[name];
-    target.clear();
-    for (const [key,value] of (Array.isArray(data[name]) ? data[name] : [])) target.set(key,value);
-  };
+  const restoreMap = name => { memory[name] = new Map(Array.isArray(data[name]) ? data[name] : []); };
   restoreMap("users");
-  memory.servers.clear();
-  for(const [key,value] of (Array.isArray(data.servers)?data.servers:[])){
-    memory.servers.set(key,{...value,members:new Map(value?.members||[])});
-  }
+  memory.servers = new Map((data.servers || []).map(([key, value]) => [key, { ...value, members: new Map(value?.members || []) }]));
   restoreMap("channels"); restoreMap("messages"); restoreMap("invites"); restoreMap("friendRequests");
-  memory.friendships.clear();
-  for(const value of (data.friendships||[])) memory.friendships.add(value);
+  memory.friendships = new Set(data.friendships || []);
   restoreMap("dms"); restoreMap("dmMessages"); restoreMap("dmReads"); restoreMap("notifications");
   restoreMap("threads"); restoreMap("polls"); restoreMap("uploads");
   restoreMap("events"); restoreMap("projects"); restoreMap("aiConversations"); restoreMap("liveSessions");
   memory.audit = Array.isArray(data.audit) ? data.audit : [];
-  restoreMap("sessions");
-  memory.blocks.clear(); for(const value of (data.blocks||[])) memory.blocks.add(String(value));
-  memory.mutes.clear(); for(const value of (data.mutes||[])) memory.mutes.add(String(value));
-  restoreMap("userSettings");
-  restoreMap("notificationPreferences");
-  restoreMap("posts");
-  restoreMap("postComments");
-  restoreMap("apiKeys");
-  restoreMap("developerApplications");
-  restoreMap("bookmarks");
-  memory.analyticsEvents = Array.isArray(data.analyticsEvents) ? data.analyticsEvents.slice(-10000) : [];
 }
 
 async function sidecarRequest(method, body) {
@@ -324,7 +256,6 @@ function readToken(req) {
 function authenticate(req, res, next, allowLegacy = false) {
   try {
     const payload = jwt.verify(readToken(req), JWT_SECRET);
-    if (payload?.sessionId) v1Sessions.verifyAccess(readToken(req));
     const user = memory.users.get(payload.id);
     if (!user) return res.status(401).json({ error: "Session expired. Please sign in again." });
     if (user.suspended) return res.status(403).json({ error: "This ORBIT account is suspended." });
@@ -339,62 +270,6 @@ function authenticate(req, res, next, allowLegacy = false) {
 }
 function auth(req, res, next) { return authenticate(req, res, next, false); }
 function authLegacy(req, res, next) { return authenticate(req, res, next, true); }
-function authV1(req, res, next) {
-  try {
-    const result = v1Sessions.verifyAccess(readToken(req));
-    req.user = result.user;
-    req.authPayload = result.payload;
-    req.v1Session = result.session;
-    next();
-  } catch {
-    return res.status(401).json({ error: "Session expired. Please refresh or sign in again." });
-  }
-}
-
-
-
-function apiKeyFromRequest(req){
-  const direct=String(req.get("x-api-key")||"").trim();
-  const bearer=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"").trim();
-  if(direct)return direct;
-  return bearer.startsWith("orb_live_") ? bearer : "";
-}
-function findApiKey(secret){
-  const clean=String(secret||"").trim();
-  if(!clean)return null;
-  const digest=hashSecret(clean);
-  const nowMs=Date.now();
-  for(const key of memory.apiKeys.values()){
-    if(key.revokedAt)continue;
-    if(key.expiresAt){
-      const expires=new Date(key.expiresAt).getTime();
-      if(Number.isFinite(expires) && expires<=nowMs)continue;
-    }
-    if(String(key.hash||"")===digest)return key;
-  }
-  return null;
-}
-
-function authApiKey(req,res,next){
-  const secret=apiKeyFromRequest(req);
-  const key=findApiKey(secret);
-  if(!key)return res.status(401).json({error:"Valid ORBIT API key required."});
-  const user=memory.users.get(String(key.userId));
-  if(!user)return res.status(401).json({error:"API key owner no longer exists."});
-  key.lastUsedAt=now();
-  req.user=user;
-  req.apiKey=key;
-  next();
-}
-
-function requireApiScope(scope){
-  return (req,res,next)=>{
-    if(!req.apiKey || !Array.isArray(req.apiKey.scopes) || !req.apiKey.scopes.includes(scope)){
-      return res.status(403).json({error:"API scope required.",scope});
-    }
-    next();
-  };
-}
 function serverSettings(server) {
   if (!server.settings || typeof server.settings !== "object") server.settings = {};
   if (typeof server.settings.locked !== "boolean") server.settings.locked = false;
@@ -486,25 +361,7 @@ function member(serverId, userId) {
   return role ? { role, server: s } : null;
 }
 function canManage(role) {
-  return canManageRole(role);
-}
-function can(role, permission) {
-  return hasPermission(role, permission);
-}
-function ROLE_BITS_FOR_ROLE(role){
-  const checks=[
-    ["VIEW_CHANNEL",PERMISSIONS.VIEW_CHANNEL],["SEND_MESSAGES",PERMISSIONS.SEND_MESSAGES],["MANAGE_MESSAGES",PERMISSIONS.MANAGE_MESSAGES],
-    ["CREATE_THREADS",PERMISSIONS.CREATE_THREADS],["ATTACH_FILES",PERMISSIONS.ATTACH_FILES],["ADD_REACTIONS",PERMISSIONS.ADD_REACTIONS],
-    ["MENTION_EVERYONE",PERMISSIONS.MENTION_EVERYONE],["CONNECT_VOICE",PERMISSIONS.CONNECT_VOICE],["SPEAK",PERMISSIONS.SPEAK],
-    ["USE_VIDEO",PERMISSIONS.USE_VIDEO],["STREAM",PERMISSIONS.STREAM],["MANAGE_CHANNELS",PERMISSIONS.MANAGE_CHANNELS],
-    ["MANAGE_ROLES",PERMISSIONS.MANAGE_ROLES],["MANAGE_MEMBERS",PERMISSIONS.MANAGE_MEMBERS],["MANAGE_COMMUNITY",PERMISSIONS.MANAGE_COMMUNITY],
-    ["MANAGE_EVENTS",PERMISSIONS.MANAGE_EVENTS],["MANAGE_WEBHOOKS",PERMISSIONS.MANAGE_WEBHOOKS],["MANAGE_BOTS",PERMISSIONS.MANAGE_BOTS],
-    ["VIEW_AUDIT_LOG",PERMISSIONS.VIEW_AUDIT_LOG],["BAN_MEMBERS",PERMISSIONS.BAN_MEMBERS]
-  ];
-  return checks.map(([key,permission])=>({key,value:hasPermission(role,permission)}));
-}
-function requirePermission(access, permission, message="Permission denied") {
-  return access && hasPermission(access.role, permission) ? null : message;
+  return ["owner", "admin", "moderator"].includes(role);
 }
 function adminTokenFor(user, serverId, role) {
   return jwt.sign(
@@ -611,8 +468,6 @@ function createGuest(username, existingId) {
   return user;
 }
 
-applySecurity(app);
-app.use("/api", createApiLimiter());
 app.use(express.json({ limit: "6mb" }));
 app.use(express.static(path.join(__dirname, "public"), {
   setHeaders(res) {
@@ -631,209 +486,12 @@ app.get("/health", (req, res) => {
   res.status(200).json({
     ok: true,
     service: "orbit-chat",
-    version: platformManifest.version,
     mode: persistMode,
     db: dbReady,
     users: memory.users.size,
     servers: memory.servers.size,
     calls: [...io.sockets.adapter.rooms.keys()].filter(k => k.startsWith(CALL_EVENT_PREFIX)).length,
-    time: now(),
-    requestId: req.orbitRequestId || null
-  });
-});
-
-app.get("/readyz", (req, res) => {
-  const persistenceRequired = env.nodeEnv === "production";
-  const ready = !persistenceRequired || dbReady;
-  res.status(ready ? 200 : 503).json({
-    ok: ready,
-    persistence: persistMode,
-    databaseReady: dbReady,
-    requestId: req.orbitRequestId || null
-  });
-});
-
-app.get("/api/v1/developer/api-keys",authV1,(req,res)=>{
-  const keys=[...memory.apiKeys.values()].filter(k=>String(k.userId)===String(req.user.id)).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
-  res.json({scopes:[...API_KEY_SCOPES],keys:keys.map(k=>({id:k.id,name:k.name,scopes:k.scopes,createdAt:k.createdAt,lastUsedAt:k.lastUsedAt||null,expiresAt:k.expiresAt||null,revokedAt:k.revokedAt||null}))});
-});
-
-app.post("/api/v1/developer/api-keys",authV1,(req,res)=>{
-  const name=safeCredentialName(req.body?.name);
-  const scopes=validScopes(req.body?.scopes);
-  if(!scopes.length)return res.status(400).json({error:"Choose at least one valid scope."});
-  if(scopes.includes("community.manage") && !["owner","admin"].includes(String(req.user.globalRole||"member"))){
-    // Community-level authorization is still enforced per endpoint. This gate only prevents accidental broad keys.
-  }
-  const secret=makeApiKeySecret();
-  const record={id:id("apikey"),userId:req.user.id,name,hash:hashSecret(secret),prefix:secret.slice(0,18),scopes,createdAt:now(),lastUsedAt:null,expiresAt:req.body?.expiresAt?new Date(req.body.expiresAt).toISOString():null,revokedAt:null};
-  memory.apiKeys.set(record.id,record);
-  audit(req.user.id,"API_KEY_CREATE",record.id,{scopes:record.scopes});
-  schedulePersist();
-  res.status(201).json({key:{id:record.id,name:record.name,secret,scopes:record.scopes,createdAt:record.createdAt,warning:"This secret is shown once. Store it securely."}});
-});
-
-app.post("/api/v1/developer/api-keys/:id/revoke",authV1,(req,res)=>{
-  const key=memory.apiKeys.get(String(req.params.id));
-  if(!key || String(key.userId)!==String(req.user.id))return res.status(404).json({error:"API key not found"});
-  key.revokedAt=now();
-  audit(req.user.id,"API_KEY_REVOKE",key.id,{});
-  schedulePersist();
-  res.json({ok:true});
-});
-
-app.get("/api/v1/developer/applications",authV1,(req,res)=>{
-  const apps=[...memory.developerApplications.values()].filter(app=>String(app.ownerId)===String(req.user.id)).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
-  res.json({applications:apps.map(app=>({id:app.id,name:app.name,description:app.description,clientId:app.clientId,redirectUris:app.redirectUris,createdAt:app.createdAt,revokedAt:app.revokedAt||null}))});
-});
-
-app.post("/api/v1/developer/applications",authV1,(req,res)=>{
-  const name=safeCredentialName(req.body?.name||"ORBIT App");
-  const description=String(req.body?.description||"").trim().slice(0,500);
-  const redirectUris=Array.isArray(req.body?.redirectUris)?req.body.redirectUris.map(x=>String(x).trim()).filter(Boolean).slice(0,10):[];
-  for(const uri of redirectUris){
-    if(!/^https?:\/\/[^\s]+$/i.test(uri))return res.status(400).json({error:"Redirect URIs must be valid HTTP(S) URLs."});
-  }
-  const clientId=makeClientId();
-  const clientSecret=makeClientSecret();
-  const record={id:id("app"),ownerId:req.user.id,name,description,clientId,clientSecretHash:hashSecret(clientSecret),redirectUris,createdAt:now(),revokedAt:null};
-  memory.developerApplications.set(record.id,record);
-  audit(req.user.id,"DEVELOPER_APP_CREATE",record.id,{clientId});
-  schedulePersist();
-  res.status(201).json({application:{id:record.id,name,description,clientId,redirectUris,createdAt:record.createdAt},clientSecret,warning:"The client secret is shown once. Store it securely."});
-});
-
-app.post("/api/v1/developer/applications/:id/revoke",authV1,(req,res)=>{
-  const appRecord=memory.developerApplications.get(String(req.params.id));
-  if(!appRecord || String(appRecord.ownerId)!==String(req.user.id))return res.status(404).json({error:"Application not found"});
-  appRecord.revokedAt=now();
-  audit(req.user.id,"DEVELOPER_APP_REVOKE",appRecord.id,{});
-  schedulePersist();
-  res.json({ok:true});
-});
-
-app.get("/api/v1/developer/me",authApiKey,requireApiScope("profile.read"),(req,res)=>{
-  res.json({user:publicUser(req.user),apiKey:{id:req.apiKey.id,name:req.apiKey.name,scopes:req.apiKey.scopes}});
-});
-
-app.get("/api/v1/sdk/me",authApiKey,requireApiScope("profile.read"),(req,res)=>{
-  res.json({user:publicUser(req.user)});
-});
-
-app.get("/api/v1/sdk/communities",authApiKey,requireApiScope("communities.read"),(req,res)=>{
-  const rows=[...memory.servers.values()].filter(server=>server.members.has(String(req.user.id))).map(server=>({
-    id:server.id,name:server.name,memberCount:server.members.size,channelCount:server.channels.length
-  }));
-  res.json({communities:rows});
-});
-
-app.get("/api/v1/sdk/communities/:id/channels",authApiKey,requireApiScope("channels.read"),(req,res)=>{
-  const access=member(req.params.id,req.user.id);
-  if(!access)return res.status(403).json({error:"You are not a member of this community."});
-  const rows=access.server.channels.map(idValue=>memory.channels.get(idValue)).filter(Boolean).map(channel=>({id:channel.id,name:channel.name,type:channel.type,topic:channel.topic||""}));
-  res.json({channels:rows});
-});
-
-app.get("/api/v1/sdk/channels/:id/messages",authApiKey,requireApiScope("messages.read"),(req,res)=>{
-  const channel=memory.channels.get(String(req.params.id));
-  if(!channel)return res.status(404).json({error:"Channel not found"});
-  const access=member(channel.serverId,req.user.id);
-  if(!access || !can(access.role,PERMISSIONS.VIEW_CHANNEL))return res.status(403).json({error:"View Channel permission required."});
-  const rows=(memory.messages.get(channel.id)||[]).slice(-100).map(message=>({...message}));
-  res.json({messages:rows});
-});
-
-app.get("/api/v1/sdk/communities/:id/events",authApiKey,requireApiScope("events.read"),(req,res)=>{
-  const access=member(req.params.id,req.user.id);
-  if(!access)return res.status(403).json({error:"You are not a member of this community."});
-  const events=[...memory.events.values()]
-    .filter(event=>String(event.serverId)===String(req.params.id))
-    .sort((a,b)=>String(a.when).localeCompare(String(b.when)))
-    .slice(0,100)
-    .map(event=>sanitizeEvent(event,req.user.id));
-  res.json({events});
-});
-
-app.post("/api/v1/sdk/communities/:id/events",authApiKey,requireApiScope("events.write"),(req,res)=>{
-  const access=member(req.params.id,req.user.id);
-  if(!access)return res.status(403).json({error:"You are not a member of this community."});
-  if(!can(access.role,PERMISSIONS.MANAGE_EVENTS))return res.status(403).json({error:"Manage Events permission required."});
-  const title=String(req.body?.title||"").trim().slice(0,140);
-  const when=String(req.body?.when||"").trim();
-  if(!title||!when||Number.isNaN(new Date(when).getTime()))return res.status(400).json({error:"Valid title and date/time are required"});
-  const event={id:id("event"),serverId:access.server.id,title,description:String(req.body?.description||"").trim().slice(0,800),type:["Community","Gaming","Class","Meeting","Watch party","Voice","Video"].includes(req.body?.type)?req.body.type:"Community",when:new Date(when).toISOString(),creatorId:req.user.id,createdAt:now(),updatedAt:now(),rsvps:[String(req.user.id)]};
-  memory.events.set(event.id,event);
-  audit(req.user.id,"API_EVENT_CREATE",event.id,{serverId:event.serverId,apiKeyId:req.apiKey.id});
-  schedulePersist();
-  const result=sanitizeEvent(event,req.user.id);
-  emitToServer(event.serverId,"event:created",{event:result});
-  res.status(201).json({event:result});
-});
-
-app.post("/api/v1/sdk/channels/:id/messages",authApiKey,requireApiScope("messages.write"),(req,res)=>{
-  const channel=memory.channels.get(String(req.params.id));
-  if(!channel)return res.status(404).json({error:"Channel not found"});
-  const access=member(channel.serverId,req.user.id);
-  if(!access || !can(access.role,PERMISSIONS.SEND_MESSAGES))return res.status(403).json({error:"Send Messages permission required."});
-  if(!channelAllowsText(channel.type) || channel.locked || channel.archived)return res.status(423).json({error:"This channel is not writable."});
-  const content=String(req.body?.content||"").trim().slice(0,4000);
-  if(!content)return res.status(400).json({error:"Message content is required."});
-  const message={id:id("msg"),channelId:channel.id,serverId:channel.serverId,userId:req.user.id,username:req.user.username,content,createdAt:now(),created_at:now(),attachments:[],reactions:{}};
-  const list=memory.messages.get(channel.id)||[];
-  list.push(message);
-  memory.messages.set(channel.id,list.slice(-2000));
-  const server=memory.servers.get(channel.serverId);
-  for(const uid of server?.members?.keys?.()||[])notify(uid,{type:"message",title:"#"+channel.name,body:req.user.username+": "+content,actorId:req.user.id,channelId:channel.id});
-  emitToServer(channel.serverId,"message:new",message);
-  audit(req.user.id,"API_MESSAGE_CREATE",message.id,{channelId:channel.id,apiKeyId:req.apiKey.id});
-  schedulePersist();
-  res.status(201).json({message});
-});
-
-app.post("/api/v1/analytics/events",authV1,(req,res)=>{
-  const events=Array.isArray(req.body?.events)?req.body.events:[req.body];
-  let accepted=0;
-  for(const event of events.slice(0,50)){
-    const name=String(event?.name||"").trim();
-    if(!/^[a-zA-Z0-9_.:-]{2,120}$/.test(name))continue;
-    trackEvent(name,req.user.id,event?.properties||{});
-    accepted++;
-  }
-  res.status(202).json({accepted});
-});
-
-app.get("/api/v1/admin/analytics/overview",authV1,(req,res)=>{
-  if(!requireOwner(req,res))return;
-  const windowDays=Math.max(1,Math.min(90,Number(req.query.days||30)));
-  const since=Date.now()-windowDays*24*60*60*1000;
-  const recent=memory.analyticsEvents.filter(e=>new Date(e.occurredAt).getTime()>=since);
-  const counts={};
-  for(const event of recent)counts[event.name]=(counts[event.name]||0)+1;
-  const uniqueUsers=new Set(recent.map(e=>e.userId).filter(Boolean)).size;
-  const daily={};
-  for(const event of recent){
-    const day=String(event.occurredAt).slice(0,10);
-    daily[day]=(daily[day]||0)+1;
-  }
-  res.json({
-    windowDays,
-    totalEvents:recent.length,
-    uniqueUsers,
-    topEvents:Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,25).map(([name,count])=>({name,count})),
-    daily:Object.entries(daily).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count}))
-  });
-});
-
-app.get("/api/v1/platform/manifest", (req, res) => {
-  res.json({
-    ...platformManifest,
-    runtime: {
-      node: process.version,
-      uptime: Math.floor(process.uptime()),
-      persistence: persistMode,
-      realtimeScaling: realtimeScale.enabled,
-      objectStorage: objectStorage.enabled
-    }
+    time: now()
   });
 });
 
@@ -922,99 +580,6 @@ app.post("/api/auth/login", async (req, res) => {
   res.json({ user: publicUser(user), token: tokenFor(user) });
 });
 
-app.post("/api/v1/auth/register", async (req,res)=>{
-  const username=validAccountUsername(req.body?.username);
-  const password=String(req.body?.password||"");
-  const displayName=cleanName(req.body?.displayName||username,username);
-  if(!username) return res.status(400).json({error:"Username must be 4–20 characters and use letters, numbers, dots, underscores or hyphens."});
-  if(!validAccountPassword(password)) return res.status(400).json({error:"Password must be 8–72 characters."});
-  if([...memory.users.values()].some(user=>String(user.username||"").toLowerCase()===username.toLowerCase()))
-    return res.status(409).json({error:"That username is already in use."});
-  const passwordHash=await bcrypt.hash(password,12);
-  const user={id:id("user"),username,displayName,passwordHash,accountCreatedAt:now(),status:"online",activity:"Online",activityType:"custom",bio:"",createdAt:now(),avatarUrl:null,avatarDecoration:"none",avatarDecorationUrl:null,stats:{messages:0,voiceJoins:0,serversCreated:0,friends:0}};
-  memory.users.set(user.id,user);
-  ensureDefaultServer(user);
-  trackEvent("auth.register",user.id,{method:"password"});
-  const issued=v1Sessions.issue(user,req);
-  setRefreshCookie(res,issued.refreshToken,env.nodeEnv==="production");
-  schedulePersist();
-  res.status(201).json({user:publicUser(user),token:issued.accessToken,accessToken:issued.accessToken,expiresIn:900,session:issued.session});
-});
-
-app.post("/api/v1/auth/login", async (req,res)=>{
-  const username=validAccountUsername(req.body?.username);
-  const password=String(req.body?.password||"");
-  if(!username||!password) return res.status(400).json({error:"Username and password are required."});
-  const key=authAttemptKey(req,username);
-  const nowMs=Date.now();
-  const history=accountLoginAttempts.get(key)||{count:0,resetAt:nowMs+10*60*1000};
-  if(nowMs>history.resetAt){history.count=0;history.resetAt=nowMs+10*60*1000}
-  if(history.count>=12) return res.status(429).json({error:"Too many sign-in attempts. Try again later."});
-  const user=[...memory.users.values()].find(item=>String(item.username||"").toLowerCase()===username.toLowerCase()&&item.passwordHash);
-  const ok=Boolean(user)&&await bcrypt.compare(password,user.passwordHash);
-  if(!ok){history.count+=1;accountLoginAttempts.set(key,history);return res.status(401).json({error:"Incorrect username or password."})}
-  if(user?.twoFactor?.enabled){
-    const rawTwoFactor=String(req.body?.twoFactorCode||"").trim();
-    let validTwoFactor=false;
-    try{
-      const secret=decryptSecret(user.twoFactor.secretEncrypted,JWT_SECRET);
-      validTwoFactor=verifyTotp(secret,rawTwoFactor);
-    }catch{}
-    if(!validTwoFactor && rawTwoFactor) validTwoFactor=consumeRecoveryCode(user.twoFactor.recoveryCodes||[],rawTwoFactor);
-    if(!validTwoFactor) return res.status(401).json({error:"Two-factor authentication is required.",code:"TWO_FACTOR_REQUIRED"});
-  }
-  accountLoginAttempts.delete(key);
-  user.status="online";user.activity="Online";
-  trackEvent("auth.login",user.id,{method:"password",twoFactor:Boolean(user.twoFactor?.enabled)});
-  const issued=v1Sessions.issue(user,req);
-  setRefreshCookie(res,issued.refreshToken,env.nodeEnv==="production");
-  schedulePersist();
-  res.json({user:publicUser(user),token:issued.accessToken,accessToken:issued.accessToken,expiresIn:900,session:issued.session});
-});
-
-app.post("/api/v1/auth/refresh",(req,res)=>{
-  try{
-    const cookies=cookieMap(req);
-    const issued=v1Sessions.refresh(cookies.orbit_refresh,req);
-    setRefreshCookie(res,issued.refreshToken,env.nodeEnv==="production");
-    schedulePersist();
-    res.json({user:publicUser(v1Sessions.verifyAccess(issued.accessToken).user),token:issued.accessToken,accessToken:issued.accessToken,expiresIn:900,session:issued.session});
-  }catch{
-    clearRefreshCookie(res,env.nodeEnv==="production");
-    res.status(401).json({error:"Refresh session is invalid or expired."});
-  }
-});
-
-app.post("/api/v1/auth/logout",authV1,(req,res)=>{
-  const sessionId=req.v1Session?.id;
-  if(sessionId) v1Sessions.revoke(sessionId,req.user.id);
-  clearRefreshCookie(res,env.nodeEnv==="production");
-  schedulePersist();
-  res.json({ok:true});
-});
-
-app.get("/api/v1/auth/me",authV1,(req,res)=>{
-  res.json({user:publicUser(req.user),sessionId:req.v1Session.id});
-});
-
-app.get("/api/v1/auth/sessions",authV1,(req,res)=>{
-  res.json({sessions:v1Sessions.list(req.user.id),currentSessionId:req.v1Session.id});
-});
-
-app.post("/api/v1/auth/sessions/:id/revoke",authV1,(req,res)=>{
-  const target=String(req.params.id);
-  if(target===String(req.v1Session.id)) return res.status(400).json({error:"Use Log out for the current session."});
-  if(!v1Sessions.revoke(target,req.user.id)) return res.status(404).json({error:"Session not found"});
-  schedulePersist();
-  res.json({ok:true});
-});
-
-app.post("/api/v1/auth/sessions/revoke-others",authV1,(req,res)=>{
-  const count=v1Sessions.revokeAllExcept(req.v1Session.id,req.user.id);
-  schedulePersist();
-  res.json({ok:true,revoked:count});
-});
-
 app.post("/api/auth/convert-legacy", authLegacy, async (req, res) => {
   if (req.user.passwordHash) return res.status(400).json({ error: "This account is already configured." });
   const username = validAccountUsername(req.body?.username || req.user.username);
@@ -1032,62 +597,6 @@ app.post("/api/auth/convert-legacy", authLegacy, async (req, res) => {
 
 app.get("/api/me", authLegacy, (req, res) => {
   res.json({ user: publicUser(req.user) });
-});
-
-app.get("/api/v1/security/2fa",authV1,(req,res)=>{
-  const two=req.user.twoFactor||{};
-  res.json({enabled:Boolean(two.enabled),pending:Boolean(two.pendingSecretEncrypted),recoveryCodesRemaining:Array.isArray(two.recoveryCodes)?two.recoveryCodes.filter(x=>!x.usedAt).length:0});
-});
-
-app.post("/api/v1/security/2fa/setup",authV1,(req,res)=>{
-  const two=req.user.twoFactor||{};
-  if(two.enabled)return res.status(409).json({error:"Two-factor authentication is already enabled."});
-  const secret=generateSecret();
-  req.user.twoFactor={enabled:false,pendingSecretEncrypted:encryptSecret(secret,JWT_SECRET),pendingCreatedAt:now(),recoveryCodes:[]};
-  schedulePersist();
-  res.json({secret,otpauthUri:setupUri(secret,req.user.username),expiresInSeconds:900});
-});
-
-app.post("/api/v1/security/2fa/verify",authV1,(req,res)=>{
-  const two=req.user.twoFactor||{};
-  if(two.enabled)return res.status(409).json({error:"Two-factor authentication is already enabled."});
-  if(!two.pendingSecretEncrypted)return res.status(400).json({error:"Start 2FA setup first."});
-  if(two.pendingCreatedAt && Date.now()-new Date(two.pendingCreatedAt).getTime()>15*60*1000)return res.status(400).json({error:"The pending 2FA setup expired. Start again."});
-  let secret="";
-  try{secret=decryptSecret(two.pendingSecretEncrypted,JWT_SECRET)}catch{return res.status(400).json({error:"The pending 2FA setup is invalid."})}
-  if(!verifyTotp(secret,String(req.body?.code||"")))return res.status(400).json({error:"Invalid authenticator code."});
-  const recoveryCodes=makeRecoveryCodes(10);
-  req.user.twoFactor={enabled:true,enabledAt:now(),secretEncrypted:two.pendingSecretEncrypted,pendingSecretEncrypted:null,pendingCreatedAt:null,recoveryCodes:recoveryCodes.map(code=>({hash:hashRecoveryCode(code),usedAt:null}))};
-  audit(req.user.id,"2FA_ENABLE",req.user.id);
-  schedulePersist();
-  res.json({enabled:true,recoveryCodes});
-});
-
-app.post("/api/v1/security/2fa/disable",authV1,(req,res)=>{
-  const two=req.user.twoFactor||{};
-  if(!two.enabled)return res.status(400).json({error:"Two-factor authentication is not enabled."});
-  let valid=false;
-  try{valid=verifyTotp(decryptSecret(two.secretEncrypted,JWT_SECRET),String(req.body?.code||""))}catch{}
-  if(!valid && req.body?.recoveryCode)valid=consumeRecoveryCode(two.recoveryCodes||[],String(req.body.recoveryCode));
-  if(!valid)return res.status(400).json({error:"Valid authenticator or recovery code required."});
-  req.user.twoFactor={enabled:false,pendingSecretEncrypted:null,pendingCreatedAt:null,recoveryCodes:[]};
-  audit(req.user.id,"2FA_DISABLE",req.user.id);
-  schedulePersist();
-  res.json({enabled:false});
-});
-
-app.post("/api/v1/uploads/presign", authV1, async (req,res)=>{
-  if(!objectStorage.enabled) return res.status(503).json({error:"Object storage is not configured.",code:"STORAGE_NOT_CONFIGURED"});
-  try{
-    const result=await objectStorage.presignUpload({
-      filename:req.body?.filename,
-      contentType:req.body?.contentType,
-      size:req.body?.size
-    },req.user.id);
-    res.status(201).json({upload:result});
-  }catch(error){
-    res.status(400).json({error:error.message});
-  }
 });
 
 app.get("/api/pulse", auth, (req, res) => {
@@ -1146,21 +655,6 @@ app.get("/api/search", auth, (req, res) => {
 function pairKey(a, b) {
   return [String(a), String(b)].sort().join(":");
 }
-function directedPairKey(a,b){return String(a)+":"+String(b);}
-function isBlocked(a,b){return memory.blocks.has(directedPairKey(a,b)) || memory.blocks.has(pairKey(a,b));}
-function isMuted(a,b){return memory.mutes.has(directedPairKey(a,b)) || memory.mutes.has(pairKey(a,b));}
-function defaultNotificationPreferences(){return {mentions:true,directMessages:true,friendRequests:true,events:true,streams:true,security:true,replies:true,social:true};}
-function userNotificationPreferences(userId){
-  const current=memory.notificationPreferences.get(String(userId));
-  if(!current){const created=defaultNotificationPreferences();memory.notificationPreferences.set(String(userId),created);return created;}
-  return {...defaultNotificationPreferences(),...current};
-}
-function notificationAllowed(userId,type){
-  const prefs=userNotificationPreferences(userId);
-  const map={friend_request:"friendRequests",message:"directMessages",reply:"replies",event:"events",stream:"streams",security:"security",social:"social",mention:"mentions"};
-  const key=map[String(type||"social")]||"social";
-  return prefs[key]!==false;
-}
 function findMessage(messageId) {
   for (const [channelId, list] of memory.messages.entries()) {
     const index = list.findIndex(m => String(m.id) === String(messageId));
@@ -1169,7 +663,6 @@ function findMessage(messageId) {
   return null;
 }
 function notify(userId, item) {
-  if(!notificationAllowed(userId,item?.type)) return;
   const list = memory.notifications.get(String(userId)) || [];
   list.unshift({
     id: id("notif"),
@@ -1365,75 +858,6 @@ app.put("/api/servers/:id/nexus/world", auth, (req, res) => {
   emitToServer(access.server.id, "nexus:world-updated", { world });
   res.json({ world });
 });
-app.get("/api/v1/social/blocks",auth,(req,res)=>{
-  res.json({blocks:[...memory.blocks].filter(key=>key.startsWith(String(req.user.id)+":")).map(key=>{
-    const ids=key.split(":"); const other=ids[0]===String(req.user.id)?ids[1]:ids[0];
-    return publicUser(memory.users.get(other)||{id:other});
-  })});
-});
-app.post("/api/v1/social/blocks/:userId",auth,(req,res)=>{
-  const other=memory.users.get(String(req.params.userId));
-  if(!other)return res.status(404).json({error:"User not found"});
-  if(String(other.id)===String(req.user.id))return res.status(400).json({error:"You cannot block yourself"});
-  const key=directedPairKey(req.user.id,other.id);
-  memory.blocks.add(key);
-  memory.friendships.delete(key);
-  for(const [idValue,r] of memory.friendRequests.entries()){
-    if((String(r.from)===String(req.user.id)&&String(r.to)===String(other.id))||(String(r.from)===String(other.id)&&String(r.to)===String(req.user.id))) r.status="cancelled";
-  }
-  audit(req.user.id,"USER_BLOCK",other.id);
-  schedulePersist();
-  res.json({ok:true,user:publicUser(other)});
-});
-app.delete("/api/v1/social/blocks/:userId",auth,(req,res)=>{
-  memory.blocks.delete(directedPairKey(req.user.id,req.params.userId));
-  schedulePersist();
-  res.json({ok:true});
-});
-app.get("/api/v1/social/mutes",auth,(req,res)=>{
-  res.json({mutes:[...memory.mutes].filter(key=>key.startsWith(String(req.user.id)+":")).map(key=>{
-    const ids=key.split(":"); const other=ids[0]===String(req.user.id)?ids[1]:ids[0];
-    return publicUser(memory.users.get(other)||{id:other});
-  })});
-});
-app.post("/api/v1/social/mutes/:userId",auth,(req,res)=>{
-  const other=memory.users.get(String(req.params.userId));
-  if(!other)return res.status(404).json({error:"User not found"});
-  if(String(other.id)===String(req.user.id))return res.status(400).json({error:"You cannot mute yourself"});
-  memory.mutes.add(directedPairKey(req.user.id,other.id));
-  schedulePersist();
-  res.json({ok:true});
-});
-app.delete("/api/v1/social/mutes/:userId",auth,(req,res)=>{
-  memory.mutes.delete(directedPairKey(req.user.id,req.params.userId));
-  schedulePersist();
-  res.json({ok:true});
-});
-app.get("/api/v1/me/preferences",auth,(req,res)=>{
-  const locale=(memory.userSettings.get(String(req.user.id))||{}).locale||"en";
-  res.json({locale,dir:locale==="ar"?"rtl":"ltr",timezone:(memory.userSettings.get(String(req.user.id))||{}).timezone||null,notifications:userNotificationPreferences(req.user.id)});
-});
-app.patch("/api/v1/me/preferences",auth,(req,res)=>{
-  const current=memory.userSettings.get(String(req.user.id))||{};
-  if(req.body?.locale!==undefined){
-    const locale=String(req.body.locale||"en").toLowerCase();
-    if(!["en","ar"].includes(locale))return res.status(400).json({error:"Supported locales: en, ar"});
-    current.locale=locale;
-  }
-  if(req.body?.timezone!==undefined) current.timezone=String(req.body.timezone||"").slice(0,80)||null;
-  if(req.body?.notifications && typeof req.body.notifications==="object"){
-    current.notificationPreferences=userNotificationPreferences(req.user.id);
-    for(const key of Object.keys(current.notificationPreferences)){
-      if(req.body.notifications[key]!==undefined) current.notificationPreferences[key]=Boolean(req.body.notifications[key]);
-    }
-    memory.notificationPreferences.set(String(req.user.id),current.notificationPreferences);
-  }
-  memory.userSettings.set(String(req.user.id),current);
-  schedulePersist();
-  const locale=current.locale||"en";
-  res.json({locale,dir:locale==="ar"?"rtl":"ltr",timezone:current.timezone||null,notifications:userNotificationPreferences(req.user.id)});
-});
-
 app.get("/api/friends", auth, (req, res) => {
   const userId = String(req.user.id);
   const friends = [];
@@ -1457,8 +881,6 @@ app.post("/api/friends/request", auth, (req, res) => {
   const target = [...memory.users.values()].find(u => u.username.toLowerCase() === targetName);
   if (!target) return res.status(404).json({ error: "User not found" });
   if (target.id === req.user.id) return res.status(400).json({ error: "You cannot add yourself" });
-  if (isBlocked(req.user.id,target.id)) return res.status(403).json({ error: "You blocked this user" });
-  if (isBlocked(target.id,req.user.id)) return res.status(403).json({ error: "This user cannot receive friend requests from you" });
   if (memory.friendships.has(pairKey(req.user.id, target.id))) return res.status(409).json({ error: "Already friends" });
   const existing = [...memory.friendRequests.values()].find(r =>
     r.status === "pending" &&
@@ -1516,8 +938,6 @@ app.post("/api/dms", auth, (req, res) => {
   const target = targetId ? memory.users.get(targetId) : [...memory.users.values()].find(u => u.username.toLowerCase() === targetName);
   if (!target) return res.status(404).json({ error: "User not found" });
   if (target.id === req.user.id) return res.status(400).json({ error: "You cannot message yourself" });
-  if (isBlocked(req.user.id,target.id)) return res.status(403).json({error:"You blocked this user"});
-  if (isBlocked(target.id,req.user.id)) return res.status(403).json({error:"This user has blocked you"});
 
   const existing = [...memory.dms.values()].find(dm => dm.type === "dm" && dm.members.length === 2 && dm.members.includes(String(req.user.id)) && dm.members.includes(String(target.id)));
   if (existing) return res.json({ dm: existing });
@@ -1596,95 +1016,6 @@ app.post("/api/dms/:id/read", auth, (req, res) => {
   res.json({ ok: true, readAt });
 });
 
-app.get("/api/v1/channels/:id/posts",auth,(req,res)=>{
-  const channel=memory.channels.get(String(req.params.id));
-  if(!channel || channel.type!=="forum")return res.status(400).json({error:"This channel is not a forum"});
-  const access=member(channel.serverId,req.user.id);
-  if(!access)return res.status(403).json({error:"Not a member"});
-  const limit=Math.max(1,Math.min(50,Number(req.query.limit||25)));
-  const before=req.query.before?String(req.query.before):null;
-  let rows=[...memory.posts.values()].filter(p=>String(p.channelId)===String(channel.id)&&!p.deletedAt).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
-  if(before)rows=rows.filter(p=>String(p.createdAt)<before);
-  rows=rows.slice(0,limit).map(post=>({...post,author:publicUser(memory.users.get(post.authorId)||{}),commentCount:(memory.postComments.get(post.id)||[]).length}));
-  res.json({posts:rows,nextBefore:rows.length===limit?rows[rows.length-1].createdAt:null});
-});
-
-app.post("/api/v1/channels/:id/posts",auth,(req,res)=>{
-  const channel=memory.channels.get(String(req.params.id));
-  if(!channel || channel.type!=="forum")return res.status(400).json({error:"This channel is not a forum"});
-  const access=member(channel.serverId,req.user.id);
-  if(!access || !can(access.role,PERMISSIONS.SEND_MESSAGES))return res.status(403).json({error:"Send Messages permission required"});
-  if(channel.archived || channel.locked)return res.status(423).json({error:"This forum is locked"});
-  const title=String(req.body?.title||"").trim().slice(0,180);
-  const body=String(req.body?.body||"").trim().slice(0,10000);
-  if(!title||!body)return res.status(400).json({error:"Post title and body are required"});
-  const post={id:id("post"),channelId:channel.id,serverId:channel.serverId,authorId:req.user.id,title,body,tags:Array.isArray(req.body?.tags)?req.body.tags.map(x=>String(x).trim().slice(0,32)).filter(Boolean).slice(0,8):[],createdAt:now(),updatedAt:now(),deletedAt:null,pinned:false,solved:false,reactions:{}};
-  memory.posts.set(post.id,post);
-  memory.postComments.set(post.id,[]);
-  emitToServer(channel.serverId,"forum:post-created",{post:{...post,author:publicUser(req.user),commentCount:0}});
-  audit(req.user.id,"FORUM_POST_CREATE",post.id,{serverId:channel.serverId,channelId:channel.id});
-  schedulePersist();
-  res.status(201).json({post:{...post,author:publicUser(req.user),commentCount:0}});
-});
-
-app.get("/api/v1/posts/:id/comments",auth,(req,res)=>{
-  const post=memory.posts.get(String(req.params.id));
-  if(!post)return res.status(404).json({error:"Post not found"});
-  const access=member(post.serverId,req.user.id);
-  if(!access)return res.status(403).json({error:"Not a member"});
-  const comments=(memory.postComments.get(post.id)||[]).map(c=>({...c,author:publicUser(memory.users.get(c.authorId)||{})}));
-  res.json({comments});
-});
-
-app.post("/api/v1/posts/:id/comments",auth,(req,res)=>{
-  const post=memory.posts.get(String(req.params.id));
-  if(!post)return res.status(404).json({error:"Post not found"});
-  const access=member(post.serverId,req.user.id);
-  if(!access || !can(access.role,PERMISSIONS.SEND_MESSAGES))return res.status(403).json({error:"Send Messages permission required"});
-  const body=String(req.body?.body||"").trim().slice(0,4000);
-  if(!body)return res.status(400).json({error:"Comment is required"});
-  const comment={id:id("comment"),postId:post.id,authorId:req.user.id,body,createdAt:now()};
-  const list=memory.postComments.get(post.id)||[];
-  list.push(comment);
-  memory.postComments.set(post.id,list.slice(-500));
-  notify(post.authorId,{type:"reply",title:"New forum reply",body:req.user.username+" replied to your post",actorId:req.user.id,postId:post.id});
-  emitToServer(post.serverId,"forum:comment-created",{postId:post.id,comment:{...comment,author:publicUser(req.user)}});
-  schedulePersist();
-  res.status(201).json({comment:{...comment,author:publicUser(req.user)}});
-});
-
-app.post("/api/v1/posts/:id/reaction",auth,(req,res)=>{
-  const post=memory.posts.get(String(req.params.id));
-  if(!post)return res.status(404).json({error:"Post not found"});
-  const access=member(post.serverId,req.user.id);
-  if(!access || !can(access.role,PERMISSIONS.ADD_REACTIONS))return res.status(403).json({error:"Add Reactions permission required"});
-  const emoji=String(req.body?.emoji||"👍").slice(0,8);
-  post.reactions=post.reactions||{};
-  const users=post.reactions[emoji]||[];
-  const index=users.indexOf(String(req.user.id));
-  if(index===-1)users.push(String(req.user.id));else users.splice(index,1);
-  post.reactions[emoji]=users;
-  emitToServer(post.serverId,"forum:post-reaction",{postId:post.id,reactions:post.reactions});
-  schedulePersist();
-  res.json({reactions:post.reactions});
-});
-
-app.patch("/api/v1/posts/:id",auth,(req,res)=>{
-  const post=memory.posts.get(String(req.params.id));
-  if(!post)return res.status(404).json({error:"Post not found"});
-  const access=member(post.serverId,req.user.id);
-  if(!access)return res.status(403).json({error:"Not a member"});
-  if(String(post.authorId)!==String(req.user.id)&&!can(access.role,PERMISSIONS.MANAGE_MESSAGES))return res.status(403).json({error:"Permission denied"});
-  if(req.body?.title!==undefined)post.title=String(req.body.title||"").trim().slice(0,180);
-  if(req.body?.body!==undefined)post.body=String(req.body.body||"").trim().slice(0,10000);
-  if(req.body?.pinned!==undefined&&can(access.role,PERMISSIONS.MANAGE_MESSAGES))post.pinned=Boolean(req.body.pinned);
-  if(req.body?.solved!==undefined)post.solved=Boolean(req.body.solved);
-  post.updatedAt=now();
-  emitToServer(post.serverId,"forum:post-updated",{post});
-  schedulePersist();
-  res.json({post:{...post,author:publicUser(memory.users.get(post.authorId)||{}),commentCount:(memory.postComments.get(post.id)||[]).length}});
-});
-
 app.get("/api/notifications", auth, (req, res) => {
   res.json({ notifications: memory.notifications.get(String(req.user.id)) || [] });
 });
@@ -1716,37 +1047,6 @@ app.post("/api/messages/:id/thread", auth, (req, res) => {
   thread.replies.push(reply);
   notify(found.message.user_id, { type: "reply", title: "New thread reply", body: req.user.username + " replied to your message", actorId: req.user.id, messageId: found.message.id });
   res.status(201).json({ reply, thread });
-});
-
-app.get("/api/v1/bookmarks",auth,(req,res)=>{
-  const rows=[...memory.bookmarks.values()]
-    .filter(b=>String(b.userId)===String(req.user.id))
-    .sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)))
-    .map(b=>{
-      const found=findMessage(b.messageId);
-      return {id:b.id,messageId:b.messageId,channelId:found?.channelId||null,createdAt:b.createdAt,message:found?.message||null};
-    })
-    .filter(b=>b.message);
-  res.json({bookmarks:rows});
-});
-
-app.post("/api/v1/messages/:id/bookmark",auth,(req,res)=>{
-  const found=findMessage(req.params.id);
-  if(!found)return res.status(404).json({error:"Message not found"});
-  const channel=memory.channels.get(found.channelId);
-  if(!channel || !member(channel.serverId,req.user.id))return res.status(403).json({error:"Not a member"});
-  const key=String(req.user.id)+":"+String(found.message.id);
-  const existing=memory.bookmarks.get(key);
-  if(existing){
-    memory.bookmarks.delete(key);
-    schedulePersist();
-    return res.json({bookmarked:false});
-  }
-  const bookmark={id:id("bookmark"),key,userId:String(req.user.id),messageId:String(found.message.id),channelId:String(channel.id),createdAt:now()};
-  memory.bookmarks.set(key,bookmark);
-  audit(req.user.id,"MESSAGE_BOOKMARK",found.message.id,{channelId:channel.id});
-  schedulePersist();
-  res.status(201).json({bookmarked:true,bookmark});
 });
 
 app.post("/api/messages/:id/reaction", auth, (req, res) => {
@@ -2034,7 +1334,6 @@ app.get("/api/servers/:id/events", auth, (req,res)=>{
 app.post("/api/servers/:id/events", auth, (req,res)=>{
   const access=member(req.params.id,req.user.id);
   if(!access) return res.status(403).json({error:"Not a member"});
-  if(!can(access.role,PERMISSIONS.MANAGE_EVENTS)) return res.status(403).json({error:"Manage Events permission required"});
   const title=String(req.body?.title||"").trim().slice(0,140);
   const when=String(req.body?.when||"").trim();
   if(!title||!when||Number.isNaN(new Date(when).getTime())) return res.status(400).json({error:"Valid title and date/time are required"});
@@ -2061,7 +1360,7 @@ app.patch("/api/events/:id", auth, (req,res)=>{
   if(!event) return res.status(404).json({error:"Event not found"});
   const access=member(event.serverId,req.user.id);
   if(!access) return res.status(403).json({error:"Not a member"});
-  if(String(event.creatorId)!==String(req.user.id) && !can(access.role,PERMISSIONS.MANAGE_EVENTS)) return res.status(403).json({error:"Manage Events permission required"});
+  if(String(event.creatorId)!==String(req.user.id) && !canManage(access.role)) return res.status(403).json({error:"Permission denied"});
   if(req.body?.title!==undefined) event.title=String(req.body.title||"").trim().slice(0,140);
   if(req.body?.description!==undefined) event.description=String(req.body.description||"").trim().slice(0,800);
   if(req.body?.type!==undefined && ["Community","Gaming","Class","Meeting","Watch party","Voice","Video"].includes(req.body.type)) event.type=req.body.type;
@@ -2081,7 +1380,7 @@ app.delete("/api/events/:id", auth, (req,res)=>{
   if(!event) return res.status(404).json({error:"Event not found"});
   const access=member(event.serverId,req.user.id);
   if(!access) return res.status(403).json({error:"Not a member"});
-  if(String(event.creatorId)!==String(req.user.id) && !can(access.role,PERMISSIONS.MANAGE_EVENTS)) return res.status(403).json({error:"Manage Events permission required"});
+  if(String(event.creatorId)!==String(req.user.id) && !canManage(access.role)) return res.status(403).json({error:"Permission denied"});
   memory.events.delete(event.id);
   emitToServer(event.serverId,"event:deleted",{eventId:event.id});
   res.json({ok:true});
@@ -2259,7 +1558,6 @@ app.post("/api/live/:id/end", auth, (req,res)=>{
 });
 
 app.post("/api/uploads", auth, (req,res)=>{
-  if(!objectStorage.enabled) return res.status(503).json({error:"Object storage is not configured.",code:"STORAGE_NOT_CONFIGURED"});
   const data=String(req.body?.data||"");
   if(!data || data.length>6_000_000) return res.status(400).json({error:"File is missing or too large"});
   const type=String(req.body?.type||"application/octet-stream").slice(0,120);
@@ -2355,104 +1653,6 @@ app.patch("/api/me", auth, (req, res) => {
   res.json({ user: publicUser(req.user) });
 });
 
-app.get("/api/v1/servers/:id/permissions",auth,(req,res)=>{
-  const access=member(req.params.id,req.user.id);
-  if(!access)return res.status(403).json({error:"Not a member"});
-  const bits=ROLE_BITS_FOR_ROLE(access.role);
-  res.json({role:access.role,permissions:bits.map(x=>x.label),bits:bits.reduce((out,x)=>{out[x.key]=x.value;return out},{})});
-});
-
-app.get("/api/v1/servers/:id/channels",auth,(req,res)=>{
-  const access=member(req.params.id,req.user.id);
-  if(!access)return res.status(403).json({error:"Not a member"});
-  const channels=access.server.channels.map(idValue=>memory.channels.get(idValue)).filter(Boolean).sort((a,b)=>Number(a.position||0)-Number(b.position||0)).map(channel=>({
-    ...channel,
-    canView:true,
-    canSend:can(access.role,PERMISSIONS.SEND_MESSAGES),
-    canManage:can(access.role,PERMISSIONS.MANAGE_CHANNELS)
-  }));
-  res.json({channels});
-});
-
-app.post("/api/v1/servers/:id/channels",auth,(req,res)=>{
-  const access=member(req.params.id,req.user.id);
-  if(!access || !canCreateChannel(access.role))return res.status(403).json({error:"Manage Channels permission required"});
-  const name=cleanName(req.body?.name,"channel").toLowerCase().replace(/[^a-z0-9\u0600-\u06ff _-]/g,"-").replace(/-+/g,"-").slice(0,80);
-  const type=String(req.body?.type||"text").toLowerCase();
-  if(!name)return res.status(400).json({error:"Channel name is required"});
-  if(!CHANNEL_TYPES.includes(type))return res.status(400).json({error:"Unsupported channel type"});
-  const channelId=id("channel");
-  const position=access.server.channels.length;
-  const channel={
-    id:channelId,
-    serverId:access.server.id,
-    name,
-    type,
-    topic:String(req.body?.topic||"").trim().slice(0,255),
-    position,
-    categoryId:req.body?.categoryId?String(req.body.categoryId):null,
-    slowmode:Math.max(0,Math.min(120,Number(req.body?.slowmode||0))),
-    archived:Boolean(req.body?.archived),
-    locked:Boolean(req.body?.locked),
-    nsfw:Boolean(req.body?.nsfw),
-    createdAt:now(),
-    permissionOverrides:{}
-  };
-  access.server.channels.push(channelId);
-  memory.channels.set(channelId,channel);
-  memory.messages.set(channelId,[]);
-  if(channel.type==="forum") channel.postsEnabled=true;
-  if(channelAllowsRealtime(type)) channel.realtimeMode=type;
-  if(channelAllowsText(type)===false) channel.messageMode="realtime";
-  audit(req.user.id,"CHANNEL_CREATE",channelId,{serverId:access.server.id,type,name});
-  emitToServer(access.server.id,"channel:created",{channel});
-  schedulePersist();
-  res.status(201).json({channel});
-});
-
-app.patch("/api/v1/channels/:id",auth,(req,res)=>{
-  const channel=memory.channels.get(String(req.params.id));
-  if(!channel)return res.status(404).json({error:"Channel not found"});
-  const access=member(channel.serverId,req.user.id);
-  if(!access || !canCreateChannel(access.role))return res.status(403).json({error:"Manage Channels permission required"});
-  if(req.body?.name!==undefined){
-    const name=cleanName(req.body.name,"channel").toLowerCase().replace(/[^a-z0-9\u0600-\u06ff _-]/g,"-").replace(/-+/g,"-").slice(0,80);
-    if(!name)return res.status(400).json({error:"Channel name is required"});
-    channel.name=name;
-  }
-  if(req.body?.topic!==undefined)channel.topic=String(req.body.topic||"").trim().slice(0,255);
-  if(req.body?.categoryId!==undefined)channel.categoryId=req.body.categoryId?String(req.body.categoryId):null;
-  if(req.body?.archived!==undefined)channel.archived=Boolean(req.body.archived);
-  if(req.body?.locked!==undefined)channel.locked=Boolean(req.body.locked);
-  if(req.body?.nsfw!==undefined)channel.nsfw=Boolean(req.body.nsfw);
-  if(req.body?.slowmode!==undefined){
-    const value=Number(req.body.slowmode);
-    if(!Number.isFinite(value)||value<0||value>120)return res.status(400).json({error:"Slowmode must be between 0 and 120 seconds"});
-    channel.slowmode=Math.round(value);
-  }
-  channel.updatedAt=now();
-  audit(req.user.id,"CHANNEL_UPDATE",channel.id,{serverId:channel.serverId});
-  emitToServer(channel.serverId,"channel:updated",{channel});
-  schedulePersist();
-  res.json({channel});
-});
-
-app.delete("/api/v1/channels/:id",auth,(req,res)=>{
-  const channel=memory.channels.get(String(req.params.id));
-  if(!channel)return res.status(404).json({error:"Channel not found"});
-  const access=member(channel.serverId,req.user.id);
-  if(!access || !canCreateChannel(access.role))return res.status(403).json({error:"Manage Channels permission required"});
-  if(access.server.channels.length<=1)return res.status(400).json({error:"A community must keep at least one channel"});
-  access.server.channels=access.server.channels.filter(idValue=>String(idValue)!==String(channel.id));
-  memory.channels.delete(channel.id);
-  memory.messages.delete(channel.id);
-  for(const [postId,post] of [...memory.posts.entries()])if(String(post.channelId)===String(channel.id)){memory.posts.delete(postId);memory.postComments.delete(postId)}
-  audit(req.user.id,"CHANNEL_DELETE",channel.id,{serverId:channel.serverId});
-  emitToServer(channel.serverId,"channel:deleted",{channelId:channel.id});
-  schedulePersist();
-  res.json({ok:true});
-});
-
 app.get("/api/servers", auth, (req, res) => {
   const servers = [];
   for (const s of memory.servers.values()) {
@@ -2468,59 +1668,6 @@ app.get("/api/servers", auth, (req, res) => {
     }
   }
   res.json({ servers });
-});
-
-app.get("/api/discover/communities", auth, (req,res)=>{
-  const q=String(req.query.q||"").trim().toLowerCase();
-  const limit=Math.max(1,Math.min(100,Number(req.query.limit||50)));
-  const communities=[...memory.servers.values()]
-    .filter(server=>!server.bannedUserIds?.includes(String(req.user.id)))
-    .filter(server=>!q||String(server.name||"").toLowerCase().includes(q))
-    .map(server=>{
-      const members=[...server.members.keys()].map(idValue=>memory.users.get(String(idValue))).filter(Boolean);
-      const online=members.filter(user=>String(user.status||"").toLowerCase()==="online").length;
-      const textChannels=server.channels.map(idValue=>memory.channels.get(idValue)).filter(c=>c&&c.type!=="voice").length;
-      return {
-        id:server.id,
-        name:server.name,
-        ownerId:server.ownerId,
-        memberCount:server.members.size,
-        onlineCount:online,
-        channelCount:server.channels.length,
-        textChannels,
-        role:server.members.get(String(req.user.id))||null,
-        discoverable:true,
-        type:"community",
-        createdAt:server.createdAt
-      };
-    })
-    .sort((a,b)=>b.onlineCount-a.onlineCount||b.memberCount-a.memberCount)
-    .slice(0,limit);
-  res.json({communities});
-});
-app.get("/api/v1/discover/communities", auth, (req,res)=>{
-  req.url="/api/discover/communities";
-  const q=String(req.query.q||"").trim().toLowerCase();
-  const limit=Math.max(1,Math.min(100,Number(req.query.limit||50)));
-  const communities=[...memory.servers.values()]
-    .filter(server=>!server.bannedUserIds?.includes(String(req.user.id)))
-    .filter(server=>!q||String(server.name||"").toLowerCase().includes(q))
-    .map(server=>({id:server.id,name:server.name,ownerId:server.ownerId,memberCount:server.members.size,onlineCount:[...server.members.keys()].map(idValue=>memory.users.get(String(idValue))).filter(Boolean).filter(u=>String(u.status||"").toLowerCase()==="online").length,role:server.members.get(String(req.user.id))||null,discoverable:true,type:"community",createdAt:server.createdAt}))
-    .sort((a,b)=>b.onlineCount-a.onlineCount||b.memberCount-a.memberCount)
-    .slice(0,limit);
-  res.json({communities});
-});
-app.post("/api/servers/:id/join", auth, (req,res)=>{
-  const server=memory.servers.get(String(req.params.id));
-  if(!server) return res.status(404).json({error:"Community not found"});
-  if(isServerBanned(server,req.user.id)) return res.status(403).json({error:"You are banned from this community"});
-  if(!server.members.has(String(req.user.id))){
-    server.members.set(String(req.user.id),"member");
-    audit(req.user.id,"COMMUNITY_JOIN",server.id,{serverId:server.id});
-    emitToServer(server.id,"member:joined",{user:publicUser(req.user),serverId:server.id});
-    schedulePersist();
-  }
-  res.json({ok:true,server:{id:server.id,name:server.name,role:server.members.get(String(req.user.id)),default_channel_id:server.channels[0]||null}});
 });
 
 app.post("/api/servers", auth, (req, res) => {
@@ -2977,8 +2124,7 @@ io.on("connection", socket => {
 
   socket.on("channel:join", channelId => {
     const channel = memory.channels.get(String(channelId));
-    const access = channel ? member(channel.serverId, socket.user.id) : null;
-    if (!channel || !access || !can(access.role, PERMISSIONS.VIEW_CHANNEL)) return;
+    if (!channel || !member(channel.serverId, socket.user.id)) return;
     for (const room of socket.rooms) {
       if (room.startsWith("channel:")) socket.leave(room);
     }
@@ -3003,16 +2149,14 @@ io.on("connection", socket => {
     const server = memory.servers.get(channel.serverId);
     const role = server?.members.get(socket.user.id);
     const settings = server ? serverSettings(server) : { locked:false, slowmode:0 };
-    const channelSlowmode = Math.max(0, Number(channel.slowmode || 0));
-    const effectiveSlowmode = Math.max(Number(settings.slowmode || 0), channelSlowmode);
     if (settings.locked && !canManage(role)) {
       socket.emit("error:toast", { message: "This server is currently locked by an administrator." });
       return;
     }
     const rateKey = channel.serverId + ":" + socket.user.id;
     const lastMessageAt = serverMessageRate.get(rateKey) || 0;
-    if (effectiveSlowmode > 0 && !canManage(role)) {
-      const wait = (effectiveSlowmode * 1000) - (Date.now() - lastMessageAt);
+    if (settings.slowmode > 0 && !canManage(role)) {
+      const wait = (settings.slowmode * 1000) - (Date.now() - lastMessageAt);
       if (wait > 0) {
         socket.emit("error:toast", { message: "Slowmode is enabled. Try again in " + Math.ceil(wait / 1000) + "s." });
         return;
@@ -3049,8 +2193,7 @@ io.on("connection", socket => {
     const channelId = typeof payload === "object" ? payload.channelId : payload;
     const mode = typeof payload === "object" && payload.mode ? payload.mode : "video";
     const channel = memory.channels.get(String(channelId));
-    const access = channel ? member(channel.serverId, socket.user.id) : null;
-    if (!channel || !access || !can(access.role, PERMISSIONS.CONNECT_VOICE) || !channelAllowsRealtime(channel.type)) return;
+    if (!channel || !member(channel.serverId, socket.user.id)) return;
 
     const room = callRoomFor(channel.id);
     for (const existingRoom of socket.rooms) {
@@ -3449,33 +2592,7 @@ io.on("connection", socket => {
 });
 
 async function boot() {
-  assertProductionBasics();
-  realtimeScale = await configureRedisAdapter(io, env.redisUrl, console);
-  objectStorage = createStorage(process.env);
-  if(objectStorage.enabled) console.log("[orbit] S3-compatible object storage enabled.");
-  else console.log("[orbit] Object storage not configured; legacy attachment storage remains active.");
-
-  if (env.autoMigrate) {
-    if (!env.databaseUrl) throw new Error("ORBIT_AUTO_MIGRATE=true requires DATABASE_URL.");
-    await migrate();
-  }
   await initPersistence();
   server.listen(PORT, "0.0.0.0", () => console.log("[orbit] guest mode listening on " + PORT + (dbReady ? " with PostgreSQL" : " in memory mode")));
 }
-
-let shuttingDown=false;
-async function shutdown(signal) {
-  if(shuttingDown)return;
-  shuttingDown=true;
-  console.log("[orbit] graceful shutdown:",signal);
-  clearTimeout(persistTimer);
-  try{await persistState()}catch(error){console.error("[orbit] final persistence failed:",error.message)}
-  try{await closeRedisAdapter(realtimeScale)}catch(error){console.error("[orbit] Redis shutdown failed:",error.message)}
-  try{if(dbPool)await dbPool.end()}catch(error){console.error("[orbit] PostgreSQL shutdown failed:",error.message)}
-  server.close(()=>process.exit(0));
-  setTimeout(()=>process.exit(1),10000).unref();
-}
-process.on("SIGTERM",()=>shutdown("SIGTERM"));
-process.on("SIGINT",()=>shutdown("SIGINT"));
-
 boot().catch(error => { console.error("[orbit] boot failed", error); process.exit(1); });
