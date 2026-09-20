@@ -69,8 +69,23 @@
     $$("[data-channel]").forEach(b=>b.onclick=()=>openChannel(b.dataset.channel))
   }
 
+  async function openChannel(id){
+    const c=S.channels.find(x=>String(x.id)===String(id));
+    if(!c)return;
+    S.channel=c;
+    setView("channel");
+    if(c.type==="voice"){toast("Voice channel","Press Join voice to enter this room.");return;}
+  }
+
+  function renderDiscover(root){
+    root.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">DISCOVER</span><h1>Explore</h1><p>Explore the communities already connected to your Orbit.</p></div><button class="btn primary" id="discover-create">＋ Create community</button></div><div class="grid g2">'+S.servers.map(s=>'<section class="card pad"><span class="eyebrow">COMMUNITY</span><h3 style="font:600 15px Space Grotesk;margin:7px 0">'+esc(s.name)+'</h3><span class="muted" style="font-size:8px">'+esc(s.role||"member")+'</span><div class="actions" style="margin-top:12px"><button class="btn primary" data-discover-open="'+esc(s.id)+'">Open</button></div></section>').join("")+'</div></div>';
+    $("#discover-create").onclick=openCreateServer;
+    $("[data-discover-open]").forEach(b=>b.onclick=async()=>{await selectServer(b.dataset.discoverOpen);const c=S.channels.find(x=>x.type==="text")||S.channels[0];if(c)openChannel(c.id)});
+  }
+
   function renderSurface(){
     const root=$("#surface");
+    if(S.view==="discover"){renderDiscover(root);return}
     if(S.view==="channel"){renderChannel(root);return}
     if(S.view==="messages"){renderMessages(root);return}
     if(S.view==="communities"){renderCommunities(root);return}
