@@ -63,6 +63,27 @@
     localStorage.setItem("orbit_prism_prefs",JSON.stringify(pref));applyVisualPrefs();syncThemeDrawer();
   }
   function ensureScene(){
+    document.body.classList.add("prism-cinematic");
+    if(!document.querySelector(".prism-ambient-hud")){
+      const hud=document.createElement("div");
+      hud.className="prism-ambient-hud";
+      hud.innerHTML='<span class="prism-hud-line l1"></span><span class="prism-hud-line l2"></span><span class="prism-hud-line l3"></span><span class="prism-hud-corner c1">ORBIT / LIVE</span><span class="prism-hud-corner c2">PRISM FIELD</span>';
+      document.body.appendChild(hud);
+    }
+    if(!window.__orbitPrismPointer){
+      window.__orbitPrismPointer=true;
+      let raf=0,mx=.5,my=.5;
+      window.addEventListener("pointermove",e=>{
+        mx=e.clientX/Math.max(1,innerWidth); my=e.clientY/Math.max(1,innerHeight);
+        if(raf)return;
+        raf=requestAnimationFrame(()=>{
+          raf=0;
+          const x=((mx-.5)*2).toFixed(3), y=((my-.5)*2).toFixed(3);
+          document.documentElement.style.setProperty("--prism-mx",x);
+          document.documentElement.style.setProperty("--prism-my",y);
+        });
+      },{passive:true});
+    }
     if(!document.querySelector(".prism-aurora-layer")){
       const wrap=document.createElement("div");wrap.className="prism-aurora-layer";wrap.innerHTML='<span class="prism-aurora a"></span><span class="prism-aurora b"></span><span class="prism-aurora c"></span>';document.body.appendChild(wrap);
     }
