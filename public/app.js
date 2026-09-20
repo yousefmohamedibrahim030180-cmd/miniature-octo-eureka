@@ -1,8 +1,8 @@
 const $ = s => document.querySelector(s);
 
 const ORBIT_LOCALES={
-  en:{dir:"ltr",name:"English",search:"Search",channels:"CHANNELS",voice:"VOICE",write:"Write a message...",send:"Send",chat:"Chat",more:"More",discover:"Discover",notifications:"Notifications",settings:"Settings",home:"Home",security:"Security",language:"Language"},
-  ar:{dir:"rtl",name:"العربية",search:"بحث",channels:"القنوات",voice:"الصوت",write:"اكتب رسالة...",send:"إرسال",chat:"الدردشة",more:"المزيد",discover:"استكشاف",notifications:"الإشعارات",settings:"الإعدادات",home:"الرئيسية",security:"الأمان",language:"اللغة"}
+  en:{dir:"ltr",name:"English",search:"Search",channels:"CHANNELS",voice:"VOICE",write:"Write a message...",send:"Send",chat:"Chat",more:"More",discover:"Discover",notifications:"Notifications",home:"Home",security:"Security",language:"Language"},
+  ar:{dir:"rtl",name:"العربية",search:"بحث",channels:"القنوات",voice:"الصوت",write:"اكتب رسالة...",send:"إرسال",chat:"الدردشة",more:"المزيد",discover:"استكشاف",notifications:"الإشعارات",home:"الرئيسية",security:"الأمان",language:"اللغة"}
 };
 function applyOrbitLocale(locale){
   const key=ORBIT_LOCALES[locale]?locale:"en";
@@ -19,7 +19,7 @@ function applyOrbitLocale(locale){
   const sectionTitles=document.querySelectorAll(".section-title span");
   if(sectionTitles[0])sectionTitles[0].textContent=t.channels;
   if(sectionTitles[1])sectionTitles[1].textContent=t.voice;
-  const navMap={home:t.home,discover:t.discover,notifications:t.notifications,settings:t.settings};
+  const navMap={home:t.home,discover:t.discover,notifications:t.notifications};
   document.querySelectorAll(".global-nav .rail-nav").forEach(btn=>{if(navMap[btn.dataset.view])btn.title=navMap[btn.dataset.view]});
   return key;
 }
@@ -1795,7 +1795,6 @@ function renderPage(view) {
   if(view==="ai")renderAIPage();
     if(view==="saved")renderSavedPage();
   if(view==="explore")renderExplorePage();
-  if(view==="settings")renderSettingsPage();
 }
 function setView(view){
   if(view==="dms"){view="home";}
@@ -1810,7 +1809,7 @@ function setView(view){
     $("#sidebar")?.classList.remove("open");
     document.body.classList.remove("mobile-sidebar-open");
   }
-  const globalViews=["space","home","server-home","communities","discover","dms","calls","live","events","projects","files","ai","notifications","saved","explore","settings"];
+  const globalViews=["space","home","server-home","communities","discover","dms","calls","live","events","projects","files","ai","notifications","saved","explore"];
   if(globalViews.includes(view)){
     global.classList.remove("hidden");
     chat.classList.add("hidden");
@@ -3907,7 +3906,7 @@ function runCommand(item){
   closeCommandPalette();
   const a=item[2];
   if(a==="developer"){setView("settings");return renderSettingsPage("developer")}
-  if(["home","discover","dms","calls","live","events","projects","files","ai","notifications","saved","explore","settings"].includes(a))return setView(a);
+  if(["home","discover","dms","calls","live","events","projects","files","ai","notifications","saved","explore"].includes(a))return setView(a);
   if(a==="create-server")return $("#new-server").click();
   if(a==="create-channel")return $("#new-channel").click();
   if(a==="voice")return goChat(),startCall("voice");
