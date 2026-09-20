@@ -478,3 +478,91 @@ body.orbit-prism .aether-content .global-page .page-body{
   body.orbit-prism .aether-hero-strip{margin:9px!important;min-height:310px!important}
   body.orbit-prism .aether-chat{padding-left:9px!important;padding-right:9px!important}
 }
+
+/* PRISM INTERACTION + SPACING HARDENING */
+body.orbit-prism .app,
+body.orbit-prism .server-rail,
+body.orbit-prism #sidebar,
+body.orbit-prism .content,
+body.orbit-prism #aether-inspector{min-width:0!important}
+body.orbit-prism .aether-hero-strip,
+body.orbit-prism .aether-chat,
+body.orbit-prism .aether-chat-body,
+body.orbit-prism .aether-pane-scroll,
+body.orbit-prism .aether-inspector-body{min-width:0!important}
+body.orbit-prism .aether-hero-copy,
+body.orbit-prism .aether-channel-identity,
+body.orbit-prism .aether-workspace-brand,
+body.orbit-prism .aether-context-trail{min-width:0!important}
+body.orbit-prism .aether-hero-copy h1,
+body.orbit-prism .aether-hero-copy p,
+body.orbit-prism .aether-channel-identity strong,
+body.orbit-prism .aether-channel-identity span,
+body.orbit-prism .aether-workspace-brand strong,
+body.orbit-prism .aether-workspace-brand span,
+body.orbit-prism .aether-signal-line b,
+body.orbit-prism .aether-signal-line span,
+body.orbit-prism .aether-inspector-card,
+body.orbit-prism .aether-feed-card{overflow-wrap:anywhere}
+body.orbit-prism button,
+body.orbit-prism a,
+body.orbit-prism input,
+body.orbit-prism textarea{pointer-events:auto!important}
+body.orbit-prism .aether-canvas-glow,
+body.orbit-prism #aether-stars,
+body.orbit-prism #aether-noise,
+body.orbit-prism .prism-aurora-layer,
+body.orbit-prism .prism-mesh-layer,
+body.orbit-prism .prism-scan-layer,
+body.orbit-prism .prism-aurora{pointer-events:none!important}
+body.orbit-prism .aether-topline,
+body.orbit-prism .aether-hero-strip,
+body.orbit-prism .aether-chat-head,
+body.orbit-prism .aether-composer,
+body.orbit-prism #aether-inspector .aether-inspector-head,
+body.orbit-prism #aether-inspector .aether-radar,
+body.orbit-prism #aether-inspector .aether-inspector-tabs{position:relative!important;z-index:5!important}
+body.orbit-prism .aether-top-actions,
+body.orbit-prism .aether-hero-actions,
+body.orbit-prism .aether-head-actions,
+body.orbit-prism .aether-inspector-actions,
+body.orbit-prism .aether-rail-footer,
+body.orbit-prism .aether-rail-actions{position:relative!important;z-index:20!important}
+body.orbit-prism .aether-nav,
+body.orbit-prism .aether-square-action,
+body.orbit-prism .aether-icon-button,
+body.orbit-prism .aether-command-button,
+body.orbit-prism .aether-top-actions button,
+body.orbit-prism .aether-hero-actions button,
+body.orbit-prism .aether-head-actions button,
+body.orbit-prism .aether-inspector-tabs button,
+body.orbit-prism .aether-inspector-actions button,
+body.orbit-prism .aether-rail-footer button,
+body.orbit-prism #new-channel,
+body.orbit-prism #new-voice-channel,
+body.orbit-prism #profile-card-btn{cursor:pointer!important}
+body.orbit-prism .aether-chat-body{overflow:hidden!important}
+body.orbit-prism .aether-chat .messages{position:relative!important;z-index:4!important}
+body.orbit-prism .aether-composer{position:relative!important;z-index:30!important}
+body.orbit-prism .aether-search input,
+body.orbit-prism #message,
+body.orbit-prism #quick-search{position:relative!important;z-index:31!important}
+body.orbit-prism .aether-content .global-page{overflow:auto!important;min-height:0!important}
+body.orbit-prism #command-palette,
+body.orbit-prism #modal,
+body.orbit-prism #incoming-call,
+body.orbit-prism #context-menu,
+body.orbit-prism #toast-stack{z-index:10000!important}
+body.orbit-prism .global-page.hidden,
+body.orbit-prism #chat-view.hidden,
+body.orbit-prism .hidden{display:none!important}
+@media(min-width:1251px){
+ body.orbit-prism .aether-hero-strip{grid-template-columns:minmax(0,1fr) minmax(240px,310px)!important}
+}
+@media(max-width:1250px){
+ body.orbit-prism .aether-chat{min-width:0!important}
+}
+@media(max-width:900px){
+ body.orbit-prism .server-rail .aether-global-nav{min-width:0!important}
+ body.orbit-prism .aether-hero-strip{overflow:auto!important}
+}
