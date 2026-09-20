@@ -202,14 +202,50 @@
   function attachRemote(id,stream,u){let t=document.querySelector('.tile[data-peer="'+CSS.escape(id)+'"]');if(!t){t=document.createElement("div");t.className="tile";t.dataset.peer=id;t.innerHTML='<video autoplay playsinline></video><span>'+esc(u?.username||"REMOTE")+"</span>";$("#call-stage").appendChild(t)}t.querySelector("video").srcObject=stream}
   function removePeer(id){const p=S.call?.peers.get(id);if(p?.pc)try{p.pc.close()}catch{}S.call?.peers.delete(id);document.querySelector('.tile[data-peer="'+CSS.escape(id)+'"]')?.remove()}
   async function iceServers(){try{const d=await api("/api/realtime-config");return d.iceServers||[{urls:"stun:stun.l.google.com:19302"}]}catch{return[{urls:"stun:stun.l.google.com:19302"}]}}
-  function syncCall(){if(!S.call)return;$("#call-mic").classList.toggle("off",!S.call.mic?.enabled);$("#call-camera").classList.toggle("off",!S.call.cam?.enabled)}
+  async function toggleScreen(){
+    if(!S.call?.active)return;
+    if(S.call.screen){
+      const old=S.call.screen; S.call.screen=null;
+      try{old.stop()}catch{}
+      for(const [id,p] of S.call.peers){
+        const sender=p.pc.getSenders().find(x=>x.track?.kind==="video");
+        if(sender)await sender.replaceTrack(S.call.cam||null);
+        await makeOffer(id);
+      }
+      renderCallStage(); syncCall(); return;
+    }
+    if(!navigator.mediaDevices?.getDisplayMedia){toast("Screen share","This browser does not support screen sharing.","error");return}
+    try{
+      const ds=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:30,max:60}},audio:false});
+      const track=ds.getVideoTracks()[0]; if(!track)return;
+      S.call.screen=track;
+      for(const [id,p] of S.call.peers){
+        const sender=p.pc.getSenders().find(x=>x.track?.kind==="video");
+        if(sender)await sender.replaceTrack(track);
+        await makeOffer(id);
+      }
+      const self=document.querySelector('.tile[data-peer="self"] video"); if(self){self.srcObject=ds;self.muted=true;self.play().catch(()=>{})}
+      track.onended=()=>{if(S.call?.screen===track){S.call.screen=null;syncCall()}}
+      syncCall();
+      const payload=S.call.scope==="dm"?{callId:S.call.callId,dmId:S.call.dmId}:{channelId:S.call.roomId};
+      S.socket?.emit(S.call.scope==="dm"?"dm:call:media-state":"call:media-state",{...payload,screenShare:true,muted:!S.call.mic?.enabled,cameraOff:!S.call.cam?.enabled});
+      toast("Screen sharing","Your screen is being shared.","success");
+    }catch(e){if(e?.name!=="AbortError")toast("Screen share",e.message||"Unable to share screen.","error")}
+  }
+
+  function emitCallMedia(){
+    if(!S.call?.active||!S.socket)return;
+    const p=S.call.scope==="dm"?{callId:S.call.callId,dmId:S.call.dmId}:{channelId:S.call.roomId};
+    S.socket.emit(S.call.scope==="dm"?"dm:call:media-state":"call:media-state",{...p,muted:!S.call.mic?.enabled,cameraOff:!S.call.cam?.enabled,screenShare:!!S.call.screen});
+  }
+  function syncCall(){if(!S.call)return;$("#call-mic").classList.toggle("off",!S.call.mic?.enabled);$("#call-camera").classList.toggle("off",!S.call.cam?.enabled);$("#call-screen").classList.toggle("active",!!S.call.screen)}
   function incoming(c){if(S.call?.active)return;S.call={pending:c};$("#incoming").classList.remove("hidden");$("#incoming-avatar").textContent=String(c.username||c.fromUser?.username||"G").slice(0,1).toUpperCase();$("#incoming-title").textContent=(c.username||c.fromUser?.username||"Someone")+" is calling";$("#incoming-subtitle").textContent=(c.mode==="voice"?"Voice":"Video")+" call · "+(c.scope==="dm"?"Private":"Community")}
   async function acceptIncoming(){const c=S.call?.pending;if(!c)return;$("#incoming").classList.add("hidden");if(c.scope==="dm"){S.dm=S.dms.find(d=>String(d.id)===String(c.dmId))||S.dm;const m=await localMedia(c.mode);if(!m)return;S.call={scope:"dm",mode:c.mode,active:true,roomId:c.roomId,dmId:c.dmId,callId:c.callId,local:m.stream,mic:m.mic,cam:m.cam,screen:null,peers:new Map()};$("#call-overlay").classList.remove("hidden");$("#call-title").textContent=c.username||"Private call";$("#call-subtitle").textContent=c.mode==="voice"?"Voice room":"Video room";renderCallStage();syncCall();S.socket.emit("dm:call:accept",{callId:c.callId});return}await selectServer(c.serverId);S.channel=S.channels.find(x=>String(x.id)===String(c.channelId));const m=await localMedia(c.mode);if(!m)return;S.call={scope:"channel",mode:c.mode,active:true,roomId:c.channelId,dmId:null,callId:null,local:m.stream,mic:m.mic,cam:m.cam,screen:null,peers:new Map()};$("#call-overlay").classList.remove("hidden");$("#call-title").textContent=S.channel?.name||"Channel call";$("#call-subtitle").textContent=c.mode==="voice"?"Voice room":"Video room";renderCallStage();S.socket.emit("call:join",{channelId:c.channelId,mode:c.mode})}
   function declineIncoming(){const c=S.call?.pending;if(c?.scope==="dm")S.socket?.emit("dm:call:decline",{callId:c.callId});S.call=null;$("#incoming").classList.add("hidden")}
   function endCall(silent){const c=S.call;if(!c||(!c.active&&!c.local))return; if(c.scope==="dm"&&c.callId)S.socket?.emit("dm:call:leave",{callId:c.callId,dmId:c.dmId}); else if(c.roomId)S.socket?.emit("call:leave",c.roomId);c.peers?.forEach(x=>{try{x.pc.close()}catch{}});c.local?.getTracks().forEach(t=>{try{t.stop()}catch{}});S.call=null;$("#call-stage").innerHTML="";$("#call-overlay").classList.add("hidden");if(!silent)toast("Call","Call ended.")}
   function bind(){
     $("#rail-nav").onclick=e=>{const b=e.target.closest("[data-view]");if(b)setView(b.dataset.view)};$("#search-open").onclick=openSearch;$("#command-open").onclick=openCommand;$("#notifications").onclick=()=>setView("notifications");$("#messages-open").onclick=()=>setView("messages");$("#calls-open").onclick=()=>{const c=S.channels.find(x=>x.type==="voice");if(c){S.channel=c;startCall("channel","voice")}else setView("communities")};$("#profile-open").onclick=()=>setView("settings");$("#collapse").onclick=()=>$("#app").classList.toggle("collapsed");
-    $("#call-close").onclick=endCall;$("#call-leave").onclick=endCall;$("#call-mic").onclick=()=>{if(S.call?.mic){S.call.mic.enabled=!S.call.mic.enabled;syncCall()}};$("#call-camera").onclick=()=>{if(S.call?.cam){S.call.cam.enabled=!S.call.cam.enabled;syncCall()}};$("#incoming-accept").onclick=acceptIncoming;$("#incoming-decline").onclick=declineIncoming;
+    $("#call-close").onclick=endCall;$("#call-leave").onclick=endCall;$("#call-mic").onclick=()=>{if(S.call?.mic){S.call.mic.enabled=!S.call.mic.enabled;syncCall();emitCallMedia()}};$("#call-camera").onclick=()=>{if(S.call?.cam){S.call.cam.enabled=!S.call.cam.enabled;syncCall();emitCallMedia()}};$("#call-screen").onclick=toggleScreen;$("#incoming-accept").onclick=acceptIncoming;$("#incoming-decline").onclick=declineIncoming;
     document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();openSearch()}if(e.key==="Escape")closeModal()})
   }
 
