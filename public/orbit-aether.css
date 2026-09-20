@@ -315,3 +315,166 @@ body.orbit-prism .prism-toggle-row span{font-size:7px;color:#9aa6ba}.prism-toggl
 body.orbit-prism.prism-reduced *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
 body.orbit-prism.prism-calm{--p-speed:.55}
 body.orbit-prism.prism-electric{--p-speed:1.35}
+
+/* PRISM ORDER PASS — visual hierarchy, density control, and alignment */
+body.orbit-prism{
+  --p-gap:12px;
+  --p-pad:14px;
+}
+/* one clear outer frame */
+body.orbit-prism .app{
+  grid-template-columns:72px minmax(235px,276px) minmax(520px,1fr) minmax(300px,340px)!important;
+  gap:var(--p-gap)!important;
+  padding:var(--p-gap)!important;
+}
+/* rail: navigation only */
+body.orbit-prism .server-rail{
+  padding:12px 8px!important;
+}
+body.orbit-prism .aether-global-nav{
+  gap:5px!important;
+}
+body.orbit-prism .aether-rail-label{
+  margin-top:8px!important;
+}
+/* workspace: header / channels / utilities / profile are now distinct zones */
+body.orbit-prism #sidebar{
+  display:flex!important;
+  flex-direction:column!important;
+  min-width:0!important;
+  overflow:hidden!important;
+}
+body.orbit-prism .aether-workspace-top{
+  flex:0 0 auto!important;
+}
+body.orbit-prism .aether-pane-scroll{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  padding:7px 12px 10px!important;
+}
+body.orbit-prism .aether-section-heading{
+  min-height:30px!important;
+  padding:8px 3px 5px!important;
+}
+body.orbit-prism .aether-channel-list{
+  gap:2px!important;
+}
+body.orbit-prism .aether-shortcuts{
+  margin-top:14px!important;
+  padding-top:10px!important;
+  border-top:1px solid var(--p-line)!important;
+}
+body.orbit-prism .aether-profile-dock{
+  flex:0 0 auto!important;
+  min-height:62px!important;
+}
+/* center: strict vertical rhythm */
+body.orbit-prism .content{
+  display:flex!important;
+  flex-direction:column!important;
+  min-width:0!important;
+}
+body.orbit-prism .aether-topline{
+  flex:0 0 72px!important;
+}
+body.orbit-prism .aether-hero-strip{
+  flex:0 0 auto!important;
+  min-height:270px!important;
+  margin:12px!important;
+}
+body.orbit-prism .aether-chat{
+  flex:1 1 0!important;
+  min-height:280px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  padding:0 12px 12px!important;
+  overflow:hidden!important;
+}
+body.orbit-prism .aether-chat-head{
+  flex:0 0 68px!important;
+}
+body.orbit-prism .aether-chat-body{
+  flex:1 1 0!important;
+  min-height:0!important;
+}
+body.orbit-prism .aether-chat .messages{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  scrollbar-width:thin!important;
+}
+body.orbit-prism .aether-composer{
+  flex:0 0 auto!important;
+}
+/* inspector: hierarchy instead of equal-weight cards */
+body.orbit-prism #aether-inspector{
+  display:flex!important;
+  flex-direction:column!important;
+  min-width:0!important;
+  overflow:hidden!important;
+}
+body.orbit-prism .aether-inspector-head{
+  flex:0 0 auto!important;
+}
+body.orbit-prism .aether-radar{
+  flex:0 0 150px!important;
+}
+body.orbit-prism .aether-inspector-tabs{
+  flex:0 0 auto!important;
+}
+body.orbit-prism .aether-inspector-body{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  overflow:auto!important;
+  padding-right:2px!important;
+}
+body.orbit-prism .aether-inspector-card,
+body.orbit-prism .aether-feed-card{
+  margin-bottom:10px!important;
+}
+body.orbit-prism .aether-metric-grid{
+  margin-bottom:10px!important;
+}
+/* reduce competing visual noise */
+body.orbit-prism .aether-hero-strip:before{opacity:.72!important}
+body.orbit-prism .aether-orbit-caption{right:2px!important;bottom:2px!important}
+body.orbit-prism .aether-signal-line{padding:8px 0!important}
+body.orbit-prism .aether-top-actions{gap:6px!important}
+body.orbit-prism .aether-top-actions button{font-weight:650!important}
+/* consistent focus hierarchy */
+body.orbit-prism button:focus-visible,
+body.orbit-prism input:focus-visible{
+  outline:2px solid rgba(61,229,255,.45)!important;
+  outline-offset:2px!important;
+}
+/* when the inspector is closed, reclaim the fourth column */
+body.orbit-prism:has(#aether-inspector.closed) .app{
+  grid-template-columns:72px 276px minmax(0,1fr)!important;
+}
+body.orbit-prism #aether-inspector.closed{
+  display:none!important;
+}
+/* pages get the same breathing room as chat */
+body.orbit-prism .aether-content .global-page{
+  padding:0 12px 12px!important;
+}
+body.orbit-prism .aether-content .global-page .page-head{
+  margin:12px 0!important;
+}
+body.orbit-prism .aether-content .global-page .page-body{
+  min-height:0!important;
+}
+/* tablet keeps the center dominant */
+@media(max-width:1250px){
+  body.orbit-prism .app{grid-template-columns:70px 250px minmax(0,1fr)!important}
+  body.orbit-prism #aether-inspector{display:none!important}
+}
+@media(max-width:900px){
+  body.orbit-prism .app{padding:7px!important}
+  body.orbit-prism .content{height:calc(100vh - 14px)!important}
+  body.orbit-prism .aether-topline{flex-basis:66px!important}
+  body.orbit-prism .aether-chat{min-height:0!important;padding-bottom:72px!important}
+}
+@media(max-width:600px){
+  body.orbit-prism .aether-hero-strip{margin:9px!important;min-height:310px!important}
+  body.orbit-prism .aether-chat{padding-left:9px!important;padding-right:9px!important}
+}
