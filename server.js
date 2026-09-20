@@ -63,6 +63,8 @@ const memory = {
   apiKeys: new Map(),
   developerApplications: new Map(),
   bookmarks: new Map(),
+  posts: new Map(),
+  postComments: new Map(),
   analyticsEvents: []
 };
 
@@ -350,6 +352,28 @@ function authV1(req, res, next) {
 }
 
 
+
+function apiKeyFromRequest(req){
+  const direct=String(req.get("x-api-key")||"").trim();
+  const bearer=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"").trim();
+  if(direct)return direct;
+  return bearer.startsWith("orb_live_") ? bearer : "";
+}
+function findApiKey(secret){
+  const clean=String(secret||"").trim();
+  if(!clean)return null;
+  const digest=hashSecret(clean);
+  const nowMs=Date.now();
+  for(const key of memory.apiKeys.values()){
+    if(key.revokedAt)continue;
+    if(key.expiresAt){
+      const expires=new Date(key.expiresAt).getTime();
+      if(Number.isFinite(expires) && expires<=nowMs)continue;
+    }
+    if(String(key.hash||"")===digest)return key;
+  }
+  return null;
+}
 
 function authApiKey(req,res,next){
   const secret=apiKeyFromRequest(req);
@@ -710,6 +734,42 @@ app.get("/api/v1/sdk/communities/:id/channels",authApiKey,requireApiScope("chann
   res.json({channels:rows});
 });
 
+app.get("/api/v1/sdk/channels/:id/messages",authApiKey,requireApiScope("messages.read"),(req,res)=>{
+  const channel=memory.channels.get(String(req.params.id));
+  if(!channel)return res.status(404).json({error:"Channel not found"});
+  const access=member(channel.serverId,req.user.id);
+  if(!access || !can(access.role,PERMISSIONS.VIEW_CHANNEL))return res.status(403).json({error:"View Channel permission required."});
+  const rows=(memory.messages.get(channel.id)||[]).slice(-100).map(message=>({...message}));
+  res.json({messages:rows});
+});
+
+app.get("/api/v1/sdk/communities/:id/events",authApiKey,requireApiScope("events.read"),(req,res)=>{
+  const access=member(req.params.id,req.user.id);
+  if(!access)return res.status(403).json({error:"You are not a member of this community."});
+  const events=[...memory.events.values()]
+    .filter(event=>String(event.serverId)===String(req.params.id))
+    .sort((a,b)=>String(a.when).localeCompare(String(b.when)))
+    .slice(0,100)
+    .map(event=>sanitizeEvent(event,req.user.id));
+  res.json({events});
+});
+
+app.post("/api/v1/sdk/communities/:id/events",authApiKey,requireApiScope("events.write"),(req,res)=>{
+  const access=member(req.params.id,req.user.id);
+  if(!access)return res.status(403).json({error:"You are not a member of this community."});
+  if(!can(access.role,PERMISSIONS.MANAGE_EVENTS))return res.status(403).json({error:"Manage Events permission required."});
+  const title=String(req.body?.title||"").trim().slice(0,140);
+  const when=String(req.body?.when||"").trim();
+  if(!title||!when||Number.isNaN(new Date(when).getTime()))return res.status(400).json({error:"Valid title and date/time are required"});
+  const event={id:id("event"),serverId:access.server.id,title,description:String(req.body?.description||"").trim().slice(0,800),type:["Community","Gaming","Class","Meeting","Watch party","Voice","Video"].includes(req.body?.type)?req.body.type:"Community",when:new Date(when).toISOString(),creatorId:req.user.id,createdAt:now(),updatedAt:now(),rsvps:[String(req.user.id)]};
+  memory.events.set(event.id,event);
+  audit(req.user.id,"API_EVENT_CREATE",event.id,{serverId:event.serverId,apiKeyId:req.apiKey.id});
+  schedulePersist();
+  const result=sanitizeEvent(event,req.user.id);
+  emitToServer(event.serverId,"event:created",{event:result});
+  res.status(201).json({event:result});
+});
+
 app.post("/api/v1/sdk/channels/:id/messages",authApiKey,requireApiScope("messages.write"),(req,res)=>{
   const channel=memory.channels.get(String(req.params.id));
   if(!channel)return res.status(404).json({error:"Channel not found"});
@@ -1024,7 +1084,7 @@ app.post("/api/v1/uploads/presign", authV1, async (req,res)=>{
       contentType:req.body?.contentType,
       size:req.body?.size
     },req.user.id);
-    res.status(201).json({upload:result});
+    res.status(201).json({upload:{...result,completeEndpoint:"/api/v1/uploads/complete"}});
   }catch(error){
     res.status(400).json({error:error.message});
   }
@@ -1086,8 +1146,9 @@ app.get("/api/search", auth, (req, res) => {
 function pairKey(a, b) {
   return [String(a), String(b)].sort().join(":");
 }
-function isBlocked(a,b){return memory.blocks.has(pairKey(a,b));}
-function isMuted(a,b){return memory.mutes.has(pairKey(a,b));}
+function directedPairKey(a,b){return String(a)+":"+String(b);}
+function isBlocked(a,b){return memory.blocks.has(directedPairKey(a,b)) || memory.blocks.has(pairKey(a,b));}
+function isMuted(a,b){return memory.mutes.has(directedPairKey(a,b)) || memory.mutes.has(pairKey(a,b));}
 function defaultNotificationPreferences(){return {mentions:true,directMessages:true,friendRequests:true,events:true,streams:true,security:true,replies:true,social:true};}
 function userNotificationPreferences(userId){
   const current=memory.notificationPreferences.get(String(userId));
@@ -1305,7 +1366,7 @@ app.put("/api/servers/:id/nexus/world", auth, (req, res) => {
   res.json({ world });
 });
 app.get("/api/v1/social/blocks",auth,(req,res)=>{
-  res.json({blocks:[...memory.blocks].filter(key=>key.startsWith(String(req.user.id)+":")||key.endsWith(":"+String(req.user.id))).map(key=>{
+  res.json({blocks:[...memory.blocks].filter(key=>key.startsWith(String(req.user.id)+":")).map(key=>{
     const ids=key.split(":"); const other=ids[0]===String(req.user.id)?ids[1]:ids[0];
     return publicUser(memory.users.get(other)||{id:other});
   })});
@@ -1314,7 +1375,7 @@ app.post("/api/v1/social/blocks/:userId",auth,(req,res)=>{
   const other=memory.users.get(String(req.params.userId));
   if(!other)return res.status(404).json({error:"User not found"});
   if(String(other.id)===String(req.user.id))return res.status(400).json({error:"You cannot block yourself"});
-  const key=pairKey(req.user.id,other.id);
+  const key=directedPairKey(req.user.id,other.id);
   memory.blocks.add(key);
   memory.friendships.delete(key);
   for(const [idValue,r] of memory.friendRequests.entries()){
@@ -1325,13 +1386,12 @@ app.post("/api/v1/social/blocks/:userId",auth,(req,res)=>{
   res.json({ok:true,user:publicUser(other)});
 });
 app.delete("/api/v1/social/blocks/:userId",auth,(req,res)=>{
-  const key=pairKey(req.user.id,req.params.userId);
-  memory.blocks.delete(key);
+  memory.blocks.delete(directedPairKey(req.user.id,req.params.userId));
   schedulePersist();
   res.json({ok:true});
 });
 app.get("/api/v1/social/mutes",auth,(req,res)=>{
-  res.json({mutes:[...memory.mutes].filter(key=>key.startsWith(String(req.user.id)+":")||key.endsWith(":"+String(req.user.id))).map(key=>{
+  res.json({mutes:[...memory.mutes].filter(key=>key.startsWith(String(req.user.id)+":")).map(key=>{
     const ids=key.split(":"); const other=ids[0]===String(req.user.id)?ids[1]:ids[0];
     return publicUser(memory.users.get(other)||{id:other});
   })});
@@ -1340,17 +1400,18 @@ app.post("/api/v1/social/mutes/:userId",auth,(req,res)=>{
   const other=memory.users.get(String(req.params.userId));
   if(!other)return res.status(404).json({error:"User not found"});
   if(String(other.id)===String(req.user.id))return res.status(400).json({error:"You cannot mute yourself"});
-  memory.mutes.add(pairKey(req.user.id,other.id));
+  memory.mutes.add(directedPairKey(req.user.id,other.id));
   schedulePersist();
   res.json({ok:true});
 });
 app.delete("/api/v1/social/mutes/:userId",auth,(req,res)=>{
-  memory.mutes.delete(pairKey(req.user.id,req.params.userId));
+  memory.mutes.delete(directedPairKey(req.user.id,req.params.userId));
   schedulePersist();
   res.json({ok:true});
 });
 app.get("/api/v1/me/preferences",auth,(req,res)=>{
-  res.json({locale:(memory.userSettings.get(String(req.user.id))||{}).locale||"en",timezone:(memory.userSettings.get(String(req.user.id))||{}).timezone||null,notifications:userNotificationPreferences(req.user.id)});
+  const locale=(memory.userSettings.get(String(req.user.id))||{}).locale||"en";
+  res.json({locale,dir:locale==="ar"?"rtl":"ltr",timezone:(memory.userSettings.get(String(req.user.id))||{}).timezone||null,notifications:userNotificationPreferences(req.user.id)});
 });
 app.patch("/api/v1/me/preferences",auth,(req,res)=>{
   const current=memory.userSettings.get(String(req.user.id))||{};
@@ -1369,7 +1430,8 @@ app.patch("/api/v1/me/preferences",auth,(req,res)=>{
   }
   memory.userSettings.set(String(req.user.id),current);
   schedulePersist();
-  res.json({locale:current.locale||"en",timezone:current.timezone||null,notifications:userNotificationPreferences(req.user.id)});
+  const locale=current.locale||"en";
+  res.json({locale,dir:locale==="ar"?"rtl":"ltr",timezone:current.timezone||null,notifications:userNotificationPreferences(req.user.id)});
 });
 
 app.get("/api/friends", auth, (req, res) => {
@@ -1972,6 +2034,7 @@ app.get("/api/servers/:id/events", auth, (req,res)=>{
 app.post("/api/servers/:id/events", auth, (req,res)=>{
   const access=member(req.params.id,req.user.id);
   if(!access) return res.status(403).json({error:"Not a member"});
+  if(!can(access.role,PERMISSIONS.MANAGE_EVENTS)) return res.status(403).json({error:"Manage Events permission required"});
   const title=String(req.body?.title||"").trim().slice(0,140);
   const when=String(req.body?.when||"").trim();
   if(!title||!when||Number.isNaN(new Date(when).getTime())) return res.status(400).json({error:"Valid title and date/time are required"});
@@ -1998,7 +2061,7 @@ app.patch("/api/events/:id", auth, (req,res)=>{
   if(!event) return res.status(404).json({error:"Event not found"});
   const access=member(event.serverId,req.user.id);
   if(!access) return res.status(403).json({error:"Not a member"});
-  if(String(event.creatorId)!==String(req.user.id) && !canManage(access.role)) return res.status(403).json({error:"Permission denied"});
+  if(String(event.creatorId)!==String(req.user.id) && !can(access.role,PERMISSIONS.MANAGE_EVENTS)) return res.status(403).json({error:"Manage Events permission required"});
   if(req.body?.title!==undefined) event.title=String(req.body.title||"").trim().slice(0,140);
   if(req.body?.description!==undefined) event.description=String(req.body.description||"").trim().slice(0,800);
   if(req.body?.type!==undefined && ["Community","Gaming","Class","Meeting","Watch party","Voice","Video"].includes(req.body.type)) event.type=req.body.type;
@@ -2018,7 +2081,7 @@ app.delete("/api/events/:id", auth, (req,res)=>{
   if(!event) return res.status(404).json({error:"Event not found"});
   const access=member(event.serverId,req.user.id);
   if(!access) return res.status(403).json({error:"Not a member"});
-  if(String(event.creatorId)!==String(req.user.id) && !canManage(access.role)) return res.status(403).json({error:"Permission denied"});
+  if(String(event.creatorId)!==String(req.user.id) && !can(access.role,PERMISSIONS.MANAGE_EVENTS)) return res.status(403).json({error:"Manage Events permission required"});
   memory.events.delete(event.id);
   emitToServer(event.serverId,"event:deleted",{eventId:event.id});
   res.json({ok:true});
@@ -2196,6 +2259,7 @@ app.post("/api/live/:id/end", auth, (req,res)=>{
 });
 
 app.post("/api/uploads", auth, (req,res)=>{
+  if(!objectStorage.enabled) return res.status(503).json({error:"Object storage is not configured.",code:"STORAGE_NOT_CONFIGURED"});
   const data=String(req.body?.data||"");
   if(!data || data.length>6_000_000) return res.status(400).json({error:"File is missing or too large"});
   const type=String(req.body?.type||"application/octet-stream").slice(0,120);
