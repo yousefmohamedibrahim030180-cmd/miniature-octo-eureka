@@ -234,7 +234,7 @@ app.get("/api/missions",auth,async(req,res)=>{
  const u=await getUserById(req.user.id);const today=new Date().toISOString().slice(0,10);
  const claims=await q("SELECT mission_id,cycle FROM v2_mission_claims WHERE user_id=$1 AND (cycle=$2 OR cycle='lifetime')",[u.id,today]);
  const set=new Set(claims.rows.map(x=>x.mission_id+":"+x.cycle));
- const missions=MISSIONS.map(m=>({...m,progress:m.metric==="profile"?await metricValue(u,"profile"):await metricValue(u,m.metric),claimed:set.has(m.id+":"+cycleFor(m))}));
+ const missions=await Promise.all(MISSIONS.map(async m=>({...m,progress:await metricValue(u,m.metric),claimed:set.has(m.id+":"+cycleFor(m))})));
  res.json({missions});
 });
 app.post("/api/missions/:id/claim",auth,async(req,res)=>{
