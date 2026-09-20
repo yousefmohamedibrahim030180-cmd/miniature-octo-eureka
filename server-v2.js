@@ -142,18 +142,19 @@ async function dailyCheckIn(userId){
  return Boolean(r.rowCount);
 }
 async function ensureHome(userId){
- const r=await q("SELECT c.id FROM v2_communities c JOIN v2_members m ON m.community_id=c.id WHERE m.user_id=$1 ORDER BY c.created_at LIMIT 1",[userId]);
- if(r.rows[0])return r.rows[0].id;
+ const membership=await q("SELECT c.id FROM v2_communities c JOIN v2_members m ON m.community_id=c.id WHERE m.user_id=$1 ORDER BY c.created_at LIMIT 1",[userId]);
+ if(membership.rows[0])return membership.rows[0].id;
  const existing=await q("SELECT id FROM v2_communities WHERE join_code='ORBIT-HOME' LIMIT 1");
  let cid=existing.rows[0]?.id;
  if(!cid){
    cid=id("com");
    await q("INSERT INTO v2_communities(id,name,description,join_code,owner_id) VALUES($1,$2,$3,$4,$5)",[cid,"ORBIT Lobby","Official starting space for ORBIT.","ORBIT-HOME",userId]);
+   const conv=id("conv");await q("INSERT INTO v2_conversations(id,kind) VALUES($1,'channel')",[conv]);
+   await q("INSERT INTO v2_channels(id,community_id,name,type,conversation_id) VALUES($1,$2,'general','text',$3)",[id("ch"),cid,conv]);
  }
- await q("INSERT INTO v2_members(community_id,user_id,role) VALUES($1,$2,'member') ON CONFLICT DO NOTHING",[cid,userId]);
- const conv=id("conv");await q("INSERT INTO v2_conversations(id,kind) VALUES($1,'channel')",[conv]);
- const ch=id("ch");await q("INSERT INTO v2_channels(id,community_id,name,type,conversation_id) VALUES($1,$2,'general','text',$3)",[ch,cid,conv]);
- await award(userId,0,0);return cid;
+ const added=await q("INSERT INTO v2_members(community_id,user_id,role) VALUES($1,$2,'member') ON CONFLICT DO NOTHING RETURNING user_id",[cid,userId]);
+ if(added.rowCount)await q("UPDATE v2_users SET communities_joined=communities_joined+1 WHERE id=$1",[userId]);
+ return cid;
 }
 
 app.use(express.json({limit:"4mb"}));
