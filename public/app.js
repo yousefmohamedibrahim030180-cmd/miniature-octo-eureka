@@ -1775,7 +1775,6 @@ function renderPage(view) {
     projects:["PROJECTS","Projects","Tasks, boards and team collaboration inside communities."],
     files:["FILES","Files","Shared workspace files and attachments."],
     ai:["ORBIT AI","AI","Your optional AI workspace assistant."],
-    settings:["PREFERENCES","Settings","Appearance, privacy, voice, notifications, accessibility and security."]
   }[view] || ["ORBIT","Home",""];
   $("#page-eyebrow").textContent=cfg[0];
   $("#page-title").textContent=cfg[1];
@@ -3896,7 +3895,7 @@ function openCommandPalette(){
 function closeCommandPalette(){$("#command-palette").classList.add("hidden")}
 function renderCommandResults(q){
   const commands=[
-    ["⌂","Home","home"],["☎","Calls","calls"],["●","Live","live"],["◷","Events","events"],["◫","Projects","projects"],["□","Files","files"],["✧","ORBIT AI","ai"],["✦","Discover","discover"],["◎","Friends","friends"],["⌑","Saved","saved"],["⌖","Explore","explore"],["⚙","Settings","settings"],["⌘","Developer Portal","developer"],["+","Create server","create-server"],["#","Create channel","create-channel"],["☎","Start voice call","voice"],["▣","Start video call","video"],["↗","Share screen","share"],["⌕","Search","search"]
+    ["⌂","Home","home"],["☎","Calls","calls"],["●","Live","live"],["◷","Events","events"],["◫","Projects","projects"],["□","Files","files"],["✧","ORBIT AI","ai"],["✦","Discover","discover"],["◎","Friends","friends"],["⌑","Saved","saved"],["⌖","Explore","explore"],["⌘","Developer Portal","developer"],["+","Create server","create-server"],["#","Create channel","create-channel"],["☎","Start voice call","voice"],["▣","Start video call","video"],["↗","Share screen","share"],["⌕","Search","search"]
   ].filter(x=>(x[1]+" "+x[2]).toLowerCase().includes(String(q||"").toLowerCase()));
   $("#command-results").innerHTML=(commands.length?commands:[["⌕","No matches",""]]).map((x,i)=>'<button class="command-item" data-command-index="'+i+'"><span class="command-icon">'+x[0]+'</span><div><strong>'+x[1]+'</strong><span>'+x[2]+'</span></div><span>↵</span></button>').join("");
   document.querySelectorAll("[data-command-index]").forEach((b,i)=>b.onclick=()=>runCommand(commands[i]));
@@ -3905,7 +3904,6 @@ function runCommand(item){
   if(!item)return;
   closeCommandPalette();
   const a=item[2];
-  if(a==="developer"){setView("settings");return renderSettingsPage("developer")}
   if(["home","discover","dms","calls","live","events","projects","files","ai","notifications","saved","explore"].includes(a))return setView(a);
   if(a==="create-server")return $("#new-server").click();
   if(a==="create-channel")return $("#new-channel").click();
