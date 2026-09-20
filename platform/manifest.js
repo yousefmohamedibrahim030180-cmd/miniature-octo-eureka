@@ -1,10 +1,10 @@
 module.exports = {
-  version: "1.0.0",
+  version: "1.1.0",
   product: "ORBIT",
   capabilities: {
     communities: true, chat: true, threads: true, directMessages: true, friends: true, presence: true,
     voice: true, video: true, screenShare: true, events: true, projects: true, moderation: true, search: true,
-    notifications: true, profiles: true, uploads: true, streaming: false, payments: false, bots: false, developerApi: false
+    notifications: true, profiles: true, uploads: true, streaming: false, payments: false, bots: false, developerApi: true
   },
   integrations: {
     database: Boolean(process.env.DATABASE_URL),
