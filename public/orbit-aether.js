@@ -12,7 +12,7 @@
   function sync(){
     const active=String(window.orbitUI?.view||document.querySelector(".rail-nav.active")?.dataset.view||"home");
     $$(".aether-nav").forEach(b=>b.classList.toggle("active",b.dataset.view===active));
-    $("#aether-context-name").textContent=active==="home"?"Command Center":active.replace(/^./,x=>x.toUpperCase());
+    $("#aether-context-name").textContent=active==="home"?"Command Center":active.replace(/^./,x=>x.toUpperCase()); $("#aether-hero-strip")?.classList.toggle("aether-hide",active!=="home");
     $("#aether-current-surface").textContent=("ORBIT / "+active).toUpperCase();
     const users=pulseUsers(), calls=pulseCalls(), worlds=document.querySelectorAll("#server-list>*").length, dms=document.querySelectorAll("#channel-list>*").length;
     $("#aether-metric-people").textContent=String(users.length||"—");
