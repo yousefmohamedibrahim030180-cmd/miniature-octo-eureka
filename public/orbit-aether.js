@@ -183,6 +183,7 @@
     document.body.dataset.orbitSurface=active;
   }
   function wire(){
+    $(".aether-nav[data-view]").forEach(b=>b.onclick=()=>route(b.dataset.view));
     $("#aether-command")?.addEventListener("click",openSearch);
     $("#aether-top-search")?.addEventListener("click",openSearch);
     $("#aether-top-call")?.addEventListener("click",()=>$("#voice-call-btn")?.click());
