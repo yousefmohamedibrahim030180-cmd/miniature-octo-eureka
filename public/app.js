@@ -692,12 +692,19 @@ function closeServerSidebar() {
   document.body.classList.remove("mobile-sidebar-open");
 }
 function renderServers() {
-  $("#server-list").innerHTML = servers.map(s =>
-    '<button class="server-item ' + (String(currentServer?.id) === String(s.id) ? "active" : "") +
-    '" data-id="' + s.id + '" title="' + escapeHtml(s.name) + '">' +
-    escapeHtml(s.name.slice(0, 2).toUpperCase()) + "</button>"
-  ).join("");
-  document.querySelectorAll(".server-item").forEach(btn => {
+  const host = $("#server-list");
+  if (!host) return;
+  host.innerHTML = servers.map(s => {
+    const active = String(currentServer?.id) === String(s.id) ? "active" : "";
+    const initials = escapeHtml((s.name || "OR").slice(0, 2).toUpperCase());
+    const name = escapeHtml(s.name || "Community");
+    return '<button class="server-item ' + active + '" data-id="' + s.id + '" title="' + name + '">' +
+      '<span class="server-icon" aria-hidden="true">' + initials + '</span>' +
+      '<span class="server-name">' + name + '</span>' +
+      '<span class="server-arrow" aria-hidden="true">›</span>' +
+    '</button>';
+  }).join("");
+  host.querySelectorAll(".server-item").forEach(btn => {
     btn.onclick = () => selectServer(servers.find(s => String(s.id) === btn.dataset.id));
   });
 }
