@@ -250,8 +250,36 @@ function tokenFor(user) {
     { expiresIn: "30d" }
   );
 }
+function parseCookies(req) {
+  const raw = String(req.headers.cookie || "");
+  const out = {};
+  for (const part of raw.split(";")) {
+    const item = part.trim();
+    if (!item) continue;
+    const index = item.indexOf("=");
+    if (index < 0) continue;
+    const key = item.slice(0, index).trim();
+    const value = item.slice(index + 1).trim();
+    try { out[key] = decodeURIComponent(value); } catch { out[key] = value; }
+  }
+  return out;
+}
 function readToken(req) {
-  return (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+  if (bearer) return bearer;
+  return String(parseCookies(req).orbit_session || "").trim();
+}
+function setSessionCookie(res, token) {
+  const secure = process.env.NODE_ENV === "production" || String(res.req?.headers?.["x-forwarded-proto"] || "").split(",")[0].trim() === "https";
+  const parts = [
+    "orbit_session=" + encodeURIComponent(String(token || "")),
+    "Max-Age=2592000",
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax"
+  ];
+  if (secure) parts.push("Secure");
+  res.setHeader("Set-Cookie", parts.join("; "));
 }
 function authenticate(req, res, next, allowLegacy = false) {
   try {
@@ -497,7 +525,9 @@ app.get("/health", (req, res) => {
 
 app.post("/api/guest", (req, res) => {
   const user = createGuest(req.body?.username, req.body?.guestId);
-  res.json({ user: publicUser(user), token: tokenFor(user) });
+  const token = tokenFor(user);
+  setSessionCookie(res, token);
+  res.json({ user: publicUser(user), token });
 });
 
 const accountLoginAttempts = new Map();
@@ -548,7 +578,9 @@ app.post("/api/auth/register", async (req, res) => {
   ensureDefaultServer(user);
   schedulePersist();
 
-  res.status(201).json({ user: publicUser(user), token: tokenFor(user) });
+  const token = tokenFor(user);
+  setSessionCookie(res, token);
+  res.status(201).json({ user: publicUser(user), token });
 });
 
 app.post("/api/auth/login", async (req, res) => {
@@ -577,7 +609,9 @@ app.post("/api/auth/login", async (req, res) => {
   user.status = "online";
   user.activity = "Online";
   schedulePersist();
-  res.json({ user: publicUser(user), token: tokenFor(user) });
+  const token = tokenFor(user);
+  setSessionCookie(res, token);
+  res.json({ user: publicUser(user), token });
 });
 
 app.post("/api/auth/convert-legacy", authLegacy, async (req, res) => {
@@ -592,7 +626,9 @@ app.post("/api/auth/convert-legacy", authLegacy, async (req, res) => {
   req.user.accountCreatedAt = req.user.accountCreatedAt || now();
   req.user.guest = false;
   schedulePersist();
-  res.json({ user: publicUser(req.user), token: tokenFor(req.user) });
+  const token = tokenFor(req.user);
+  setSessionCookie(res, token);
+  res.json({ user: publicUser(req.user), token });
 });
 
 app.get("/api/me", authLegacy, (req, res) => {
@@ -2056,7 +2092,13 @@ app.use((err, req, res, next) => {
 
 io.use((socket, next) => {
   try {
-    const payload = jwt.verify(socket.handshake.auth?.token, JWT_SECRET);
+    const cookieHeader = String(socket.handshake.headers?.cookie || "");
+    const cookieMatch = cookieHeader.match(/(?:^|;\s*)orbit_session=([^;]+)/);
+    let rawToken = socket.handshake.auth?.token || "";
+    if (!rawToken && cookieMatch) {
+      try { rawToken = decodeURIComponent(cookieMatch[1]); } catch { rawToken = cookieMatch[1]; }
+    }
+    const payload = jwt.verify(rawToken, JWT_SECRET);
     const user = memory.users.get(payload.id);
     if (!user || !payload.account || !user.passwordHash) return next(new Error("Account authentication required"));
     if (user.suspended) return next(new Error("Account suspended"));
