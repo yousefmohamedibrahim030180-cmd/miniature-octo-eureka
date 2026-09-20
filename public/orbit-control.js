@@ -26,13 +26,14 @@
     const row={id:Date.now()+Math.random(),title:String(title),copy:String(copy),time:new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})};
     activities.push(row);saveActivities();renderActivity();updateCounters();
   };
+  const feedback=()=>{if(!state.sound)return;try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const c=new C(),o=c.createOscillator(),g=c.createGain();o.frequency.value=640;g.gain.value=.018;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.055);setTimeout(()=>c.close?.(),120)}catch{}}
   const toast=(msg)=>{
     let t=$("#orbit-control-toast");
     if(!t){t=document.createElement("div");t.id="orbit-control-toast";document.body.appendChild(t)}
     t.textContent=msg;t.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("show"),2100);
   };
   const run=(label,fn)=>{
-    try{fn();note(label,"Action executed from Orbit Control");toast(label)}
+    try{fn();feedback();note(label,"Action executed from Orbit Control");toast(label)}
     catch(e){console.error("[orbit-control]",e);toast("Action unavailable")}
   };
   const setTheme=(id)=>{
@@ -76,7 +77,7 @@
     const legacy=document.querySelector('[data-view="'+CSS.escape(view)+'"]');
     legacy?.click();
   }
-  function clickSel(sel){$(sel)?.click()}
+  function clickSel(sel){const el=$(sel);if(!el)return false;el.click();return true}
   function actionFor(id){
     const map={
       voice:()=>clickSel("#voice-call-btn"),
