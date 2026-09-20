@@ -19,7 +19,7 @@ function applyOrbitLocale(locale){
   const sectionTitles=document.querySelectorAll(".section-title span");
   if(sectionTitles[0])sectionTitles[0].textContent=t.channels;
   if(sectionTitles[1])sectionTitles[1].textContent=t.voice;
-  const navMap={home:t.home,discover:t.discover,notifications:t.notifications};
+  const navMap={home:t.home,notifications:t.notifications};
   document.querySelectorAll(".global-nav .rail-nav").forEach(btn=>{if(navMap[btn.dataset.view])btn.title=navMap[btn.dataset.view]});
   return key;
 }
