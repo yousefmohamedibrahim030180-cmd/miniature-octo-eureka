@@ -24,6 +24,8 @@ body.oc-zen .aether-inspector,
 body.oc-zen .aether-topline{opacity:0;pointer-events:none;transform:translateX(-12px);transition:.35s}
 body.oc-zen .aether-content{grid-column:1 / -1!important}
 body.oc-zen .aether-chat{max-width:1120px;margin:0 auto!important}
+body.oc-ambient-off #aether-stars,body.oc-ambient-off #aether-noise,body.oc-ambient-off .aether-canvas-glow{opacity:0!important}
+body.oc-ambient-off .aether-orbit-visual{filter:saturate(.72)!important}
 #orbit-control-launcher{
   position:fixed;right:18px;bottom:18px;z-index:170;
   width:58px;height:58px;border-radius:18px;border:1px solid rgba(186,174,255,.28);
