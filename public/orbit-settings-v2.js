@@ -168,14 +168,7 @@
     if(err)n.style.borderColor="#ff647e45";stack.appendChild(n);setTimeout(()=>n.remove(),3500);
   }
 
-  const obs=new MutationObserver(()=>{if(location.pathname==="/")requestAnimationFrame(enhanceSettings)});
-  obs.observe($("#surface")||document.body,{childList:true,subtree:true});
 
-  document.addEventListener("click",e=>{
-    const v=e.target.closest("[data-view]")?.dataset.view;
-    if(v==="settings")setTimeout(enhanceSettings,25);
-  });
-
-  window.__ORBIT_REFRESH_CHROME=()=>{const b=$("#rail-name");if(b&&window.__ORBIT_USER)b.textContent=window.__ORBIT_USER.display_name||window.__ORBIT_USER.username||"Guest"};
+  window.__ORBIT_ENHANCE_SETTINGS=enhanceSettings;
   window.__ORBIT_SETTINGS_V2=true;
 })();
