@@ -53,7 +53,6 @@
     document.body.classList.toggle("oc-compact",!!state.compact);
     document.body.classList.toggle("oc-zen",!!state.zen);
     document.body.classList.toggle("oc-ambient-off",!state.ambient);
-    if(!state.motion){" ");}
     setTheme(state.theme);
   };
   const socket=()=>window.__orbitRealtimeSocket||window.__orbitSocket||null;
