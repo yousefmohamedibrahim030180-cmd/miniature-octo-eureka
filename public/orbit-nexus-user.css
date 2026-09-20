@@ -58,6 +58,8 @@
 
 
 /* NEXUS STRUCTURAL RESET — keep every surface in its own region */
+.view{display:none!important}
+
 .app-shell{height:100dvh;min-height:0;overflow:hidden}
 .main{min-width:0;min-height:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:rgba(7,9,17,.42)}
 .topbar{height:64px;min-height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--line);background:rgba(8,11,19,.78);backdrop-filter:blur(22px);position:relative;z-index:5}
