@@ -1645,9 +1645,9 @@ function renderPage(view) {
   if(view==="settings")renderSettingsPage();
 }
 function setView(view){
-  if(view==="dms"){view="home";}
+  if(view==="dms" || view==="messages"){view="home";}
   orbitUI.view=view;
-  document.querySelectorAll(".rail-nav[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+  document.querySelectorAll(".nav-item[data-view], .rail-nav[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
   const global=$("#global-page"),chat=$("#chat-view");
   const isHome=view==="home";
   document.body.classList.toggle("orbit-discord-home",isHome);
@@ -1673,7 +1673,7 @@ function goChat(){
   setView("chat");
   document.body.classList.remove("orbit-discord-home");
   $("#global-page")?.classList.remove("discord-home-active");
-  document.querySelectorAll(".rail-nav[data-view]").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".nav-item[data-view], .rail-nav[data-view]").forEach(b=>b.classList.remove("active"));
   document.body.classList.remove("mobile-sidebar-open");
   $("#sidebar")?.classList.remove("open");
 }
@@ -3680,7 +3680,20 @@ function bindPremiumNavigation(){
     setView(b.dataset.view);
     closeServerSidebar();
   });
-  $("#mobile-sidebar-btn")?.addEventListener("click",()=>{
+  // NEXUS shell compatibility: bind the new top-level controls to the existing application routes.
+  $("#openSearch")?.addEventListener("click",()=>openSearchModal("")); 
+  $("#quickCommand")?.addEventListener("click",()=>openCommandPalette());
+  $("#notifyBtn")?.addEventListener("click",()=>setView("notifications"));
+  $("#topProfile")?.addEventListener("click",()=>{setView("settings");closeServerSidebar();setTimeout(()=>renderSettingsPage("profile"),0)});
+  $("#openProfile")?.addEventListener("click",()=>{setView("settings");closeServerSidebar();setTimeout(()=>renderSettingsPage("profile"),0)});
+  document.querySelectorAll('.circle-btn[aria-label="Messages"]').forEach(b=>b.addEventListener("click",()=>setView("home")));
+  document.querySelectorAll('.circle-btn[aria-label="Calls"]').forEach(b=>b.addEventListener("click",()=>setView("calls")));
+  $("#collapseContext")?.addEventListener("click",()=>{
+    const sidebar=$("#sidebar");
+    sidebar?.classList.toggle("collapsed");
+    $("#app")?.classList.toggle("context-collapsed",sidebar?.classList.contains("collapsed"));
+  });
+    $("#mobile-sidebar-btn")?.addEventListener("click",()=>{
     const sidebar=$("#sidebar");
     if(!sidebar)return;
     sidebar.classList.toggle("open");
