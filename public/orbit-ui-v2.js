@@ -28,3 +28,5 @@
   const observer=new MutationObserver(boot);
   observer.observe(document.documentElement,{childList:true,subtree:true});
 })();
+
+;(()=>{if(!document.getElementById('orbit-2200-runtime')){const s=document.createElement('script');s.id='orbit-2200-runtime';s.src='/orbit-2200.js?v=orbit-2200-v1';document.head.appendChild(s)}})();
