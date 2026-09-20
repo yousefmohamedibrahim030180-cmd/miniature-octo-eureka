@@ -306,8 +306,11 @@ async function enterAsGuest() {
 }
 
 function connectRealtime() {
-  if(socket && (socket.connected || socket.connecting)) return socket;
-  if(window.__orbitRealtimeSocket && (window.__orbitRealtimeSocket.connected || window.__orbitRealtimeSocket.connecting)){ socket=window.__orbitRealtimeSocket; return socket; }
+  if(window.__orbitRealtimeBooting || window.__orbitRealtimeStarted){
+    if(window.__orbitRealtimeSocket){socket=window.__orbitRealtimeSocket;}
+    return socket;
+  }
+  window.__orbitRealtimeBooting=true;
   socket = io({
     auth: { token },
     path: "/socket.io",
@@ -322,6 +325,19 @@ function connectRealtime() {
   });
 
   window.__orbitRealtimeSocket=socket;
+  window.__orbitRealtimeStarted=true;
+  window.__orbitRealtimeBooting=false;
+  socket.on("connect_error", () => {
+    window.__orbitRealtimeStarted=false;
+    window.__orbitRealtimeBooting=false;
+  });
+  socket.on("disconnect", reason => {
+    if(reason==="io client disconnect"){
+      window.__orbitRealtimeStarted=false;
+      window.__orbitRealtimeBooting=false;
+      window.__orbitRealtimeSocket=null;
+    }
+  });
   socket.on("message:new", m => {
     const active = currentChannel && String(m.channel_id) === String(currentChannel.id);
     if (active) {
