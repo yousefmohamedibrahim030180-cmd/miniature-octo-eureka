@@ -209,8 +209,8 @@
   }
   function boot(){
     document.body.classList.add("orbit-prism");
-    ensureScene();stars();applyVisualPrefs();themeDrawer();syncThemeDrawer();wire();sync();setInterval(sync,1500);
-    const ob=new MutationObserver(()=>sync());ob.observe($("#app")||document.body,{subtree:true,childList:true});
+    ensureScene();stars();applyVisualPrefs();themeDrawer();syncThemeDrawer();wire();sync();
+    if(!window.__orbitPrismSyncTimer){window.__orbitPrismSyncTimer=setInterval(sync,2000)}
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});else boot();
 })();
