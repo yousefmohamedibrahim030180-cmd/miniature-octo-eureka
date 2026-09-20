@@ -3,175 +3,59 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0a0c10">
-<title>Orbit — Community, Chat & Calls</title>
+<meta name="theme-color" content="#070911">
+<title>ORBIT NEXUS — Social Operating System</title>
+<meta name="description" content="Premium futuristic Orbit social application interface">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.css?v=orbit-pro-v8-20260918">
-<link rel="stylesheet" href="/orbit-next.css?v=orbit-nexus-v9-20260918">
-<link rel="stylesheet" href="/orbit-spatial.css?v=orbit-spatial-v10-20260918-clean">
-<link rel="stylesheet" href="/orbit-desk.css?v=orbit-space-v63-20260919">
-<link rel="stylesheet" href="/orbit-adaptive.css?v=adaptive-v1-20260919">
-<link rel="stylesheet" href="/orbit-nexus.css?v=nexus-v4-20260919">
-<link rel="stylesheet" href="/orbit-core.css?v=core-v3-20260919">
-<link rel="stylesheet" href="/orbit-call-fix.css?v=call-fix-v1-20260920">
-<link rel="stylesheet" href="/orbit-pro-ui.css?v=orbit-pro-ui-v4-20260920">
-<link rel="stylesheet" href="/orbit-easy-ui.css?v=orbit-easy-v1-20260920">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/orbit-nexus-user.css?v=nexus-user-v1">
 </head>
 <body>
-<div id="app" class="app">
-  <aside class="server-rail">
-    <div class="brand-shell"><div class="rail-logo">◈</div><span class="brand-name">ORBIT</span></div>
-    <nav class="global-nav" aria-label="Global">
-      <button class="rail-nav active" data-view="home" title="Home">⌂</button>
-      <button class="rail-nav space-nav" data-view="space" title="Space">✦</button>
-    </nav>
-    <div class="rail-divider"></div>
-    <div id="server-list" class="server-list"></div>
-    <button id="new-server" class="rail-btn" title="Create server">+</button>
-    <button id="join-server" class="rail-btn join" title="Join server">↗</button>
-    <button id="settings-nav" class="rail-nav bottom-nav" data-view="settings" title="Settings">⚙</button>
-  </aside>
-
-  <aside id="sidebar" class="sidebar">
-    <div class="workspace-head">
-      <div class="workspace-brand"><div class="workspace-avatar" id="workspace-avatar">O</div><div><strong id="workspace-name">Orbit Lobby</strong><span id="workspace-role">guest</span></div></div>
-      <button id="workspace-menu" class="icon-btn" title="Community menu">⋯</button>
-    </div>
-
-    <div class="sidebar-search" id="sidebar-search"><span>⌕</span><input id="quick-search" placeholder="Search"><kbd>Ctrl K</kbd></div>
-
-    <div class="section-title"><span>CHANNELS</span><button id="new-channel" title="Create channel">+</button></div>
-    <div class="channel-list" id="channel-list"></div>
-
-    <div class="section-title voice-section-title"><span>VOICE</span><button id="new-voice-channel" title="Create voice channel">+</button></div>
-    <div class="channel-list voice-list" id="voice-channel-list"></div>
-
-    <div id="voice-dock" class="voice-dock hidden">
-      <div class="voice-dock-status"><span class="dock-dot"></span><div><strong>Voice connected</strong><span id="voice-dock-name">Lounge</span></div></div>
-      <div class="voice-dock-actions"><button id="dock-mic">🎙</button><button id="dock-screen">▣</button><button id="dock-leave" class="dock-danger">×</button></div>
-    </div>
-
-    <div class="sidebar-bottom">
-      <button id="profile-card-btn" class="profile">
-        <div class="avatar" id="me-avatar">G</div>
-        <div><strong id="me-name">Guest</strong><span id="me-status">online · guest</span></div>
-        <span class="profile-spark">✦</span>
-      </button>
-    </div>
-  </aside>
-
-  <main class="content">
-    <div id="drop-overlay" class="drop-overlay hidden">
-      <div class="drop-card"><div class="drop-icon">↥</div><strong>Drop files into this channel</strong><span>Images, video, audio, PDF and common documents · up to 4.5 MB each</span></div>
-    </div>
-    <div id="upload-overlay" class="upload-overlay hidden">
-      <div class="upload-card"><div class="upload-icon">↥</div><div class="upload-copy"><strong>Uploading <span id="upload-file-name">file</span></strong><span id="upload-progress-value">Reading…</span></div><div class="upload-progress"><i id="upload-progress-bar"></i></div></div>
-    </div>
-    <div id="global-page" class="global-page hidden">
-      <div class="page-head">
-        <div><span class="eyebrow" id="page-eyebrow">ORBIT</span><h1 id="page-title">Home</h1><p id="page-subtitle">Your communities, conversations, and live rooms in one place.</p></div>
-        <div class="page-actions" id="page-actions"></div>
-      </div>
-      <div id="page-body" class="page-body"></div>
-    </div>
-
-    <div id="chat-view" class="chat">
-      <header class="chat-head">
-        <button id="mobile-sidebar-btn" class="mobile-sidebar-btn" title="Channels" aria-label="Open channels">☰</button>
-        <div class="channel-title">
-          <span class="hash" id="channel-symbol">#</span>
-          <div><strong id="channel-name">general</strong><span id="channel-meta">Chat</span></div>
-        </div>
-        <div class="head-actions" aria-label="Channel actions">
-          <button id="voice-call-btn" class="head-action call-action" title="Start voice call" aria-label="Start voice call"><span>☎</span><b>Voice</b></button>
-          <button id="video-call-btn" class="head-action primary-soft call-action" title="Start video call" aria-label="Start video call"><span>▣</span><b>Video</b></button>
-          <button id="quick-screen-share-btn" class="head-action screen-head-action secondary-channel-action" title="Share your screen" aria-label="Share your screen"><span>▣</span><b>Share screen</b></button>
-          <button id="channel-more-btn" class="head-action channel-more-btn" title="More channel actions" aria-label="More channel actions">More <span>⋯</span></button>
-          <div id="channel-more-menu" class="channel-more-menu hidden" role="menu">
-            <button type="button" data-action="quick-share">Share channel link</button>
-            <button type="button" data-action="invite">Invite people</button>
-            <button type="button" data-action="members">View members</button>
-            <button type="button" data-action="admin">Channel control</button>
-          </div>
-          <button id="quick-share-btn" class="head-action utility-hidden" aria-hidden="true" tabindex="-1">Share link</button>
-          <button id="invite-btn" class="head-action utility-hidden" aria-hidden="true" tabindex="-1">Invite</button>
-          <button id="members-btn" class="head-action utility-hidden" aria-hidden="true" tabindex="-1">Members</button>
-          <button id="admin-btn" class="head-action utility-hidden" aria-hidden="true" tabindex="-1">Control</button>
-        </div>
-      </header>
-
-      <div class="chat-body">
-        <section id="messages" class="messages">
-          <div class="empty"><div class="empty-icon">✦</div><h2>Your community is waiting.</h2><p>Start with a message. Voice, video and screen sharing are always one click away.</p></div>
-        </section>
-        <div id="typing" class="typing"></div>
-      </div>
-
-      <form id="composer" class="composer">
-        <button type="button" id="attach" class="composer-icon" title="More tools">+</button>
-        <button type="button" id="poll-btn" class="composer-tool" title="Create poll">◫</button>
-        <input id="message" placeholder="Write a message..." autocomplete="off">
-        <button class="send">Send</button>
-      </form>
-    </div>
-
-    <div id="members-panel" class="members-panel hidden">
-      <div class="panel-head"><strong>Members</strong><button id="close-members">×</button></div>
-      <div class="member-tools"><input id="member-filter" placeholder="Search members"></div>
-      <div id="member-list"></div>
-    </div>
-
-    <aside id="thread-panel" class="thread-panel hidden">
-      <div class="panel-head"><div><strong>Thread</strong><span id="thread-meta">0 replies</span></div><button id="close-thread">×</button></div>
-      <div id="thread-root" class="thread-root"></div>
-      <div id="thread-messages" class="thread-messages"></div>
-      <form id="thread-composer" class="thread-composer"><input id="thread-input" placeholder="Reply in thread"><button>Send</button></form>
-    </aside>
-  </main>
+<div class="ambient ambient-a"></div><div class="ambient ambient-b"></div><div class="ambient ambient-c"></div>
+<div class="app-shell">
+<aside class="rail">
+<div class="brand"><div class="brand-mark">O</div><div><strong>ORBIT</strong><span>Social OS</span></div></div>
+<button class="global-search" id="openSearch"><span>⌕</span><span>Search</span><kbd>Ctrl K</kbd></button>
+<div class="rail-section-label">MENU</div>
+<nav id="mainNav">
+<button class="nav-item active" data-view="home" data-menu="HOME"><span class="ico">⌂</span><span>Home</span><em>2</em></button>
+<button class="nav-item" data-view="space" data-menu="ORBIT SPACE"><span class="ico">✦</span><span>Network</span></button>
+<button class="nav-item" data-view="messages" data-menu="MESSAGES"><span class="ico">◈</span><span>Messages</span><em class="hot">3</em></button>
+<button class="nav-item" data-view="communities" data-menu="COMMUNITIES"><span class="ico">◎</span><span>Communities</span></button>
+<button class="nav-item" data-view="live" data-menu="LIVE"><span class="ico">◉</span><span>Live</span><span class="live-dot"></span></button>
+<button class="nav-item" data-view="discover" data-menu="DISCOVER"><span class="ico">⌁</span><span>Explore</span></button>
+<button class="nav-item" data-view="events" data-menu="EVENTS"><span class="ico">▣</span><span>Events</span><em>4</em></button>
+<button class="nav-item" data-view="projects" data-menu="PROJECTS"><span class="ico">◇</span><span>Projects</span></button>
+<button class="nav-item" data-view="files" data-menu="FILES"><span class="ico">▱</span><span>Files</span></button>
+<button class="nav-item" data-view="ai" data-menu="AI"><span class="ico">✧</span><span>AI Assistant</span><span class="ai-badge">AI</span></button>
+<button class="nav-item" data-view="settings" data-menu="SETTINGS"><span class="ico">⚙</span><span>Settings</span></button>
+</nav>
+<div class="rail-spacer"></div>
+<div class="mini-card"><span class="pulse"></span><div><b>All systems online</b><small>Realtime • 18ms</small></div></div>
+<button class="profile-chip" id="openProfile"><div class="avatar me" id="me-avatar">A</div><div><b id="me-name">Guest</b><small id="me-status">Available</small></div><span>•••</span></button>
+</aside>
+<aside class="context-panel" id="contextPanel"><div class="context-head"><div><span class="eyebrow" id="contextEyebrow">HOME</span><h2 id="contextTitle">Command Center</h2></div><button class="icon-btn" id="collapseContext">‹</button></div><div id="contextBody"></div></aside>
+<main class="main">
+<header class="topbar"><div class="breadcrumbs"><span>ORBIT</span><b>/</b><strong id="pageCrumb">Home</strong></div><div class="top-actions"><button class="top-btn" id="quickCommand">⌘ <span>Search</span></button><button class="circle-btn" id="notifyBtn" aria-label="Notifications">♢<i>5</i></button><button class="circle-btn" aria-label="Messages">◈<i>3</i></button><button class="circle-btn" aria-label="Calls">◉</button><button class="status-pill"><span class="status-online"></span> Active <span>⌄</span></button><button class="avatar me" id="topProfile">A</button></div></header>
+<section class="view" id="view"></section>
+<div id="drop-overlay" class="drop-overlay hidden"><div class="drop-card"><div class="drop-icon">↥</div><strong>Drop files into this channel</strong><span>Images, video, audio, PDF and common documents</span></div></div>
+<div id="upload-overlay" class="upload-overlay hidden"><div class="upload-card"><div class="upload-icon">↥</div><div><strong>Uploading <span id="upload-file-name">file</span></strong><span id="upload-progress-value">Reading…</span></div><div class="upload-progress"><i id="upload-progress-bar"></i></div></div></div>
+<div id="global-page" class="global-page hidden"><div class="page-head"><div><span class="eyebrow" id="page-eyebrow">ORBIT</span><h1 id="page-title">Home</h1><p id="page-subtitle">Your communities, conversations, and live rooms in one place.</p></div><div class="page-actions" id="page-actions"></div></div><div id="page-body" class="page-body"></div></div>
+<div id="chat-view" class="chat"><header class="chat-head"><button id="mobile-sidebar-btn" class="mobile-sidebar-btn">☰</button><div class="channel-title"><span class="hash" id="channel-symbol">#</span><div><strong id="channel-name">general</strong><span id="channel-meta">Chat</span></div></div><div class="head-actions"><button id="voice-call-btn" class="head-action call-action"><span>☎</span><b>Voice</b></button><button id="video-call-btn" class="head-action primary-soft call-action"><span>▣</span><b>Video</b></button><button id="quick-screen-share-btn" class="head-action secondary-channel-action"><span>▣</span><b>Share screen</b></button><button id="channel-more-btn" class="head-action channel-more-btn">More <span>⋯</span></button><div id="channel-more-menu" class="channel-more-menu hidden"><button type="button" data-action="quick-share">Share channel link</button><button type="button" data-action="invite">Invite people</button><button type="button" data-action="members">View members</button><button type="button" data-action="admin">Channel control</button></div><button id="quick-share-btn" class="utility-hidden" aria-hidden="true">Share link</button><button id="invite-btn" class="utility-hidden" aria-hidden="true">Invite</button><button id="members-btn" class="utility-hidden" aria-hidden="true">Members</button><button id="admin-btn" class="utility-hidden" aria-hidden="true">Control</button></div></header><div class="chat-body"><section id="messages" class="messages"><div class="empty"><div class="empty-icon">✦</div><h2>Your community is waiting.</h2><p>Start with a message. Voice, video and screen sharing are one click away.</p></div></section><div id="typing" class="typing"></div></div><form id="composer" class="composer"><button type="button" id="attach" class="composer-icon">+</button><button type="button" id="poll-btn" class="composer-tool">◫</button><input id="message" placeholder="Write a message..." autocomplete="off"><button class="send">Send</button></form></div>
+<div id="members-panel" class="members-panel hidden"><div class="panel-head"><strong>Members</strong><button id="close-members">×</button></div><div class="member-tools"><input id="member-filter" placeholder="Search members"></div><div id="member-list"></div></div>
+<aside id="thread-panel" class="thread-panel hidden"><div class="panel-head"><div><strong>Thread</strong><span id="thread-meta">0 replies</span></div><button id="close-thread">×</button></div><div id="thread-root" class="thread-root"></div><div id="thread-messages" class="thread-messages"></div><form id="thread-composer" class="thread-composer"><input id="thread-input" placeholder="Reply in thread"><button>Send</button></form></aside>
+</main>
+<aside class="right-panel" id="rightPanel"><div class="right-head"><div><span class="eyebrow">LIVE CONTEXT</span><h3 id="rightTitle">Activity</h3></div><button class="icon-btn" id="closeRight">×</button></div><div id="rightBody"></div></aside>
 </div>
-
-<section id="call-panel" class="call-panel hidden" aria-label="Orbit call">
-  <div class="call-topbar">
-    <div class="call-room"><div class="call-live-dot"></div><div><strong id="call-title">Lounge</strong><span id="call-subtitle">Voice & video room</span></div><div class="call-duration" id="call-duration">00:00</div></div>
-    <div class="call-top-actions"><div class="live-stat" id="call-quality-indicator">CONNECTING</div><div class="live-stat muted-stat" id="call-network-indicator">NETWORK —</div><button id="minimize-call" class="glass-btn">—</button><button id="close-call" class="glass-btn danger">×</button></div>
-  </div>
-  <div id="call-stage" class="call-stage layout-grid frame-soft"></div>
-  <div id="call-toast" class="call-toast hidden"></div>
-  <div class="call-empty hidden" id="call-empty"><div class="call-empty-icon">◉</div><strong>You're the first one here</strong><span>Invite someone or share the room link.</span></div>
-  <div class="call-toolbar">
-    <div class="toolbar-left"><button id="mic-btn" class="call-btn active" title="Mute microphone">🎙</button><button id="camera-btn" class="call-btn active" title="Turn camera off">◉</button><button id="share-btn" class="call-btn share-screen-btn" title="Share screen">▣ <span class="share-label">Share screen</span></button></div>
-    <div class="toolbar-center"><button id="layout-btn" class="call-btn wide">Layout</button><button id="quality-btn" class="call-btn wide">Quality</button><button id="frames-btn" class="call-btn wide">Frame</button><button id="settings-btn" class="call-btn wide">Settings</button><button id="more-call-btn" class="call-btn wide">More</button></div>
-    <div class="toolbar-right"><button id="participants-btn" class="call-btn wide">People <span id="participant-count">1</span></button><button id="hangup-btn" class="hangup-btn">Leave</button></div>
-  </div>
-  <div id="call-popover" class="call-popover hidden"></div>
-</section>
-
+<section id="call-panel" class="call-panel hidden"><div class="call-topbar"><div class="call-room"><div class="call-live-dot"></div><div><strong id="call-title">Lounge</strong><span id="call-subtitle">Voice & video room</span></div><div class="call-duration" id="call-duration">00:00</div></div><div class="call-top-actions"><div class="live-stat" id="call-quality-indicator">CONNECTING</div><div class="live-stat muted-stat" id="call-network-indicator">NETWORK —</div><button id="minimize-call" class="glass-btn">—</button><button id="close-call" class="glass-btn danger">×</button></div></div><div id="call-stage" class="call-stage layout-grid frame-soft"></div><div id="call-toast" class="call-toast hidden"></div><div class="call-empty hidden" id="call-empty"><div class="call-empty-icon">◉</div><strong>You're the first one here</strong><span>Invite someone or share the room link.</span></div><div class="call-toolbar"><div class="toolbar-left"><button id="mic-btn" class="call-btn active">🎙</button><button id="camera-btn" class="call-btn active">◉</button><button id="share-btn" class="call-btn share-screen-btn">▣ <span class="share-label">Share screen</span></button></div><div class="toolbar-center"><button id="layout-btn" class="call-btn wide">Layout</button><button id="quality-btn" class="call-btn wide">Quality</button><button id="frames-btn" class="call-btn wide">Frame</button><button id="settings-btn" class="call-btn wide">Settings</button><button id="more-call-btn" class="call-btn wide">More</button></div><div class="toolbar-right"><button id="participants-btn" class="call-btn wide">People <span id="participant-count">1</span></button><button id="hangup-btn" class="hangup-btn">Leave</button></div></div><div id="call-popover" class="call-popover hidden"></div></section>
 <div id="incoming-call" class="incoming-call hidden"><div class="incoming-avatar" id="incoming-avatar">G</div><div class="incoming-copy"><strong id="incoming-title">Incoming call</strong><span id="incoming-subtitle">Someone is calling</span></div><div class="incoming-actions"><button id="incoming-accept">Accept</button><button id="incoming-decline">Decline</button></div></div>
-
 <div id="context-menu" class="context-menu hidden"></div>
-
-<div id="command-palette" class="command-palette hidden">
-  <div class="command-card">
-    <div class="command-search"><span>⌕</span><input id="command-input" placeholder="Search commands, pages, channels..."><kbd>ESC</kbd></div>
-    <div id="command-results" class="command-results"></div>
-    <div class="command-footer"><span>Navigate</span><span>Enter to open</span><span>Ctrl K</span></div>
-  </div>
-</div>
-
+<div id="command-palette" class="command-palette hidden"><div class="command-card"><div class="command-search"><span>⌕</span><input id="command-input" placeholder="Search commands, pages, channels..."><kbd>ESC</kbd></div><div id="command-results" class="command-results"></div><div class="command-footer"><span>Navigate</span><span>Enter to open</span><span>Ctrl K</span></div></div></div>
 <div id="toast-stack" class="toast-stack"></div>
-
 <div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><div><strong id="modal-title"></strong><span id="modal-subtitle"></span></div><button id="modal-close">×</button></div><div id="modal-body"></div></div></div>
-
 <script src="/socket.io/socket.io.js?v=4.8"></script>
-<script src="/app.js?v=orbit-space-v57-20260919"></script>
-<script src="/orbit-desk.js?v=orbit-home-native-v5-20260919"></script>
-<script src="/orbit-adaptive.js?v=adaptive-v2-20260919"></script>
-<script src="/orbit-nexus.js?v=nexus-v6-20260919"></script>
-<script src="/orbit-core.js?v=core-v6-20260919"></script>
-<a href="/store.html" class="orbit-store-launch" aria-label="Open ORBIT Store">STORE <span>↗</span></a>
-<style>.orbit-store-launch{position:fixed;right:20px;bottom:20px;z-index:99999;padding:11px 14px;border:1px solid rgba(139,233,255,.22);border-radius:999px;background:rgba(8,12,20,.82);backdrop-filter:blur(16px);color:#eefaff;text-decoration:none;font:800 10px/1 Inter,system-ui;letter-spacing:.16em;box-shadow:0 12px 35px rgba(0,0,0,.28)}.orbit-store-launch span{color:#8be9ff;margin-left:5px}</style>
+<script src="/app.js?v=nexus-user-v1"></script>
 <script src="/orbit-call-fix.js?v=call-fix-v1-20260920"></script>
 <script src="/orbit-ui-v2.js?v=orbit-ui-v2-20260920"></script>
-</body>
-</html>
+</body></html>
