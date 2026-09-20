@@ -306,7 +306,8 @@ async function enterAsGuest() {
 }
 
 function connectRealtime() {
-  if (socket) socket.disconnect();
+  if(socket && (socket.connected || socket.connecting)) return socket;
+  if(window.__orbitRealtimeSocket && (window.__orbitRealtimeSocket.connected || window.__orbitRealtimeSocket.connecting)){ socket=window.__orbitRealtimeSocket; return socket; }
   socket = io({
     auth: { token },
     path: "/socket.io",
@@ -320,6 +321,7 @@ function connectRealtime() {
     withCredentials: true
   });
 
+  window.__orbitRealtimeSocket=socket;
   socket.on("message:new", m => {
     const active = currentChannel && String(m.channel_id) === String(currentChannel.id);
     if (active) {
