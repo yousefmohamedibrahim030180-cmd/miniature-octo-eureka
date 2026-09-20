@@ -1,7 +1,10 @@
 (() => {
   "use strict";
   const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-  const S={token:localStorage.getItem("orbit_token")||"",user:null,servers:[],server:null,channels:[],channel:null,dms:[],dm:null,friends:{friends:[],incoming:[],outgoing:[]},notifications:[],view:"home",socket:null,typing:null,call:null};
+  function readStoredToken(){try{const a=localStorage.getItem("orbit_token");if(a)return a}catch{}try{return sessionStorage.getItem("orbit_token")||""}catch{return""}}
+  function persistToken(v){try{localStorage.setItem("orbit_token",String(v||""))}catch{}try{sessionStorage.setItem("orbit_token",String(v||""))}catch{}}
+  function clearStoredToken(){try{localStorage.removeItem("orbit_token")}catch{}try{sessionStorage.removeItem("orbit_token")}catch{}}
+  const S={token:readStoredToken(),user:null,servers:[],server:null,channels:[],channel:null,dms:[],dm:null,friends:{friends:[],incoming:[],outgoing:[]},notifications:[],view:"home",socket:null,typing:null,call:null};
 
   const NAV=[
     ["home","⌂","Home"],["space","✦","Network"],["messages","◈","Messages"],["communities","◎","Communities"],
@@ -20,7 +23,7 @@
     if(!r.ok)throw new Error(d.error||"Request failed"); return d;
   }
   function toast(t,b="",kind=""){const n=document.createElement("div");n.className="toast";n.innerHTML="<strong>"+esc(t)+"</strong>"+(b?"<span>"+esc(b)+"</span>":"");$("#toast-stack").appendChild(n);setTimeout(()=>n.remove(),4000)}
-  function saveAuth(d){S.token=d.token||"";S.user=d.user||null;localStorage.setItem("orbit_token",S.token)}
+  function saveAuth(d){S.token=d.token||"";S.user=d.user||null;persistToken(S.token)}
   function openModal(title,body){$("#modal-root").innerHTML='<div class="modal-bg" id="modal-bg"><div class="modal"><div class="modal-head"><strong>'+esc(title)+'</strong><button class="icon" id="modal-x">×</button></div><div class="modal-body">'+body+'</div></div></div>';$("#modal-x").onclick=closeModal;$("#modal-bg").onclick=e=>{if(e.target.id==="modal-bg")closeModal()}}
   function closeModal(){$("#modal-root").innerHTML=""}
   function empty(t,p){return'<div class="empty"><div class="empty-box"><h2>'+esc(t)+'</h2><p>'+esc(p)+'</p></div></div>'}
@@ -269,7 +272,7 @@
     try{
       const d=await api("/api/me");
       if(!d?.user?.account){
-        localStorage.removeItem("orbit_token");
+        clearStoredToken();
         S.token="";
         return authScreen("signin");
       }
@@ -287,7 +290,7 @@
       chrome();
       if(S.view==="home")renderHome($("#surface"));
     }catch(e){
-      localStorage.removeItem("orbit_token");
+      clearStoredToken();
       S.token="";
       authScreen("signin");
       return;
