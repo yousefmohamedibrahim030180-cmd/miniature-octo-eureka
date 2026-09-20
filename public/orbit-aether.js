@@ -24,12 +24,12 @@
   const pulseUsers=()=>Array.isArray(window.pulseState?.users)?window.pulseState.users:[];
   const pulseCalls=()=>Array.isArray(window.pulseState?.calls)?window.pulseState.calls:[];
   function route(id){
-    const b=document.querySelector('.rail-nav[data-view="'+id+'"]');
-    if(typeof window.setView==="function"){
-      try{window.setView(id);sync();return}catch(e){}
-    }
-    if(b)b.click();
-    sync();
+    try{
+      if(typeof window.setView==="function"){ window.setView(id); sync(); return true; }
+      const b=document.querySelector('.rail-nav[data-view="'+id+'"]');
+      if(b){ b.onclick?.(); sync(); return true; }
+    }catch(err){ console.error("Orbit route failed",id,err); }
+    return false;
   }
   function openSearch(){
     const palette=$("#command-palette"),input=$("#command-input");
@@ -121,6 +121,8 @@
   }
   function openVisualSettings(){const d=themeDrawer();syncThemeDrawer();d.classList.add("open")}
   function bindRescue(){
+    if(window.__orbitPrismRescueBound)return;
+    window.__orbitPrismRescueBound=true;
     document.addEventListener("click",e=>{
       const nav=e.target.closest?.(".aether-nav[data-view]");
       if(nav){e.preventDefault();e.stopPropagation();route(nav.dataset.view);return}
