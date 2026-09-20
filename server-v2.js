@@ -3,378 +3,377 @@ const http=require("http");
 const path=require("path");
 const crypto=require("crypto");
 const bcrypt=require("bcryptjs");
-const {Pool}=require("pg");
 const {Server}=require("socket.io");
 
 const app=express();
-const httpServer=http.createServer(app);
-const io=new Server(httpServer,{transports:["polling"],cors:{origin:true,credentials:true}});
+const server=http.createServer(app);
+const io=new Server(server,{transports:["polling"],cors:{origin:true,credentials:true},allowUpgrades:false});
 const PORT=Number(process.env.PORT||8080);
-const DATABASE_URL=String(process.env.DATABASE_URL||"").trim();
-const JWT_SECRET=String(process.env.JWT_SECRET||"orbit-v2-dev-secret");
-const cookieName="orbit_v2_session";
-const memory={sessions:new Map(),callRooms:new Map(),rate:new Map(),callStarted:new Map()};
-let db=null;
+const PERSIST_URL=String(process.env.ORBIT_PERSIST_URL||"").trim().replace(/\/$/,"");
+const PERSIST_SECRET=String(process.env.ORBIT_PERSIST_SECRET||"").trim();
+const COOKIE="orbit_v2_session";
+const memory={
+ users:new Map(),sessions:new Map(),communities:new Map(),members:new Map(),channels:new Map(),
+ conversations:new Map(),convMembers:new Map(),messages:new Map(),notifications:new Map(),
+ inventory:new Map(),missionClaims:new Set(),daily:new Set(),friends:new Set()
+};
+let persistTimer=null,persistBusy=false,persistPending=false,persistMode="memory";
 
 function id(prefix){return prefix+"_"+crypto.randomUUID()}
-function now(){return new Date()}
-function iso(v){return new Date(v).toISOString()}
-function sha(v){return crypto.createHash("sha256").update(String(v)).digest("hex")}
+function now(){return new Date().toISOString()}
 function cleanUsername(v){return String(v||"").trim().toLowerCase().replace(/^@+/,"").replace(/[^a-z0-9._-]/g,"").slice(0,20)}
-function cleanName(v,fallback="ORBIT User"){return String(v||"").trim().replace(/\s+/g," ").slice(0,32)||fallback}
-function cookieValue(req,name){
-  const raw=String(req.headers.cookie||"");
-  for(const item of raw.split(";")){
-    const [k,...rest]=item.trim().split("=");
-    if(k===name)return decodeURIComponent(rest.join("=")||"");
-  }
-  return "";
-}
-function setCookie(res,token){
-  const secure=String(res.req?.headers?.["x-forwarded-proto"]||"").split(",")[0].trim()==="https"||process.env.NODE_ENV==="production";
-  const parts=[cookieName+"="+encodeURIComponent(token),"Max-Age=2592000","Path=/","HttpOnly","SameSite=Lax"];
-  if(secure)parts.push("Secure");
-  res.setHeader("Set-Cookie",parts.join("; "));
-}
-function clearCookie(res){res.setHeader("Set-Cookie",cookieName+"=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax")}
+function cleanName(v,fallback){return String(v||"").trim().replace(/\s+/g," ").slice(0,32)||fallback||"ORBIT User"}
+function hash(v){return crypto.createHash("sha256").update(String(v)).digest("hex")}
 function token(){return crypto.randomBytes(48).toString("base64url")}
-function publicUser(u){
-  if(!u)return null;
-  return {
-    id:u.id,username:u.username,displayName:u.display_name,bio:u.bio||"",avatarUrl:u.avatar_url||"",
-    level:Number(u.level||1),xp:Number(u.xp||0),coins:Number(u.coins||0),
-    equipped:{frame:u.avatar_frame||"orbit",effect:u.avatar_effect||"none",nameplate:u.nameplate||"none",chatTheme:u.chat_theme||"orbit-dark"},
-    stats:{messages:Number(u.messages_count||0),callMinutes:Number(u.call_minutes||0),friends:Number(u.friends_count||0),communitiesCreated:Number(u.communities_created||0),communitiesJoined:Number(u.communities_joined||0)},
-    createdAt:u.created_at
-  };
+function escString(v){return String(v??"").slice(0,4000)}
+function avatarField(v){return String(v||"").slice(0,500)}
+
+function serialize(){
+ return {
+  users:[...memory.users],
+  sessions:[...memory.sessions],
+  communities:[...memory.communities].map(([id,c])=>[id,c]),
+  members:[...memory.members],
+  channels:[...memory.channels],
+  conversations:[...memory.conversations],
+  convMembers:[...memory.convMembers],
+  messages:[...memory.messages],
+  notifications:[...memory.notifications],
+  inventory:[...memory.inventory].map(([k,v])=>[k,[...v]]),
+  missionClaims:[...memory.missionClaims],
+  daily:[...memory.daily],
+  friends:[...memory.friends]
+ };
+}
+function restore(data){
+ if(!data||typeof data!=="object")return;
+ const map=(name)=>memory[name]=new Map(Array.isArray(data[name])?data[name]:[]);
+ map("users");map("sessions");map("communities");map("members");map("channels");map("conversations");map("convMembers");map("messages");map("notifications");
+ memory.inventory=new Map((data.inventory||[]).map(x=>[x[0],new Set(x[1]||[])]));
+ memory.missionClaims=new Set(data.missionClaims||[]);
+ memory.daily=new Set(data.daily||[]);
+ memory.friends=new Set(data.friends||[]);
+}
+async function sidecar(method,body){
+ if(!PERSIST_URL||!PERSIST_SECRET)return {found:false};
+ const r=await fetch(PERSIST_URL+"/state",{method,headers:{"x-orbit-secret":PERSIST_SECRET,...(body?{"content-type":"application/json"}:{})},body:body?JSON.stringify(body):undefined});
+ if(r.status===404&&method==="GET")return {found:false};
+ if(!r.ok)throw new Error("Persistence service HTTP "+r.status);
+ return {found:true,payload:await r.json()};
+}
+async function persistNow(){
+ if(!PERSIST_URL||!PERSIST_SECRET)return;
+ if(persistBusy){persistPending=true;return}
+ persistBusy=true;
+ try{await sidecar("PUT",{data:serialize()});persistMode="sidecar"}
+ catch(e){console.error("[orbit-v2] persistence write failed:",e.message)}
+ finally{
+  persistBusy=false;
+  if(persistPending){persistPending=false;setImmediate(()=>persistNow().catch(()=>{}))}
+ }
+}
+function persist(){if(!PERSIST_URL||!PERSIST_SECRET)return;clearTimeout(persistTimer);persistTimer=setTimeout(()=>persistNow().catch(()=>{}),220)}
+async function bootPersistence(){
+ if(!PERSIST_URL||!PERSIST_SECRET){persistMode="memory";return}
+ try{
+  const r=await sidecar("GET");
+  if(r.found&&r.payload?.data){
+   const legacy=r.payload.data;
+   if(Array.isArray(legacy.users)&&legacy.users.length&&!legacy.v2){
+    restoreLegacy(legacy);
+   }else restore(legacy);
+   console.log("[orbit-v2] sidecar state restored.");
+  }
+  persistMode="sidecar";await persistNow();
+ }catch(e){persistMode="memory";console.error("[orbit-v2] sidecar unavailable:",e.message)}
+}
+function restoreLegacy(legacy){
+ const rows=Array.isArray(legacy.users)?legacy.users:[];
+ let imported=0;
+ for(const pair of rows){
+  const u=pair?.[1];
+  if(!u?.passwordHash||!u.username)continue;
+  const uid=String(u.id||id("user"));
+  if([...memory.users.values()].some(x=>x.username===cleanUsername(u.username)))continue;
+  memory.users.set(uid,{
+   id:uid,username:cleanUsername(u.username),displayName:cleanName(u.displayName,u.username),passwordHash:u.passwordHash,
+   bio:String(u.bio||"").slice(0,280),avatarUrl:avatarField(u.avatarUrl),
+   frame:u.avatarDecoration||"orbit",effect:"none",nameplate:"orbit",chatTheme:"orbit-dark",
+   xp:Number(u.xp||0),level:Number(u.level||1),coins:Number(u.coins||250),
+   messages:Number(u.stats?.messages||0),callMinutes:Number(u.stats?.voiceJoins||0),friends:Number(u.stats?.friends||0),
+   communitiesCreated:Number(u.stats?.serversCreated||0),communitiesJoined:0,status:"offline",createdAt:u.createdAt||now()
+  });
+  imported++;
+ }
+ if(imported)console.log("[orbit-v2] imported legacy accounts:",imported);
 }
 
-async function q(text,params=[]){return db.query(text,params)}
-async function tx(fn){
-  const client=await db.connect();
-  try{await client.query("BEGIN");const result=await fn(client);await client.query("COMMIT");return result}
-  catch(e){await client.query("ROLLBACK");throw e}
-  finally{client.release()}
+function userPublic(u){
+ if(!u)return null;
+ return {
+  id:u.id,username:u.username,displayName:u.displayName,bio:u.bio||"",avatarUrl:u.avatarUrl||"",
+  status:u.status||"offline",level:Number(u.level||1),xp:Number(u.xp||0),coins:Number(u.coins||250),
+  equipped:{frame:u.frame||"orbit",effect:u.effect||"none",nameplate:u.nameplate||"orbit",chatTheme:u.chatTheme||"orbit-dark"},
+  stats:{messages:Number(u.messages||0),callMinutes:Number(u.callMinutes||0),friends:Number(u.friends||0),communitiesCreated:Number(u.communitiesCreated||0),communitiesJoined:Number(u.communitiesJoined||0)},
+  createdAt:u.createdAt||null
+ };
 }
-
-async function migrate(){
-  db=new Pool({connectionString:DATABASE_URL||"postgres://localhost/orbit",max:10,idleTimeoutMillis:30000,connectionTimeoutMillis:8000,ssl:process.env.DATABASE_SSL==="disable"?false:{rejectUnauthorized:false}});
-  const statements=[
-`CREATE TABLE IF NOT EXISTS v2_users(
-id TEXT PRIMARY KEY,username TEXT UNIQUE NOT NULL,display_name TEXT NOT NULL,password_hash TEXT NOT NULL,bio TEXT NOT NULL DEFAULT '',
-avatar_url TEXT NOT NULL DEFAULT '',avatar_frame TEXT NOT NULL DEFAULT 'orbit',avatar_effect TEXT NOT NULL DEFAULT 'none',
-nameplate TEXT NOT NULL DEFAULT 'none',chat_theme TEXT NOT NULL DEFAULT 'orbit-dark',xp INTEGER NOT NULL DEFAULT 0,level INTEGER NOT NULL DEFAULT 1,
-coins INTEGER NOT NULL DEFAULT 250,messages_count INTEGER NOT NULL DEFAULT 0,call_minutes INTEGER NOT NULL DEFAULT 0,friends_count INTEGER NOT NULL DEFAULT 0,
-communities_created INTEGER NOT NULL DEFAULT 0,communities_joined INTEGER NOT NULL DEFAULT 0,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
-`CREATE TABLE IF NOT EXISTS v2_sessions(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES v2_users(id) ON DELETE CASCADE,token_hash TEXT UNIQUE NOT NULL,expires_at TIMESTAMPTZ NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
-`CREATE TABLE IF NOT EXISTS v2_communities(id TEXT PRIMARY KEY,name TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',icon_url TEXT NOT NULL DEFAULT '',join_code TEXT UNIQUE NOT NULL,owner_id TEXT NOT NULL REFERENCES v2_users(id),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
-`CREATE TABLE IF NOT EXISTS v2_members(community_id TEXT NOT NULL REFERENCES v2_communities(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES v2_users(id) ON DELETE CASCADE,role TEXT NOT NULL DEFAULT 'member',joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(community_id,user_id))`,
-`CREATE TABLE IF NOT EXISTS v2_channels(id TEXT PRIMARY KEY,community_id TEXT NOT NULL REFERENCES v2_communities(id) ON DELETE CASCADE,name TEXT NOT NULL,type TEXT NOT NULL DEFAULT 'text',conversation_id TEXT UNIQUE NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
-`CREATE TABLE IF NOT EXISTS v2_conversations(id TEXT PRIMARY KEY,kind TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
-`CREATE TABLE IF NOT EXISTS v2_conversation_members(conversation_id TEXT NOT NULL REFERENCES v2_conversations(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES v2_users(id) ON DELETE CASCADE,PRIMARY KEY(conversation_id,user_id))`,
-`CREATE TABLE IF NOT EXISTS v2_messages(id TEXT PRIMARY KEY,conversation_id TEXT NOT NULL REFERENCES v2_conversations(id) ON DELETE CASCADE,sender_id TEXT NOT NULL REFERENCES v2_users(id),content TEXT NOT NULL,reply_to TEXT,metadata JSONB NOT NULL DEFAULT '{}'::jsonb,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
-`CREATE INDEX IF NOT EXISTS v2_messages_conv_idx ON v2_messages(conversation_id,created_at)`,
-`CREATE TABLE IF NOT EXISTS v2_notifications(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES v2_users(id) ON DELETE CASCADE,title TEXT NOT NULL,body TEXT NOT NULL DEFAULT '',kind TEXT NOT NULL DEFAULT 'system',read_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`,
-`CREATE TABLE IF NOT EXISTS v2_inventory(user_id TEXT NOT NULL REFERENCES v2_users(id) ON DELETE CASCADE,item_id TEXT NOT NULL,owned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,item_id))`,
-`CREATE TABLE IF NOT EXISTS v2_mission_claims(user_id TEXT NOT NULL REFERENCES v2_users(id) ON DELETE CASCADE,mission_id TEXT NOT NULL,cycle TEXT NOT NULL,claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,mission_id,cycle))`,
-`CREATE TABLE IF NOT EXISTS v2_user_daily(user_id TEXT NOT NULL REFERENCES v2_users(id) ON DELETE CASCADE,day TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,day))`,
-`CREATE TABLE IF NOT EXISTS v2_friendships(user_id TEXT NOT NULL REFERENCES v2_users(id) ON DELETE CASCADE,friend_id TEXT NOT NULL REFERENCES v2_users(id) ON DELETE CASCADE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,friend_id))`
-  ];
-  for(const s of statements)await q(s);
+function sessionUser(req){
+ const raw=cookie(req,COOKIE);if(!raw)return null;
+ const s=memory.sessions.get(hash(raw));
+ if(!s||s.expiresAt<Date.now())return null;
+ return memory.users.get(s.userId)||null;
 }
+function cookie(req,name){
+ const raw=String(req.headers.cookie||"");
+ for(const p of raw.split(";")){
+  const a=p.trim().split("=");
+  if(a[0]===name)return decodeURIComponent(a.slice(1).join("=")||"");
+ }
+ return "";
+}
+function setCookie(res,value){
+ const secure=process.env.NODE_ENV==="production"||String(res.req?.headers?.["x-forwarded-proto"]||"").split(",")[0].trim()==="https";
+ let out=COOKIE+"="+encodeURIComponent(value)+"; Max-Age=2592000; Path=/; HttpOnly; SameSite=Lax";
+ if(secure)out+="; Secure";
+ res.setHeader("Set-Cookie",out);
+}
+function clearCookie(res){res.setHeader("Set-Cookie",COOKIE+"=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax")}
+function auth(req,res,next){
+ const u=sessionUser(req);if(!u)return res.status(401).json({error:"Session expired. Please sign in again."});
+ if(u.suspended)return res.status(403).json({error:"Account suspended"});
+ u.status="online";req.user=u;persist();next();
+}
+function ensureUserDefaults(u){
+ u.frame=u.frame||"orbit";u.effect=u.effect||"none";u.nameplate=u.nameplate||"orbit";u.chatTheme=u.chatTheme||"orbit-dark";
+ u.xp=Number(u.xp||0);u.level=Math.max(1,Number(u.level||1));u.coins=Number(u.coins||250);
+ u.messages=Number(u.messages||0);u.callMinutes=Number(u.callMinutes||0);u.friends=Number(u.friends||0);
+ u.communitiesCreated=Number(u.communitiesCreated||0);u.communitiesJoined=Number(u.communitiesJoined||0);
+ return u;
+}
+for(const u of memory.users.values())ensureUserDefaults(u);
 
 const SHOP=[
-{id:"frame-orbit",type:"frame",name:"Orbit Core",price:0,rarity:"Core",css:"orbit"},
-{id:"frame-nebula",type:"frame",name:"Nebula",price:450,rarity:"Epic",css:"nebula"},
-{id:"frame-cyber",type:"frame",name:"Cyber Pulse",price:600,rarity:"Epic",css:"cyber"},
-{id:"frame-royal",type:"frame",name:"Royal Halo",price:850,rarity:"Legendary",css:"royal"},
-{id:"frame-ice",type:"frame",name:"Ice Crystal",price:700,rarity:"Legendary",css:"ice"},
-{id:"effect-none",type:"effect",name:"None",price:0,rarity:"Core",css:"none"},
-{id:"effect-spark",type:"effect",name:"Spark Field",price:300,rarity:"Rare",css:"spark"},
-{id:"effect-orbit",type:"effect",name:"Orbiting Lights",price:700,rarity:"Epic",css:"orbit"},
-{id:"plate-orbit",type:"nameplate",name:"ORBIT",price:0,rarity:"Core",css:"orbit"},
-{id:"plate-nexus",type:"nameplate",name:"NEXUS",price:900,rarity:"Legendary",css:"nexus"},
-{id:"theme-void",type:"chat_theme",name:"Void",price:0,rarity:"Core",css:"void"},
-{id:"theme-aurora",type:"chat_theme",name:"Aurora",price:550,rarity:"Epic",css:"aurora"},
-{id:"theme-ice",type:"chat_theme",name:"Ice Glass",price:650,rarity:"Epic",css:"ice"}
+ {id:"frame-orbit",type:"frame",name:"Orbit Core",price:0,rarity:"Core",css:"orbit"},
+ {id:"frame-nebula",type:"frame",name:"Nebula",price:450,rarity:"Epic",css:"nebula"},
+ {id:"frame-cyber",type:"frame",name:"Cyber Pulse",price:600,rarity:"Epic",css:"cyber"},
+ {id:"frame-royal",type:"frame",name:"Royal Halo",price:850,rarity:"Legendary",css:"royal"},
+ {id:"frame-ice",type:"frame",name:"Ice Crystal",price:700,rarity:"Legendary",css:"ice"},
+ {id:"effect-none",type:"effect",name:"None",price:0,rarity:"Core",css:"none"},
+ {id:"effect-spark",type:"effect",name:"Spark Field",price:300,rarity:"Rare",css:"spark"},
+ {id:"effect-orbit",type:"effect",name:"Orbiting Lights",price:700,rarity:"Epic",css:"orbit"},
+ {id:"plate-orbit",type:"nameplate",name:"ORBIT",price:0,rarity:"Core",css:"orbit"},
+ {id:"plate-nexus",type:"nameplate",name:"NEXUS",price:900,rarity:"Legendary",css:"nexus"},
+ {id:"theme-void",type:"chat_theme",name:"Void",price:0,rarity:"Core",css:"void"},
+ {id:"theme-aurora",type:"chat_theme",name:"Aurora",price:550,rarity:"Epic",css:"aurora"},
+ {id:"theme-ice",type:"chat_theme",name:"Ice Glass",price:650,rarity:"Epic",css:"ice"}
 ];
 const MISSIONS=[
-{id:"first-message",title:"First Signal",description:"Send your first message.",metric:"messages",target:1,rewardXp:50,rewardCoins:40,cadence:"lifetime"},
-{id:"ten-messages",title:"Conversation Starter",description:"Send 10 messages.",metric:"messages",target:10,rewardXp:150,rewardCoins:100,cadence:"daily"},
-{id:"join-community",title:"Join the Orbit",description:"Join a community.",metric:"communitiesJoined",target:1,rewardXp:100,rewardCoins:80,cadence:"lifetime"},
-{id:"create-community",title:"Build a World",description:"Create a community.",metric:"communitiesCreated",target:1,rewardXp:300,rewardCoins:180,cadence:"lifetime"},
-{id:"voice-explorer",title:"Voice Explorer",description:"Reach 15 minutes in calls.",metric:"callMinutes",target:15,rewardXp:200,rewardCoins:120,cadence:"daily"},
-{id:"profile-crafted",title:"Profile Crafted",description:"Add a bio and customize your profile.",metric:"profile",target:1,rewardXp:120,rewardCoins:90,cadence:"lifetime"}
+ {id:"first-message",title:"First Signal",description:"Send your first message.",metric:"messages",target:1,xp:50,coins:40,cadence:"lifetime"},
+ {id:"ten-messages",title:"Conversation Starter",description:"Send 10 messages.",metric:"messages",target:10,xp:150,coins:100,cadence:"daily"},
+ {id:"join-community",title:"Join the Orbit",description:"Join a community.",metric:"communitiesJoined",target:1,xp:100,coins:80,cadence:"lifetime"},
+ {id:"create-community",title:"Build a World",description:"Create a community.",metric:"communitiesCreated",target:1,xp:300,coins:180,cadence:"lifetime"},
+ {id:"voice-explorer",title:"Voice Explorer",description:"Reach 15 minutes in calls.",metric:"callMinutes",target:15,xp:200,coins:120,cadence:"daily"},
+ {id:"profile-crafted",title:"Profile Crafted",description:"Add a bio and customize your profile.",metric:"profile",target:1,xp:120,coins:90,cadence:"lifetime"}
 ];
-
-function item(id){return SHOP.find(x=>x.id===id)||null}
-function levelFromXp(xp){return Math.max(1,Math.floor(Number(xp||0)/500)+1)}
-function profileReady(u){return Boolean(String(u.bio||"").trim())&&Boolean(String(u.display_name||"").trim())}
-function cycleFor(m){if(m.cadence==="lifetime")return "lifetime";return new Date().toISOString().slice(0,10)}
-async function metricValue(u,metric){if(metric==="profile")return profileReady(u)?1:0;const fields={messages:"messages_count",callMinutes:"call_minutes",friends:"friends_count",communitiesCreated:"communities_created",communitiesJoined:"communities_joined"};return Number(u[fields[metric]]??0)}
-async function ensureCore(userId){
-  for(const x of SHOP.filter(i=>i.price===0))await q("INSERT INTO v2_inventory(user_id,item_id) VALUES($1,$2) ON CONFLICT DO NOTHING",[userId,x.id]);
+function getItem(itemId){return SHOP.find(x=>x.id===itemId)||null}
+function levelFor(xp){return Math.max(1,Math.floor(Number(xp||0)/500)+1)}
+function award(u,xp,coins){u.xp+=Number(xp||0);u.level=levelFor(u.xp);u.coins+=Number(coins||0);persist()}
+function daily(u){
+ const key=u.id+":"+new Date().toISOString().slice(0,10);
+ if(memory.daily.has(key))return false;
+ memory.daily.add(key);award(u,30,50);return true;
 }
-async function getUserById(uid){const r=await q("SELECT * FROM v2_users WHERE id=$1",[uid]);return r.rows[0]||null}
-async function auth(req,res,next){
-  try{
-    const raw=cookieValue(req,cookieName);
-    if(!raw)return res.status(401).json({error:"Not authenticated"});
-    const r=await q("SELECT s.id,u.* FROM v2_sessions s JOIN v2_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()",[sha(raw)]);
-    if(!r.rows[0])return res.status(401).json({error:"Session expired"});
-    req.user=r.rows[0];req.sessionId=r.rows[0].id;next();
-  }catch(e){console.error(e);res.status(500).json({error:"Authentication service unavailable"})}
+function ensureInventory(u){
+ if(!memory.inventory.has(u.id))memory.inventory.set(u.id,new Set());
+ const inv=memory.inventory.get(u.id);for(const x of SHOP.filter(i=>i.price===0))inv.add(x.id);
 }
-async function notify(userId,title,body,kind="system"){
- const n={id:id("notif"),userId,title,body,kind};
- await q("INSERT INTO v2_notifications(id,user_id,title,body,kind) VALUES($1,$2,$3,$4,$5)",[n.id,userId,title,body,kind]);
- for(const [sid,s] of io.sockets.sockets){if(String(s.userId)===String(userId))s.emit("notification:new",{notification:n})}
+function addNotification(uid,title,body,kind){
+ const list=memory.notifications.get(uid)||[];
+ list.unshift({id:id("notif"),user_id:uid,title,body,kind:kind||"system",read:false,created_at:now()});
+ memory.notifications.set(uid,list.slice(0,100));persist();
+ for(const socket of io.sockets.sockets.values())if(socket.userId===uid)socket.emit("notification:new",{notification:list[0]});
 }
-async function award(userId,xp=0,coins=0){
- const u=await getUserById(userId);if(!u)return;
- const nextXp=Number(u.xp||0)+Number(xp||0);const lvl=levelFromXp(nextXp);
- await q("UPDATE v2_users SET xp=$1,level=$2,coins=coins+$3,updated_at=NOW() WHERE id=$4",[nextXp,lvl,Number(coins||0),userId]);
+function communityMember(communityId,userId){const m=memory.members.get(communityId)||new Map();return m.has(userId)}
+function conversationAccess(conversationId,userId){
+ if((memory.convMembers.get(conversationId)||new Set()).has(userId))return true;
+ const channel=[...memory.channels.values()].find(x=>x.conversationId===conversationId);
+ return Boolean(channel&&communityMember(channel.communityId,userId));
 }
-async function dailyCheckIn(userId){
- const day=new Date().toISOString().slice(0,10);
- const r=await q("INSERT INTO v2_user_daily(user_id,day) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING user_id",[userId,day]);
- if(r.rowCount)await award(userId,30,50);
- return Boolean(r.rowCount);
+function conversationUsers(conversationId){return [...(memory.convMembers.get(conversationId)||new Set())]}
+function messageRows(conversationId){
+ return (memory.messages.get(conversationId)||[]).map(m=>({...m,sender:userPublic(memory.users.get(m.senderId))}));
 }
-async function ensureHome(userId){
- const membership=await q("SELECT c.id FROM v2_communities c JOIN v2_members m ON m.community_id=c.id WHERE m.user_id=$1 ORDER BY c.created_at LIMIT 1",[userId]);
- if(membership.rows[0])return membership.rows[0].id;
- const existing=await q("SELECT id FROM v2_communities WHERE join_code='ORBIT-HOME' LIMIT 1");
- let cid=existing.rows[0]?.id;
- if(!cid){
-   cid=id("com");
-   await q("INSERT INTO v2_communities(id,name,description,join_code,owner_id) VALUES($1,$2,$3,$4,$5)",[cid,"ORBIT Lobby","Official starting space for ORBIT.","ORBIT-HOME",userId]);
-   const conv=id("conv");await q("INSERT INTO v2_conversations(id,kind) VALUES($1,'channel')",[conv]);
-   await q("INSERT INTO v2_channels(id,community_id,name,type,conversation_id) VALUES($1,$2,'general','text',$3)",[id("ch"),cid,conv]);
+function ensureHome(u){
+ const existing=[...memory.members.entries()].find(([cid,m])=>m.has(u.id)&&memory.communities.get(cid)?.name==="ORBIT Lobby");
+ if(existing)return existing[0];
+ let community=[...memory.communities.values()].find(c=>c.joinCode==="ORBIT-HOME");
+ if(!community){
+  community={id:id("com"),name:"ORBIT Lobby",description:"Official ORBIT starting space.",joinCode:"ORBIT-HOME",ownerId:u.id,createdAt:now()};
+  memory.communities.set(community.id,community);
+  memory.members.set(community.id,new Map([[u.id,"member"]]));
+  const conv={id:id("conv"),kind:"channel",createdAt:now()};memory.conversations.set(conv.id,conv);memory.convMembers.set(conv.id,new Set());
+  memory.channels.set(id("ch"),{id:id("ch"),communityId:community.id,name:"general",type:"text",conversationId:conv.id,createdAt:now()});
+ }else{
+  const m=memory.members.get(community.id)||new Map();m.set(u.id,"member");memory.members.set(community.id,m);
  }
- const added=await q("INSERT INTO v2_members(community_id,user_id,role) VALUES($1,$2,'member') ON CONFLICT DO NOTHING RETURNING user_id",[cid,userId]);
- if(added.rowCount)await q("UPDATE v2_users SET communities_joined=communities_joined+1 WHERE id=$1",[userId]);
- return cid;
+ ensureInventory(u);persist();return community.id;
 }
 
-app.use(express.json({limit:"4mb"}));
+app.use(express.json({limit:"6mb"}));
 app.use(express.static(path.join(__dirname,"public"),{setHeaders(res){res.setHeader("Cache-Control","no-store")}}));
 app.get("/",(req,res)=>res.sendFile(path.join(__dirname,"public","orbit-v2.html")));
-
-app.get("/health",async(req,res)=>{
- try{const r=await q("SELECT COUNT(*)::int AS users FROM v2_users");res.json({ok:true,version:"2.0.0-aaa",database:true,users:r.rows[0].users,time:iso(now())})}
- catch(e){res.status(503).json({ok:false,version:"2.0.0-aaa",database:false,error:e.message})}
-});
+app.get("/health",(req,res)=>res.json({ok:true,service:"orbit-v2",version:"2.0.0-aaa",persistence: persistMode,users:memory.users.size,communities:memory.communities.size,conversations:memory.conversations.size,time:now()}));
 
 app.post("/api/auth/register",async(req,res)=>{
  try{
-  const username=cleanUsername(req.body?.username);const password=String(req.body?.password||"");const displayName=cleanName(req.body?.displayName,username||"ORBIT User");
+  const username=cleanUsername(req.body?.username),password=String(req.body?.password||""),displayName=cleanName(req.body?.displayName,username);
   if(!/^[a-z0-9][a-z0-9._-]{3,19}$/.test(username))return res.status(400).json({error:"Username must be 4-20 characters."});
   if(password.length<8||password.length>72)return res.status(400).json({error:"Password must be 8-72 characters."});
-  const exists=await q("SELECT 1 FROM v2_users WHERE username=$1",[username]);if(exists.rowCount)return res.status(409).json({error:"Username already exists."});
-  const userId=id("user");const hash=await bcrypt.hash(password,12);
-  await q("INSERT INTO v2_users(id,username,display_name,password_hash) VALUES($1,$2,$3,$4)",[userId,username,displayName,hash]);
-  await ensureCore(userId);await ensureHome(userId);await dailyCheckIn(userId);
-  const t=token();await q("INSERT INTO v2_sessions(id,user_id,token_hash,expires_at) VALUES($1,$2,$3,NOW()+INTERVAL '30 days')",[id("sess"),userId,sha(t)]);setCookie(res,t);
-  const u=await getUserById(userId);res.status(201).json({user:publicUser(u)});
- }catch(e){console.error(e);res.status(500).json({error:"Registration failed"})}
+  if([...memory.users.values()].some(u=>u.username===username))return res.status(409).json({error:"Username already exists."});
+  const u={id:id("user"),username,displayName,passwordHash:await bcrypt.hash(password,12),bio:"",avatarUrl:"",frame:"orbit",effect:"none",nameplate:"orbit",chatTheme:"orbit-dark",xp:0,level:1,coins:250,messages:0,callMinutes:0,friends:0,communitiesCreated:0,communitiesJoined:0,status:"online",createdAt:now()};
+  memory.users.set(u.id,u);ensureInventory(u);ensureHome(u);daily(u);const t=token();memory.sessions.set(hash(t),{userId:u.id,createdAt:Date.now(),expiresAt:Date.now()+2592000000});setCookie(res,t);persist();res.status(201).json({user:userPublic(u)});
+ }catch(e){console.error(e);res.status(500).json({error:"Registration failed."})}
 });
-
 app.post("/api/auth/login",async(req,res)=>{
- try{
-  const username=cleanUsername(req.body?.username);const password=String(req.body?.password||"");
-  const r=await q("SELECT * FROM v2_users WHERE username=$1",[username]);const u=r.rows[0];
-  if(!u||!(await bcrypt.compare(password,u.password_hash)))return res.status(401).json({error:"Incorrect username or password."});
-  await ensureCore(u.id);await ensureHome(u.id);await dailyCheckIn(u.id);
-  const t=token();await q("INSERT INTO v2_sessions(id,user_id,token_hash,expires_at) VALUES($1,$2,$3,NOW()+INTERVAL '30 days')",[id("sess"),u.id,sha(t)]);setCookie(res,t);
-  res.json({user:publicUser(await getUserById(u.id))});
- }catch(e){console.error(e);res.status(500).json({error:"Sign in failed"})}
+ const username=cleanUsername(req.body?.username),password=String(req.body?.password||""),u=[...memory.users.values()].find(x=>x.username===username);
+ if(!u||!(await bcrypt.compare(password,u.passwordHash)))return res.status(401).json({error:"Incorrect username or password."});
+ u.status="online";ensureInventory(u);ensureHome(u);daily(u);const t=token();memory.sessions.set(hash(t),{userId:u.id,createdAt:Date.now(),expiresAt:Date.now()+2592000000});setCookie(res,t);persist();res.json({user:userPublic(u)});
 });
-app.post("/api/auth/logout",auth,async(req,res)=>{await q("DELETE FROM v2_sessions WHERE id=$1",[req.sessionId]);clearCookie(res);res.json({ok:true})});
-app.get("/api/me",auth,async(req,res)=>{res.json({user:publicUser(await getUserById(req.user.id)),dailyCheckIn:await dailyCheckIn(req.user.id)})});
+app.post("/api/auth/logout",auth,(req,res)=>{const t=cookie(req,COOKIE);memory.sessions.delete(hash(t));clearCookie(res);persist();res.json({ok:true})});
+app.get("/api/me",auth,(req,res)=>{ensureInventory(req.user);res.json({user:userPublic(req.user),dailyCheckIn:daily(req.user)})});
+app.patch("/api/me/profile",auth,(req,res)=>{req.user.displayName=cleanName(req.body?.displayName,req.user.username);req.user.bio=String(req.body?.bio||"").trim().slice(0,280);req.user.avatarUrl=avatarField(req.body?.avatarUrl);persist();res.json({user:userPublic(req.user)})});
 
-app.patch("/api/me/profile",auth,async(req,res)=>{
- const display=cleanName(req.body?.displayName||req.user.display_name,req.user.username);const bio=String(req.body?.bio||"").trim().slice(0,280);const avatar=String(req.body?.avatarUrl||"").trim().slice(0,500);
- await q("UPDATE v2_users SET display_name=$1,bio=$2,avatar_url=$3,updated_at=NOW() WHERE id=$4",[display,bio,avatar,req.user.id]);
- res.json({user:publicUser(await getUserById(req.user.id))});
-});
-app.get("/api/search",auth,async(req,res)=>{
- const term=String(req.query.q||"").trim().toLowerCase();if(!term)return res.json({users:[],communities:[]});
- const u=await q("SELECT * FROM v2_users WHERE username LIKE $1 OR LOWER(display_name) LIKE $1 LIMIT 20",["%"+term+"%"]);
- const c=await q("SELECT * FROM v2_communities WHERE LOWER(name) LIKE $1 LIMIT 20",["%"+term+"%"]);
- res.json({users:u.rows.map(publicUser),communities:c.rows});
+app.get("/api/search",auth,(req,res)=>{
+ const q=String(req.query.q||"").trim().toLowerCase();if(!q)return res.json({users:[],communities:[]});
+ const users=[...memory.users.values()].filter(u=>u.username.includes(q)||u.displayName.toLowerCase().includes(q)).slice(0,20).map(userPublic);
+ const communities=[...memory.communities.values()].filter(c=>c.name.toLowerCase().includes(q)).slice(0,20);
+ res.json({users,communities});
 });
 
-app.get("/api/studio",auth,async(req,res)=>{
- const u=await getUserById(req.user.id);const inv=await q("SELECT item_id FROM v2_inventory WHERE user_id=$1",[u.id]);
- const owned=new Set(inv.rows.map(x=>x.item_id));res.json({user:publicUser(u),shop:SHOP.map(x=>({...x,owned:owned.has(x.id)}))});
+app.get("/api/studio",auth,(req,res)=>{ensureInventory(req.user);const owned=memory.inventory.get(req.user.id);res.json({user:userPublic(req.user),shop:SHOP.map(x=>({...x,owned:owned.has(x.id)}))})});
+app.post("/api/studio/checkin",auth,(req,res)=>{const claimed=daily(req.user);res.json({claimed,user:userPublic(req.user)})});
+app.post("/api/studio/buy",auth,(req,res)=>{
+ const x=getItem(req.body?.itemId);if(!x)return res.status(404).json({error:"Item not found."});ensureInventory(req.user);const inv=memory.inventory.get(req.user.id);
+ if(inv.has(x.id))return res.status(409).json({error:"You already own this item."});
+ if(req.user.coins<x.price)return res.status(400).json({error:"Not enough ORBIT Coins."});
+ req.user.coins-=x.price;inv.add(x.id);persist();res.json({ok:true,user:userPublic(req.user)})
 });
-app.post("/api/studio/buy",auth,async(req,res)=>{
- const x=item(String(req.body?.itemId||""));if(!x)return res.status(404).json({error:"Item not found"});if(x.price<=0)return res.status(400).json({error:"This item is already free."});
- const result=await tx(async(c)=>{
-   const u=(await c.query("SELECT coins FROM v2_users WHERE id=$1 FOR UPDATE",[req.user.id])).rows[0];
-   const have=await c.query("SELECT 1 FROM v2_inventory WHERE user_id=$1 AND item_id=$2",[req.user.id,x.id]);
-   if(have.rowCount)return {error:"You already own this item."};
-   if(Number(u.coins)<x.price)return {error:"Not enough ORBIT Coins."};
-   await c.query("UPDATE v2_users SET coins=coins-$1 WHERE id=$2",[x.price,req.user.id]);
-   await c.query("INSERT INTO v2_inventory(user_id,item_id) VALUES($1,$2)",[req.user.id,x.id]);return {ok:true};
+app.post("/api/studio/equip",auth,(req,res)=>{
+ const type=String(req.body?.type||""),x=getItem(req.body?.itemId);if(!x||x.type!==type)return res.status(400).json({error:"Invalid item."});ensureInventory(req.user);
+ if(!memory.inventory.get(req.user.id).has(x.id))return res.status(403).json({error:"Item is not owned."});
+ if(type==="frame")req.user.frame=x.css;if(type==="effect")req.user.effect=x.css;if(type==="nameplate")req.user.nameplate=x.css;if(type==="chat_theme")req.user.chatTheme=x.css;
+ persist();res.json({user:userPublic(req.user)})
+});
+
+app.get("/api/missions",auth,(req,res)=>{
+ const today=new Date().toISOString().slice(0,10);
+ const list=MISSIONS.map(m=>{
+  const value=m.metric==="profile"?(req.user.bio?1:0):Number(req.user[m.metric]||0);
+  const cycle=m.cadence==="lifetime"?"lifetime":today;
+  return {...m,progress:Math.min(m.target,value),claimed:memory.missionClaims.has(req.user.id+":"+m.id+":"+cycle)}
  });
- if(result.error)return res.status(400).json(result);res.json({ok:true});
+ res.json({missions:list})
 });
-app.post("/api/studio/equip",auth,async(req,res)=>{
- const type=String(req.body?.type||"");const itemId=String(req.body?.itemId||"");const x=item(itemId);
- if(!x||x.type!==type)return res.status(400).json({error:"Invalid item."});
- const owned=await q("SELECT 1 FROM v2_inventory WHERE user_id=$1 AND item_id=$2",[req.user.id,itemId]);if(!owned.rowCount)return res.status(403).json({error:"Item is not owned."});
- const col={frame:"avatar_frame",effect:"avatar_effect",nameplate:"nameplate",chat_theme:"chat_theme"}[type];if(!col)return res.status(400).json({error:"Unsupported customization."});
- await q("UPDATE v2_users SET "+col+"=$1,updated_at=NOW() WHERE id=$2",[x.css,req.user.id]);res.json({user:publicUser(await getUserById(req.user.id))});
-});
-app.post("/api/studio/checkin",auth,async(req,res)=>res.json({claimed:await dailyCheckIn(req.user.id),user:publicUser(await getUserById(req.user.id))}));
-
-app.get("/api/missions",auth,async(req,res)=>{
- const u=await getUserById(req.user.id);const today=new Date().toISOString().slice(0,10);
- const claims=await q("SELECT mission_id,cycle FROM v2_mission_claims WHERE user_id=$1 AND (cycle=$2 OR cycle='lifetime')",[u.id,today]);
- const set=new Set(claims.rows.map(x=>x.mission_id+":"+x.cycle));
- const missions=await Promise.all(MISSIONS.map(async m=>({...m,progress:await metricValue(u,m.metric),claimed:set.has(m.id+":"+cycleFor(m))})));
- res.json({missions});
-});
-app.post("/api/missions/:id/claim",auth,async(req,res)=>{
- const m=MISSIONS.find(x=>x.id===req.params.id);if(!m)return res.status(404).json({error:"Mission not found"});
- const u=await getUserById(req.user.id);const progress=await metricValue(u,m.metric);if(progress<m.target)return res.status(400).json({error:"Mission is not complete yet."});
- const cycle=cycleFor(m);const r=await q("INSERT INTO v2_mission_claims(user_id,mission_id,cycle) VALUES($1,$2,$3) ON CONFLICT DO NOTHING RETURNING user_id",[u.id,m.id,cycle]);
- if(!r.rowCount)return res.status(409).json({error:"Mission already claimed."});
- await award(u.id,m.rewardXp,m.rewardCoins);res.json({ok:true,user:publicUser(await getUserById(u.id)),reward:{xp:m.rewardXp,coins:m.rewardCoins}});
+app.post("/api/missions/:id/claim",auth,(req,res)=>{
+ const m=MISSIONS.find(x=>x.id===req.params.id);if(!m)return res.status(404).json({error:"Mission not found."});
+ const value=m.metric==="profile"?(req.user.bio?1:0):Number(req.user[m.metric]||0);if(value<m.target)return res.status(400).json({error:"Mission is not complete yet."});
+ const cycle=m.cadence==="lifetime"?"lifetime":new Date().toISOString().slice(0,10),key=req.user.id+":"+m.id+":"+cycle;
+ if(memory.missionClaims.has(key))return res.status(409).json({error:"Mission already claimed."});
+ memory.missionClaims.add(key);award(req.user,m.xp,m.coins);res.json({ok:true,user:userPublic(req.user),reward:{xp:m.xp,coins:m.coins}})
 });
 
-app.get("/api/communities",auth,async(req,res)=>{
- const r=await q("SELECT c.*,m.role FROM v2_communities c JOIN v2_members m ON m.community_id=c.id WHERE m.user_id=$1 ORDER BY c.created_at",[req.user.id]);
- res.json({communities:r.rows});
+app.get("/api/communities",auth,(req,res)=>{
+ const rows=[...memory.communities.values()].filter(c=>communityMember(c.id,req.user.id)).map(c=>({...c,role:(memory.members.get(c.id)||new Map()).get(req.user.id)||"member"}));
+ res.json({communities:rows})
 });
-app.post("/api/communities",auth,async(req,res)=>{
- const name=cleanName(req.body?.name,"New Community");const description=String(req.body?.description||"").slice(0,300);const cid=id("com"),code="ORB-"+crypto.randomBytes(4).toString("hex").toUpperCase();
- await tx(async(c)=>{
-   await c.query("INSERT INTO v2_communities(id,name,description,join_code,owner_id) VALUES($1,$2,$3,$4,$5)",[cid,name,description,code,req.user.id]);
-   await c.query("INSERT INTO v2_members(community_id,user_id,role) VALUES($1,$2,'owner')",[cid,req.user.id]);
-   const conv=id("conv");await c.query("INSERT INTO v2_conversations(id,kind) VALUES($1,'channel')",[conv]);
-   await c.query("INSERT INTO v2_channels(id,community_id,name,type,conversation_id) VALUES($1,$2,'general','text',$3)",[id("ch"),cid,conv]);
- });
- await q("UPDATE v2_users SET communities_created=communities_created+1,communities_joined=communities_joined+1 WHERE id=$1",[req.user.id]);await award(req.user.id,100,0);
- const r=await q("SELECT * FROM v2_communities WHERE id=$1",[cid]);res.status(201).json({community:r.rows[0],joinCode:code});
+app.post("/api/communities",auth,(req,res)=>{
+ const c={id:id("com"),name:cleanName(req.body?.name,"New Community"),description:String(req.body?.description||"").slice(0,300),joinCode:"ORB-"+crypto.randomBytes(4).toString("hex").toUpperCase(),ownerId:req.user.id,createdAt:now()};
+ memory.communities.set(c.id,c);memory.members.set(c.id,new Map([[req.user.id,"owner"]]));const conv={id:id("conv"),kind:"channel",createdAt:now()};memory.conversations.set(conv.id,conv);memory.convMembers.set(conv.id,new Set());
+ memory.channels.set(id("ch"),{id:id("ch"),communityId:c.id,name:"general",type:"text",conversationId:conv.id,createdAt:now()});
+ req.user.communitiesCreated++;req.user.communitiesJoined++;award(req.user,100,0);persist();res.status(201).json({community:c,joinCode:c.joinCode})
 });
-app.post("/api/communities/join",auth,async(req,res)=>{
- const code=String(req.body?.code||"").trim().toUpperCase();const r=await q("SELECT * FROM v2_communities WHERE join_code=$1",[code]);if(!r.rows[0])return res.status(404).json({error:"Community code not found."});
- const c=r.rows[0];const m=await q("INSERT INTO v2_members(community_id,user_id,role) VALUES($1,$2,'member') ON CONFLICT DO NOTHING RETURNING user_id",[c.id,req.user.id]);
- if(m.rowCount){await q("UPDATE v2_users SET communities_joined=communities_joined+1 WHERE id=$1",[req.user.id]);await award(req.user.id,75,0)}
- res.json({community:c});
+app.post("/api/communities/join",auth,(req,res)=>{
+ const code=String(req.body?.code||"").trim().toUpperCase(),c=[...memory.communities.values()].find(x=>x.joinCode===code);if(!c)return res.status(404).json({error:"Community code not found."});
+ const m=memory.members.get(c.id)||new Map();const was=m.has(req.user.id);if(!was){m.set(req.user.id,"member");req.user.communitiesJoined++;award(req.user,75,0);memory.members.set(c.id,m);persist()}res.json({community:c})
 });
-app.get("/api/communities/:id/channels",auth,async(req,res)=>{
- const m=await q("SELECT 1 FROM v2_members WHERE community_id=$1 AND user_id=$2",[req.params.id,req.user.id]);if(!m.rowCount)return res.status(403).json({error:"Not a member"});
- const r=await q("SELECT * FROM v2_channels WHERE community_id=$1 ORDER BY created_at",[req.params.id]);res.json({channels:r.rows});
+app.get("/api/communities/:id/channels",auth,(req,res)=>{
+ if(!communityMember(req.params.id,req.user.id))return res.status(403).json({error:"Not a member."});
+ res.json({channels:[...memory.channels.values()].filter(c=>c.communityId===req.params.id)})
 });
 
-app.get("/api/dms",auth,async(req,res)=>{
- const r=await q(`SELECT c.id,c.created_at,u.id other_id,u.username,u.display_name,u.avatar_url,u.avatar_frame,u.avatar_effect,u.nameplate,u.chat_theme,u.level,u.xp
- FROM v2_conversations c
- JOIN v2_conversation_members cm ON cm.conversation_id=c.id AND cm.user_id=$1
- JOIN v2_conversation_members cm2 ON cm2.conversation_id=c.id AND cm2.user_id<>$1
- JOIN v2_users u ON u.id=cm2.user_id
- WHERE c.kind='dm' ORDER BY c.created_at DESC`,[req.user.id]);
- res.json({dms:r.rows.map(x=>({id:x.id,otherUser:{id:x.other_id,username:x.username,displayName:x.display_name,avatarUrl:x.avatar_url,level:x.level,xp:x.xp,equipped:{frame:x.avatar_frame,effect:x.avatar_effect,nameplate:x.nameplate,chatTheme:x.chat_theme}}}))});
+app.get("/api/dms",auth,(req,res)=>{
+ const result=[];
+ for(const c of memory.conversations.values()){
+  if(c.kind!=="dm")continue;
+  const members=memory.convMembers.get(c.id)||new Set();if(!members.has(req.user.id))continue;
+  const other=[...members].find(x=>x!==req.user.id),u=memory.users.get(other);if(u)result.push({id:c.id,otherUser:userPublic(u)})
+ }
+ res.json({dms:result})
 });
-app.post("/api/dms",auth,async(req,res)=>{
- const username=cleanUsername(req.body?.username);const u=(await q("SELECT * FROM v2_users WHERE username=$1",[username])).rows[0];if(!u||u.id===req.user.id)return res.status(404).json({error:"User not found."});
- const found=await q(`SELECT c.id FROM v2_conversations c
- JOIN v2_conversation_members a ON a.conversation_id=c.id AND a.user_id=$1
- JOIN v2_conversation_members b ON b.conversation_id=c.id AND b.user_id=$2
- WHERE c.kind='dm' LIMIT 1`,[req.user.id,u.id]);
- if(found.rows[0])return res.json({dmId:found.rows[0].id});
- const cid=id("dm");await tx(async(c)=>{await c.query("INSERT INTO v2_conversations(id,kind) VALUES($1,'dm')",[cid]);await c.query("INSERT INTO v2_conversation_members(conversation_id,user_id) VALUES($1,$2),($1,$3)",[cid,req.user.id,u.id])});
- res.status(201).json({dmId:cid});
+app.post("/api/dms",auth,(req,res)=>{
+ const username=cleanUsername(req.body?.username),u=[...memory.users.values()].find(x=>x.username===username);if(!u||u.id===req.user.id)return res.status(404).json({error:"User not found."});
+ for(const c of memory.conversations.values())if(c.kind==="dm"){const m=memory.convMembers.get(c.id)||new Set();if(m.has(req.user.id)&&m.has(u.id)&&m.size===2)return res.json({dmId:c.id})}
+ const c={id:id("dm"),kind:"dm",createdAt:now()};memory.conversations.set(c.id,c);memory.convMembers.set(c.id,new Set([req.user.id,u.id]));persist();res.status(201).json({dmId:c.id})
 });
-async function canReadConversation(conversationId,userId){const direct=await q("SELECT 1 FROM v2_conversation_members WHERE conversation_id=$1 AND user_id=$2",[conversationId,userId]);if(direct.rowCount)return true;const channel=await q("SELECT 1 FROM v2_channels ch JOIN v2_members m ON m.community_id=ch.community_id WHERE ch.conversation_id=$1 AND m.user_id=$2",[conversationId,userId]);return Boolean(channel.rowCount)}
-app.get("/api/conversations/:id/messages",auth,async(req,res)=>{
- if(!(await canReadConversation(req.params.id,req.user.id)))return res.status(403).json({error:"Conversation access denied"});
- const r=await q(`SELECT m.*,u.username,u.display_name,u.avatar_url,u.avatar_frame,u.avatar_effect FROM v2_messages m JOIN v2_users u ON u.id=m.sender_id WHERE m.conversation_id=$1 ORDER BY m.created_at ASC LIMIT 300`,[req.params.id]);
- res.json({messages:r.rows});
+app.get("/api/conversations/:id/messages",auth,(req,res)=>{
+ if(!conversationAccess(req.params.id,req.user.id))return res.status(403).json({error:"Conversation access denied."});
+ res.json({messages:messageRows(req.params.id)})
 });
-app.post("/api/conversations/:id/messages",auth,async(req,res)=>{
- if(!(await canReadConversation(req.params.id,req.user.id)))return res.status(403).json({error:"Conversation access denied"});
- const text=String(req.body?.content||"").trim().slice(0,4000);if(!text)return res.status(400).json({error:"Message is empty"});
- const mid=id("msg");await q("INSERT INTO v2_messages(id,conversation_id,sender_id,content,reply_to,metadata) VALUES($1,$2,$3,$4,$5,$6)",[mid,req.params.id,req.user.id,text,req.body?.replyToId||null,JSON.stringify(req.body?.metadata||{})]);
- await q("UPDATE v2_users SET messages_count=messages_count+1,xp=xp+10,level=FLOOR((xp+10)/500)+1 WHERE id=$1",[req.user.id]);
- const r=await q(`SELECT m.*,u.username,u.display_name,u.avatar_url,u.avatar_frame,u.avatar_effect FROM v2_messages m JOIN v2_users u ON u.id=m.sender_id WHERE m.id=$1`,[mid]);res.status(201).json({message:r.rows[0]});
+app.post("/api/conversations/:id/messages",auth,(req,res)=>{
+ if(!conversationAccess(req.params.id,req.user.id))return res.status(403).json({error:"Conversation access denied."});
+ const text=escString(req.body?.content).trim();if(!text)return res.status(400).json({error:"Message is empty."});
+ const m={id:id("msg"),conversation_id:req.params.id,senderId:req.user.id,content:text,replyToId:req.body?.replyToId||null,metadata:req.body?.metadata||{},created_at:now(),username:req.user.username,display_name:req.user.displayName,avatar_url:req.user.avatarUrl,avatar_frame:req.user.frame,avatar_effect:req.user.effect};
+ const list=memory.messages.get(req.params.id)||[];list.push(m);memory.messages.set(req.params.id,list.slice(-500));req.user.messages++;award(req.user,10,0);persist();io.to("conversation:"+req.params.id).emit("message:new",m);res.status(201).json({message:m})
 });
 
-app.get("/api/notifications",auth,async(req,res)=>{const r=await q("SELECT * FROM v2_notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100",[req.user.id]);res.json({notifications:r.rows})});
-app.post("/api/notifications/read",auth,async(req,res)=>{await q("UPDATE v2_notifications SET read_at=NOW() WHERE user_id=$1",[req.user.id]);res.json({ok:true})});
+app.get("/api/notifications",auth,(req,res)=>res.json({notifications:memory.notifications.get(req.user.id)||[]}));
+app.post("/api/notifications/read",auth,(req,res)=>{for(const n of memory.notifications.get(req.user.id)||[])n.read=true;persist();res.json({ok:true})});
+app.get("/api/friends",auth,(req,res)=>{const friends=[...memory.friends].filter(k=>k.startsWith(req.user.id+":")).map(k=>userPublic(memory.users.get(k.split(":")[1]))).filter(Boolean);res.json({friends})});
+app.post("/api/friends/request",auth,(req,res)=>{
+ const username=cleanUsername(req.body?.username),u=[...memory.users.values()].find(x=>x.username===username);if(!u||u.id===req.user.id)return res.status(404).json({error:"User not found."});
+ const key=req.user.id+":"+u.id;if(memory.friends.has(key))return res.status(409).json({error:"Already friends."});memory.friends.add(key);memory.friends.add(u.id+":"+req.user.id);req.user.friends++;u.friends++;addNotification(u.id,"New friend","You are now connected with @"+req.user.username,"friend");persist();res.status(201).json({ok:true})
+});
 
-io.use(async(socket,next)=>{
- try{
-  const raw=cookieValue({headers:{cookie:socket.handshake.headers.cookie}},cookieName);
-  const r=await q("SELECT u.* FROM v2_sessions s JOIN v2_users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>NOW()",[sha(raw)]);
-  if(!r.rows[0])return next(new Error("Unauthorized"));
-  socket.userId=r.rows[0].id;socket.user= r.rows[0];next();
- }catch(e){next(new Error("Unauthorized"))}
+io.use((socket,next)=>{
+ const raw=String(socket.handshake.headers?.cookie||"");let t="";
+ for(const p of raw.split(";")){const a=p.trim().split("=");if(a[0]===COOKIE)t=decodeURIComponent(a.slice(1).join("=")||"")}
+ const s=memory.sessions.get(hash(t));const u=s&&s.expiresAt>Date.now()?memory.users.get(s.userId):null;
+ if(!u)return next(new Error("Unauthorized"));socket.userId=u.id;socket.user=u;u.status="online";ensureInventory(u);next();persist()
 });
 io.on("connection",socket=>{
- socket.join("user:"+socket.userId);socket.emit("session:ready",{user:publicUser(socket.user)});
- q("UPDATE v2_users SET updated_at=NOW() WHERE id=$1",[socket.userId]).catch(()=>{});
- socket.broadcast.emit("presence:update",{userId:socket.userId,status:"online"});
- socket.on("conversation:join",cid=>canReadConversation(cid,socket.userId).then(ok=>ok&&socket.join("conversation:"+cid)));
- socket.on("typing",async({conversationId,isTyping}={})=>{if(await canReadConversation(conversationId,socket.userId))socket.to("conversation:"+conversationId).emit("typing",{conversationId,userId:socket.userId,isTyping:Boolean(isTyping)})});
- socket.on("message:send",async({conversationId,content,replyToId,metadata}={},ack)=>{
-   try{
-    const key=socket.userId;const t=Date.now();const arr=memory.rate.get(key)||[];const fresh=arr.filter(x=>t-x<10000);if(fresh.length>=30)return ack?.({ok:false,error:"Slow down a little."});fresh.push(t);memory.rate.set(key,fresh);
-    if(!(await canReadConversation(conversationId,socket.userId)))return ack?.({ok:false,error:"Conversation access denied"});
-    const text=String(content||"").trim().slice(0,4000);if(!text)return;
-    const mid=id("msg");await q("INSERT INTO v2_messages(id,conversation_id,sender_id,content,reply_to,metadata) VALUES($1,$2,$3,$4,$5,$6)",[mid,conversationId,socket.userId,text,replyToId||null,JSON.stringify(metadata||{})]);
-    await q("UPDATE v2_users SET messages_count=messages_count+1,xp=xp+10,level=FLOOR((xp+10)/500)+1 WHERE id=$1",[socket.userId]);
-    const m=(await q("SELECT m.*,u.username,u.display_name,u.avatar_url,u.avatar_frame,u.avatar_effect FROM v2_messages m JOIN v2_users u ON u.id=m.sender_id WHERE m.id=$1",[mid])).rows[0];
-    io.to("conversation:"+conversationId).emit("message:new",m);ack?.({ok:true,message:m});
-   }catch(e){ack?.({ok:false,error:"Message failed"})}
+ socket.join("user:"+socket.userId);socket.emit("session:ready",{user:userPublic(socket.user)});
+ socket.on("conversation:join",cid=>{if(conversationAccess(cid,socket.userId))socket.join("conversation:"+cid)});
+ socket.on("typing",({conversationId,isTyping}={})=>{if(conversationAccess(conversationId,socket.userId))socket.to("conversation:"+conversationId).emit("typing",{conversationId,userId:socket.userId,isTyping:Boolean(isTyping)})});
+ socket.on("message:send",({conversationId,content,replyToId,metadata}={},ack)=>{
+  if(!conversationAccess(conversationId,socket.userId))return ack?.({ok:false,error:"Conversation access denied."});
+  const text=escString(content).trim();if(!text)return ack?.({ok:false,error:"Message is empty."});
+  const u=memory.users.get(socket.userId),m={id:id("msg"),conversation_id:conversationId,senderId:u.id,content:text,replyToId:replyToId||null,metadata:metadata||{},created_at:now(),username:u.username,display_name:u.displayName,avatar_url:u.avatarUrl,avatar_frame:u.frame,avatar_effect:u.effect};
+  const list=memory.messages.get(conversationId)||[];list.push(m);memory.messages.set(conversationId,list.slice(-500));u.messages++;award(u,10,0);persist();io.to("conversation:"+conversationId).emit("message:new",m);ack?.({ok:true,message:m})
  });
- socket.on("call:invite",async({conversationId,mode="video"}={})=>{
-   if(!(await canReadConversation(conversationId,socket.userId)))return;
-   const r=await q("SELECT user_id FROM v2_conversation_members WHERE conversation_id=$1 AND user_id<>$2",[conversationId,socket.userId]);
-   for(const row of r.rows)io.to("user:"+row.user_id).emit("call:incoming",{conversationId,mode,caller:publicUser(socket.user)});
+ socket.on("call:invite",({conversationId,mode="video"}={})=>{
+  if(!conversationAccess(conversationId,socket.userId))return;
+  for(const uid of conversationUsers(conversationId))if(uid!==socket.userId)io.to("user:"+uid).emit("call:incoming",{conversationId,mode,caller:userPublic(socket.user)})
  });
- socket.on("call:join",async({roomId,mode="video"}={})=>{
-   const room="v2call:"+String(roomId);socket.join(room);
-   memory.callRooms.set(socket.id,room);memory.callStarted.set(socket.id,Date.now());
-   const participants=[...(io.sockets.adapter.rooms.get(room)||[])].filter(x=>x!==socket.id).map(id=>{const s=io.sockets.sockets.get(id);return s?{socketId:id,user:publicUser(s.user)}:null}).filter(Boolean);
-   socket.emit("call:participants",participants);socket.to(room).emit("call:participant-joined",{socketId:socket.id,user:publicUser(socket.user),mode});
+ socket.on("call:join",({roomId,mode="video"}={})=>{
+  if(!conversationAccess(roomId,socket.userId))return;
+  const room="v2call:"+roomId;socket.join(room);socket.callRoom=room;socket.callStarted=Date.now();
+  const p=[...(io.sockets.adapter.rooms.get(room)||[])].filter(x=>x!==socket.id).map(sid=>{const s=io.sockets.sockets.get(sid);return s?{socketId:sid,user:userPublic(s.user)}:null}).filter(Boolean);
+  socket.emit("call:participants",p);socket.to(room).emit("call:participant-joined",{socketId:socket.id,user:userPublic(socket.user),mode})
  });
- socket.on("call:leave",async()=>{
-   const room=memory.callRooms.get(socket.id);if(!room)return;socket.leave(room);socket.to(room).emit("call:participant-left",{socketId:socket.id,userId:socket.userId});
-   const started=memory.callStarted.get(socket.id);if(started){const minutes=Math.max(1,Math.round((Date.now()-started)/60000));await q("UPDATE v2_users SET call_minutes=call_minutes+$1,xp=xp+$2,level=FLOOR((xp+$2)/500)+1 WHERE id=$3",[minutes,minutes*2,socket.userId])}
-   memory.callRooms.delete(socket.id);memory.callStarted.delete(socket.id);
+ socket.on("call:leave",()=>{
+  if(!socket.callRoom)return;socket.leave(socket.callRoom);socket.to(socket.callRoom).emit("call:participant-left",{socketId:socket.id,userId:socket.userId});
+  if(socket.callStarted){socket.user.callMinutes+=Math.max(1,Math.round((Date.now()-socket.callStarted)/60000));award(socket.user,10,0)}socket.callRoom=null;socket.callStarted=null;persist()
  });
- socket.on("call:media",payload=>{const room=memory.callRooms.get(socket.id);if(room)socket.to(room).emit("call:media", {socketId:socket.id,...payload})});
- socket.on("rtc:offer",({to,offer}={})=>{const s=io.sockets.sockets.get(to);if(s)s.emit("rtc:offer",{from:socket.id,offer})});
- socket.on("rtc:answer",({to,answer}={})=>{const s=io.sockets.sockets.get(to);if(s)s.emit("rtc:answer",{from:socket.id,answer})});
- socket.on("rtc:ice",({to,candidate}={})=>{const s=io.sockets.sockets.get(to);if(s)s.emit("rtc:ice",{from:socket.id,candidate})});
- socket.on("disconnect",async()=>{
-   socket.broadcast.emit("presence:update",{userId:socket.userId,status:"offline"});
-   const room=memory.callRooms.get(socket.id);if(room){socket.to(room).emit("call:participant-left",{socketId:socket.id,userId:socket.userId})}
- });
+ socket.on("rtc:offer",d=>{const s=io.sockets.sockets.get(d?.to);if(s)s.emit("rtc:offer",{from:socket.id,offer:d.offer,fromUser:userPublic(socket.user)})});
+ socket.on("rtc:answer",d=>{const s=io.sockets.sockets.get(d?.to);if(s)s.emit("rtc:answer",{from:socket.id,answer:d.answer})});
+ socket.on("rtc:ice",d=>{const s=io.sockets.sockets.get(d?.to);if(s)s.emit("rtc:ice",{from:socket.id,candidate:d.candidate})});
+ socket.on("disconnect",()=>{socket.user.status="offline";if(socket.callRoom){socket.to(socket.callRoom).emit("call:participant-left",{socketId:socket.id,userId:socket.userId})}persist()})
 });
 
-async function migrateLegacyAccounts(){
- try{
-  const old=await q("SELECT data FROM orbit_state WHERE id=1");
-  if(!old.rows[0]?.data)return;
-  const count=await q("SELECT COUNT(*)::int AS n FROM v2_users");if(count.rows[0].n)return;
-  const users=Array.isArray(old.rows[0].data.users)?old.rows[0].data.users:[];
-  for(const [,u] of users){
-    if(!u?.passwordHash||!u.username)continue;
-    await q("INSERT INTO v2_users(id,username,display_name,password_hash,bio) VALUES($1,$2,$3,$4,$5) ON CONFLICT(username) DO NOTHING",[u.id,cleanUsername(u.username),cleanName(u.displayName,u.username),u.passwordHash,String(u.bio||"").slice(0,280)]);
-  }
-  const rows=await q("SELECT id FROM v2_users");for(const r of rows.rows){await ensureCore(r.id);await ensureHome(r.id)}
- }catch(e){console.error("[orbit-v2] legacy migration skipped:",e.message)}
-}
-
 async function start(){
- if(!DATABASE_URL)throw new Error("DATABASE_URL is required for ORBIT V2.");
- await migrate();await migrateLegacyAccounts();
- httpServer.listen(PORT,"0.0.0.0",()=>console.log("[orbit-v2] AAA platform listening on "+PORT));
+ await bootPersistence();
+ for(const u of memory.users.values()){ensureUserDefaults(u);ensureInventory(u)}
+ server.listen(PORT,"0.0.0.0",()=>console.log("[orbit-v2] AAA platform listening on "+PORT+" persistence="+persistMode));
 }
 start().catch(e=>{console.error("[orbit-v2] boot failed",e);process.exit(1)});
