@@ -262,8 +262,38 @@
   }
 
   function authScreen(mode){$("#boot").innerHTML='<div class="modal-bg"><div class="modal"><div class="modal-body"><span class="eyebrow">ORBIT</span><h1 style="font:700 28px Space Grotesk">Secure access</h1><p class="muted" style="font-size:9px">New frontend. Existing community and realtime backend.</p><div class="actions"><button class="btn '+(mode==="signin"?"primary":"")+'" id="signin-mode">Sign in</button><button class="btn '+(mode==="register"?"primary":"")+'" id="register-mode">Create account</button></div><form id="auth" class="form" style="margin-top:14px"><label>Username<input class="input" id="auth-user" required></label>'+(mode==="register"?'<label>Display name<input class="input" id="auth-display"></label>':"")+'<label>Password<input class="input" id="auth-pass" type="password" minlength="8" required></label><button class="btn primary">Continue</button><span id="auth-error" class="muted" style="font-size:8px"></span></form></div></div></div>';$("#signin-mode").onclick=()=>authScreen("signin");$("#register-mode").onclick=()=>authScreen("register");$("#auth").onsubmit=async e=>{e.preventDefault();try{const body={username:$("#auth-user").value,password:$("#auth-pass").value};if(mode==="register")body.displayName=$("#auth-display").value;const d=await api(mode==="register"?"/api/auth/register":"/api/auth/login",{method:"POST",body:JSON.stringify(body)});saveAuth(d);boot()}catch(x){$("#auth-error").textContent=x.message}}}
+  let booting=false;
   async function boot(){
-    try{const d=await api("/api/me");S.user=d.user;if(!S.user.account){return authScreen("signin")}$("#boot").innerHTML="";$("#app").classList.remove("hidden");await loadServers();await loadDMs();await loadNotifications();connectSocket();renderNav();chrome();setView("home")}catch(e){localStorage.removeItem("orbit_token");authScreen("signin")}
+    if(booting)return;
+    booting=true;
+    try{
+      const d=await api("/api/me");
+      if(!d?.user?.account){
+        localStorage.removeItem("orbit_token");
+        S.token="";
+        return authScreen("signin");
+      }
+      S.user=d.user;
+      $("#boot").innerHTML="";
+      $("#app").classList.remove("hidden");
+      renderNav();
+      chrome();
+      setView("home");
+      try{await loadServers()}catch(e){toast("Communities",e.message||"Unable to load communities.","error")}
+      try{await loadDMs()}catch{}
+      try{await loadNotifications()}catch{}
+      try{connectSocket()}catch(e){toast("Realtime",e.message||"Realtime unavailable.","error")}
+      renderNav();
+      chrome();
+      if(S.view==="home")renderHome($("#surface"));
+    }catch(e){
+      localStorage.removeItem("orbit_token");
+      S.token="";
+      authScreen("signin");
+      return;
+    }finally{
+      booting=false;
+    }
   }
   bind(); if(S.token)boot(); else authScreen("signin");
 })();
