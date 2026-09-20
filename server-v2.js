@@ -111,7 +111,7 @@ function item(id){return SHOP.find(x=>x.id===id)||null}
 function levelFromXp(xp){return Math.max(1,Math.floor(Number(xp||0)/500)+1)}
 function profileReady(u){return Boolean(String(u.bio||"").trim())&&Boolean(String(u.display_name||"").trim())}
 function cycleFor(m){if(m.cadence==="lifetime")return "lifetime";return new Date().toISOString().slice(0,10)}
-async function metricValue(u,metric){if(metric==="profile")return profileReady(u)?1:0;return Number(u[metric+"_count"]??0)}
+async function metricValue(u,metric){if(metric==="profile")return profileReady(u)?1:0;const fields={messages:"messages_count",callMinutes:"call_minutes",friends:"friends_count",communitiesCreated:"communities_created",communitiesJoined:"communities_joined"};return Number(u[fields[metric]]??0)}
 async function ensureCore(userId){
   for(const x of SHOP.filter(i=>i.price===0))await q("INSERT INTO v2_inventory(user_id,item_id) VALUES($1,$2) ON CONFLICT DO NOTHING",[userId,x.id]);
 }
@@ -290,7 +290,7 @@ app.post("/api/dms",auth,async(req,res)=>{
  const cid=id("dm");await tx(async(c)=>{await c.query("INSERT INTO v2_conversations(id,kind) VALUES($1,'dm')",[cid]);await c.query("INSERT INTO v2_conversation_members(conversation_id,user_id) VALUES($1,$2),($1,$3)",[cid,req.user.id,u.id])});
  res.status(201).json({dmId:cid});
 });
-async function canReadConversation(conversationId,userId){const r=await q("SELECT 1 FROM v2_conversation_members WHERE conversation_id=$1 AND user_id=$2",[conversationId,userId]);return Boolean(r.rowCount)}
+async function canReadConversation(conversationId,userId){const direct=await q("SELECT 1 FROM v2_conversation_members WHERE conversation_id=$1 AND user_id=$2",[conversationId,userId]);if(direct.rowCount)return true;const channel=await q("SELECT 1 FROM v2_channels ch JOIN v2_members m ON m.community_id=ch.community_id WHERE ch.conversation_id=$1 AND m.user_id=$2",[conversationId,userId]);return Boolean(channel.rowCount)}
 app.get("/api/conversations/:id/messages",auth,async(req,res)=>{
  if(!(await canReadConversation(req.params.id,req.user.id)))return res.status(403).json({error:"Conversation access denied"});
  const r=await q(`SELECT m.*,u.username,u.display_name,u.avatar_url,u.avatar_frame,u.avatar_effect FROM v2_messages m JOIN v2_users u ON u.id=m.sender_id WHERE m.conversation_id=$1 ORDER BY m.created_at ASC LIMIT 300`,[req.params.id]);
