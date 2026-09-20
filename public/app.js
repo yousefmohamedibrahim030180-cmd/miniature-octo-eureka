@@ -4388,7 +4388,7 @@ closeServerSidebar();
     document.querySelectorAll('[data-od-social="dms"], [data-dm-nav="messages"], [data-view="dms"]:not(.aether-nav)').forEach(el=>el.remove());
   }
   hide();
-  new MutationObserver(hide).observe(document.body,{subtree:true,childList:true});
+  if(!window.__orbitLegacyDmHideTimer)window.__orbitLegacyDmHideTimer=setInterval(hide,2000);
 })();
 
 
@@ -4439,7 +4439,7 @@ closeServerSidebar();
     if(window.orbitUI && orbitUI.view==="dms") setView("home");
   }
   scrub();
-  new MutationObserver(scrub).observe(document.body,{subtree:true,childList:true});
+  if(!window.__orbitHomeDmScrubTimer)window.__orbitHomeDmScrubTimer=setInterval(scrub,2000);
 })();
 
 
