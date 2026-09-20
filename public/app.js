@@ -1648,25 +1648,34 @@ function setView(view){
   if(view==="dms" || view==="messages"){view="home";}
   orbitUI.view=view;
   document.querySelectorAll(".nav-item[data-view], .rail-nav[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
-  const global=$("#global-page"),chat=$("#chat-view");
+
+  const legacyView=$("#view");
+  const global=$("#global-page");
+  const chat=$("#chat-view");
   const isHome=view==="home";
+  const globalViews=["space","home","server-home","communities","discover","dms","friends","calls","live","events","projects","files","ai","notifications","saved","explore","settings"];
+
+  // NEXUS owns the visible surface now. The old #view mount is retained only
+  // for compatibility with legacy code and must never render underneath NEXUS.
+  legacyView?.classList.add("hidden");
   document.body.classList.toggle("orbit-discord-home",isHome);
   global?.classList.toggle("discord-home-active",isHome);
+
   if(isHome){
     $("#app")?.classList.remove("server-sidebar-open");
     $("#sidebar")?.classList.remove("open");
     document.body.classList.remove("mobile-sidebar-open");
   }
-  const globalViews=["space","home","server-home","communities","discover","dms","friends","calls","live","events","projects","files","ai","notifications","saved","explore","settings"];
+
   if(globalViews.includes(view)){
-    global.classList.remove("hidden");
-    chat.classList.add("hidden");
+    global?.classList.remove("hidden");
+    chat?.classList.add("hidden");
     $("#members-panel")?.classList.add("hidden");
     $("#thread-panel")?.classList.add("hidden");
     renderPage(view);
   }else{
-    global.classList.add("hidden");
-    chat.classList.remove("hidden");
+    global?.classList.add("hidden");
+    chat?.classList.remove("hidden");
   }
 }
 function goChat(){
