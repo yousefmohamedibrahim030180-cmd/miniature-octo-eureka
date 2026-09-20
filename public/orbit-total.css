@@ -1,0 +1,37 @@
+/* ORBIT TOTAL REDESIGN V1 — replaces the visible shell while preserving product logic. */
+body.orbit-total{background:#07090d!important;color:#eef3f7!important}
+body.orbit-total:before{content:"";position:fixed;inset:0;pointer-events:none;z-index:9000;background:radial-gradient(circle at 50% 0,rgba(255,255,255,.045),transparent 30%),linear-gradient(120deg,rgba(120,160,190,.025),transparent 35%,rgba(180,130,255,.025));}
+body.orbit-total .app{display:grid!important;grid-template-columns:96px 1fr!important;grid-template-rows:100vh!important;background:#090b10!important}
+body.orbit-total .server-rail{grid-column:1!important;grid-row:1!important;width:auto!important;padding:22px 14px!important;background:#0b0e14!important;border-right:1px solid #202630!important;display:flex!important;align-items:center!important;z-index:20!important}
+body.orbit-total .brand-shell{margin-bottom:18px!important}
+body.orbit-total .rail-logo{width:58px!important;height:58px!important;border-radius:20px!important;background:linear-gradient(145deg,#f5f7fa,#9ca8b5)!important;color:#101318!important;box-shadow:0 12px 35px rgba(0,0,0,.35)!important}
+body.orbit-total .brand-name{display:none!important}
+body.orbit-total .rail-nav{width:64px!important;height:54px!important;margin:4px auto!important;border-radius:17px!important;color:#6f7a86!important}
+body.orbit-total .rail-nav.active{background:#eef2f5!important;color:#11151a!important;box-shadow:0 12px 30px rgba(0,0,0,.28)!important}
+body.orbit-total .server-list{gap:10px!important}
+body.orbit-total .server-item{width:58px!important;height:58px!important;border-radius:19px!important;background:#12161d!important;border:1px solid #252c36!important;color:#7d8793!important}
+body.orbit-total .server-item.active{background:#eef2f5!important;color:#11151a!important;border-color:#eef2f5!important;box-shadow:0 12px 30px rgba(0,0,0,.3)!important}
+body.orbit-total .rail-btn{width:58px!important;height:46px!important;border-radius:16px!important;background:#12161d!important;border:1px solid #252c36!important}
+body.orbit-total .sidebar{grid-column:2!important;grid-row:1!important;position:absolute!important;left:96px!important;top:0!important;width:310px!important;height:100vh!important;z-index:15!important;background:#0d1016!important;border-right:1px solid #222832!important;box-shadow:20px 0 60px rgba(0,0,0,.2)!important}
+body.orbit-total .workspace-head{height:92px!important;background:#0d1016!important;border-bottom:1px solid #222832!important}
+body.orbit-total .sidebar-search{margin:14px!important;background:#080a0e!important;border:1px solid #222832!important;border-radius:14px!important}
+body.orbit-total .channel{margin:3px 10px!important;border-radius:12px!important;color:#77818d!important}
+body.orbit-total .channel.active{background:#171c24!important;color:#f1f4f7!important;border-left:3px solid #f1f4f7!important;box-shadow:none!important}
+body.orbit-total .sidebar-bottom{background:#0b0e13!important}
+body.orbit-total .content{grid-column:2!important;grid-row:1!important;margin-left:310px!important;background:#090b10!important;min-width:0!important}
+body.orbit-total .chat,.orbit-total .global-page{background:#090b10!important}
+body.orbit-total .chat-head{height:82px!important;background:#0b0e13!important;border-bottom:1px solid #222832!important}
+body.orbit-total .chat-head:after{display:none!important}
+body.orbit-total .channel-title .hash{background:#151a21!important;border:1px solid #2a323d!important;color:#d9e0e7!important}
+body.orbit-total .messages{background:#090b10!important;padding:28px 48px!important}
+body.orbit-total .message{border-radius:14px!important}
+body.orbit-total .message:hover{background:#0e1218!important;border-color:#1d252f!important}
+body.orbit-total .composer{background:#11151b!important;border:1px solid #2a323d!important;border-radius:18px!important;box-shadow:0 18px 50px rgba(0,0,0,.28)!important}
+body.orbit-total .composer .send{background:#eef2f5!important;color:#11151a!important;box-shadow:none!important}
+body.orbit-total .members-panel,body.orbit-total .thread-panel{background:#0c0f14!important;border-left:1px solid #222832!important}
+body.orbit-total .global-page .page-head{background:#0b0e13!important;border-bottom:1px solid #222832!important}
+body.orbit-total .hero-card,body.orbit-total .metric,body.orbit-total .server-home-card,body.orbit-total .os-feature,body.orbit-total .os-list-row,body.orbit-total .os-call-row,body.orbit-total .os-file-row,body.orbit-total .os-event-card,body.orbit-total .os-kanban-col,body.orbit-total .os-ai-shell{background:#10141a!important;border:1px solid #252d37!important;box-shadow:0 18px 45px rgba(0,0,0,.18)!important;border-radius:20px!important}
+body.orbit-total .hero-card:hover,body.orbit-total .os-list-row:hover,body.orbit-total .os-call-row:hover,body.orbit-total .os-file-row:hover,body.orbit-total .os-event-card:hover{transform:none!important;border-color:#3a444f!important}
+body.orbit-total .modal-card,body.orbit-total .command-card{background:#10141a!important;border:1px solid #303945!important;box-shadow:0 35px 100px rgba(0,0,0,.65)!important}
+@media(max-width:900px){body.orbit-total .sidebar{width:280px!important}body.orbit-total .content{margin-left:280px!important}}
+@media(max-width:680px){body.orbit-total .sidebar{display:none!important}body.orbit-total .content{margin-left:0!important}}
