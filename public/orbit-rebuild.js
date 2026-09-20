@@ -28,7 +28,15 @@
   function row(u,action){return'<div class="row">'+avatar(u)+'<span class="row-main"><strong>'+esc(u.display_name||u.username||"Guest")+'</strong><span>@'+esc(u.username||"")+" · "+esc(u.status||"offline")+'</span></span>'+(action?'<div class="row-actions">'+action+"</div>":"")+"</div>"}
 
   function renderNav(){
+    renderServerDock();
     $("#rail-nav").innerHTML=NAV.map(n=>'<button class="'+(S.view===n[0]?"active":"")+'" data-view="'+n[0]+'"><span class="nav-icon">'+n[1]+'</span><span class="nav-text">'+n[2]+'</span></button>').join("");
+  }
+  function renderServerDock(){
+    const dock=$("#server-dock"); if(!dock)return;
+    dock.innerHTML=S.servers.slice(0,12).map(s=>'<button class="server-orb '+(String(S.server?.id)===String(s.id)?"active":"")+'" data-server-id="'+esc(s.id)+'" title="'+esc(s.name)+'"><span>'+esc(String(s.name||"O").slice(0,1).toUpperCase())+'</span></button>').join("")+
+      '<button class="server-orb add" id="server-dock-add" title="Create community">+</button>';
+    $("[data-server-id]").forEach(b=>b.onclick=async()=>{await selectServer(b.dataset.serverId);S.view="home";$("#top-title").textContent="Home";renderNav();renderSurface();toast("Server selected",S.server?.name||"Community","success")});
+    $("#server-dock-add").onclick=openCreateServer;
   }
   function chrome(){
     const u=S.user||{};
@@ -158,7 +166,7 @@
   function openSearch(){openModal("Search ORBIT",'<input class="input" id="search-input" placeholder="Search users, channels and content"><div id="search-out" style="margin-top:10px"></div>');$("#search-input").oninput=async e=>{const q=e.target.value.trim(),out=$("#search-out");if(!q){out.innerHTML="";return}try{const d=await api("/api/search?q="+encodeURIComponent(q));out.innerHTML=(d.results||d.hits||d.users||[]).map(x=>'<div class="row"><span class="row-main"><strong>'+esc(x.username||x.name||x.title||"Result")+'</strong><span>'+esc(x.content||x.preview||"Orbit result")+'</span></span></div>').join("")||'<span class="muted" style="font-size:8px">No results.</span>'}catch(x){out.innerHTML='<span class="muted" style="font-size:8px">'+esc(x.message)+'</span>'}};$("#search-input").focus()}
   function openCommand(){openModal("Command center",'<div class="list">'+NAV.concat([["friends","◎","Friends"],["notifications","♢","Notifications"]]).map(n=>'<button class="row" data-command="'+n[0]+'"><span class="row-main"><strong>'+n[1]+" "+n[2]+'</strong><span>Open surface</span></span></button>').join("")+"</div>");$$("[data-command]").forEach(b=>b.onclick=()=>{closeModal();setView(b.dataset.command)})}
 
-  async function loadServers(){const d=await api("/api/servers");S.servers=d.servers||[]}
+  async function loadServers(){const d=await api("/api/servers");S.servers=d.servers||[];renderServerDock()}
   async function selectServer(id){const s=S.servers.find(x=>String(x.id)===String(id));if(!s)return;S.server=s;const d=await api("/api/servers/"+encodeURIComponent(s.id)+"/channels");S.channels=d.channels||[];S.channel=S.channels.find(c=>c.type==="text")||S.channels[0]||null;renderContext()}
   async function loadDMs(){try{const d=await api("/api/dms");S.dms=d.dms||[];chrome()}catch{}}
   async function loadNotifications(){try{const d=await api("/api/notifications");S.notifications=d.notifications||[];chrome()}catch{}}
