@@ -3,6 +3,7 @@ const http=require("http");
 const path=require("path");
 const crypto=require("crypto");
 const bcrypt=require("bcryptjs");
+const jwt=require("jsonwebtoken");
 const {Server}=require("socket.io");
 
 const app=express();
@@ -12,6 +13,7 @@ const PORT=Number(process.env.PORT||8080);
 const PERSIST_URL=String(process.env.ORBIT_PERSIST_URL||"").trim().replace(/\/$/,"");
 const PERSIST_SECRET=String(process.env.ORBIT_PERSIST_SECRET||"").trim();
 const COOKIE="orbit_v2_session";
+const JWT_SECRET=String(process.env.JWT_SECRET||"orbit-guest-dev-secret");
 const memory={
  users:new Map(),sessions:new Map(),communities:new Map(),members:new Map(),channels:new Map(),
  conversations:new Map(),convMembers:new Map(),messages:new Map(),notifications:new Map(),
@@ -118,11 +120,19 @@ function userPublic(u){
   createdAt:u.createdAt||null
  };
 }
-function sessionUser(req){
+function sessionUser(req,res){
  const raw=cookie(req,COOKIE);if(!raw)return null;
  const s=memory.sessions.get(hash(raw));
- if(!s||s.expiresAt<Date.now())return null;
- return memory.users.get(s.userId)||null;
+ if(s&&s.expiresAt>Date.now())return memory.users.get(s.userId)||null;
+ try{
+  const payload=jwt.verify(raw,JWT_SECRET);const u=memory.users.get(String(payload.id));
+  if(u&&payload.account){
+   const upgraded=token();memory.sessions.set(hash(upgraded),{userId:u.id,createdAt:Date.now(),expiresAt:Date.now()+2592000000});
+   if(res)setCookie(res,upgraded);
+   persist();return u;
+  }
+ }catch{}
+ return null;
 }
 function cookie(req,name){
  const raw=String(req.headers.cookie||"");
@@ -140,7 +150,7 @@ function setCookie(res,value){
 }
 function clearCookie(res){res.setHeader("Set-Cookie",COOKIE+"=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax")}
 function auth(req,res,next){
- const u=sessionUser(req);if(!u)return res.status(401).json({error:"Session expired. Please sign in again."});
+ const u=sessionUser(req,res);if(!u)return res.status(401).json({error:"Session expired. Please sign in again."});
  if(u.suspended)return res.status(403).json({error:"Account suspended"});
  u.status="online";req.user=u;persist();next();
 }
@@ -338,7 +348,11 @@ app.post("/api/friends/request",auth,(req,res)=>{
 io.use((socket,next)=>{
  const raw=String(socket.handshake.headers?.cookie||"");let t="";
  for(const p of raw.split(";")){const a=p.trim().split("=");if(a[0]===COOKIE)t=decodeURIComponent(a.slice(1).join("=")||"")}
- const s=memory.sessions.get(hash(t));const u=s&&s.expiresAt>Date.now()?memory.users.get(s.userId):null;
+ let s=memory.sessions.get(hash(t)),u=s&&s.expiresAt>Date.now()?memory.users.get(s.userId):null;
+ if(!u){
+  try{const payload=jwt.verify(t,JWT_SECRET);if(payload.account)u=memory.users.get(String(payload.id))||null}catch{}
+  if(u){const upgraded=token();memory.sessions.set(hash(upgraded),{userId:u.id,createdAt:Date.now(),expiresAt:Date.now()+2592000000});persist()}
+ }
  if(!u)return next(new Error("Unauthorized"));socket.userId=u.id;socket.user=u;u.status="online";ensureInventory(u);next();persist()
 });
 io.on("connection",socket=>{
