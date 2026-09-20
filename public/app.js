@@ -3685,7 +3685,21 @@ function wireEnhancedControls() {
   $("#poll-btn")?.addEventListener("click", openPoll);
 }
 function bindPremiumNavigation(){
-  document.querySelectorAll(".rail-nav[data-view]").forEach(b=>b.onclick=()=>{
+  const bindViewButton = b => {
+    if (!b || !b.dataset.view) return;
+    b.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation();
+      setView(b.dataset.view);
+      closeServerSidebar();
+    });
+  };
+  document.querySelectorAll(".nav-item[data-view], .rail-nav[data-view]").forEach(bindViewButton);
+  $("#mainNav")?.addEventListener("click", e => {
+    const b = e.target.closest(".nav-item[data-view]");
+    if (!b) return;
+    e.preventDefault();
+    e.stopPropagation();
     setView(b.dataset.view);
     closeServerSidebar();
   });
