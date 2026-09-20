@@ -55,3 +55,33 @@
 .od-dm-loading{padding:18px;color:var(--dim);font-size:8px;text-align:center}
 @media(max-width:1200px){.orbit-discord-home{grid-template-columns:205px minmax(0,1fr)}.od-active-sidebar{display:none}}
 @media(max-width:900px){.orbit-discord-home{grid-template-columns:1fr}.od-social-sidebar{display:none}.od-friends-head{padding:10px}.od-home-notice,.od-friend-search{margin-left:10px;margin-right:10px}}
+
+
+/* NEXUS STRUCTURAL RESET — keep every surface in its own region */
+.app-shell{height:100dvh;min-height:0;overflow:hidden}
+.main{min-width:0;min-height:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:rgba(7,9,17,.42)}
+.topbar{height:64px;min-height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--line);background:rgba(8,11,19,.78);backdrop-filter:blur(22px);position:relative;z-index:5}
+.breadcrumbs{display:flex;align-items:center;gap:9px;min-width:0;font-size:10px}.breadcrumbs span{color:var(--dim);letter-spacing:.12em}.breadcrumbs b{color:#ffffff28}.breadcrumbs strong{font-family:"Space Grotesk",Inter;font-size:13px;white-space:nowrap}
+.top-actions{display:flex;align-items:center;gap:7px}.top-btn,.circle-btn,.status-pill{height:34px;border:1px solid var(--line);border-radius:10px;background:#ffffff05;color:var(--muted)}.top-btn{padding:0 11px;font-size:10px;display:flex;align-items:center;gap:7px}.circle-btn{width:34px;display:grid;place-items:center;position:relative}.circle-btn i{position:absolute;right:-3px;top:-4px;font-style:normal;font-size:7px;min-width:15px;height:15px;border-radius:8px;display:grid;place-items:center;background:var(--purple);color:#fff}
+.status-pill{padding:0 10px;font-size:9px;display:flex;gap:6px;align-items:center}.status-pill .status-online{width:6px;height:6px}
+.global-page{min-height:0;flex:1;overflow:hidden;display:flex;flex-direction:column;padding:0}
+.global-page.hidden{display:none!important}
+.page-head{min-height:92px;padding:20px 24px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#ffffff03,transparent)}
+.page-head h1{margin:4px 0 5px;font-family:"Space Grotesk",Inter;font-size:22px;letter-spacing:-.025em}.page-head p{margin:0;color:var(--muted);font-size:10px;line-height:1.5}.page-actions{display:flex;gap:7px;flex-wrap:wrap}
+.page-body{min-height:0;flex:1;overflow:auto;padding:20px 24px 28px;overscroll-behavior:contain}
+.page-body::-webkit-scrollbar{width:6px}.page-body::-webkit-scrollbar-thumb{background:#ffffff12;border-radius:8px}
+.chat{min-height:0;flex:1;display:flex;flex-direction:column;overflow:hidden;background:#080b14}.chat.hidden{display:none!important}
+.chat-head{height:60px;min-height:60px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);background:#0a0e18;z-index:4}
+.channel-title{display:flex;align-items:center;gap:9px;min-width:0;flex:1}.channel-title .hash{font-size:20px;color:var(--dim)}.channel-title strong{display:block;font-size:12px}.channel-title span:not(.hash){display:block;color:var(--dim);font-size:8px;margin-top:2px}.head-actions{display:flex;align-items:center;gap:6px;position:relative}.head-action{height:32px;padding:0 9px;border:1px solid var(--line);border-radius:9px;background:#ffffff05;color:#aeb7c8;font-size:9px;display:flex;align-items:center;gap:6px}.head-action.primary-soft{background:#9a65ff13;color:#d8c9ff;border-color:#9a65ff2a}
+.chat-body{min-height:0;flex:1;position:relative;overflow:hidden;display:flex}.messages{min-width:0;flex:1;overflow:auto;padding:20px 24px 18px}.composer{min-height:58px;margin:0 18px 16px;padding:7px;border:1px solid var(--line);border-radius:14px;background:#0d121e;display:flex;align-items:center;gap:6px}.composer input{min-width:0;flex:1;border:0;outline:0;background:transparent;color:var(--text);font-size:11px}.composer-icon,.composer-tool,.send{height:36px;border-radius:9px;border:1px solid var(--line);background:#ffffff05}.composer-icon,.composer-tool{width:36px}.send{padding:0 13px;background:linear-gradient(135deg,#8c5cff,#4dcfff);font-size:10px}
+.right-panel{min-width:0;min-height:0;overflow:auto;background:rgba(9,13,22,.76);border-left:1px solid var(--line);padding:20px 15px}.right-panel.hidden{display:none!important}
+.context-panel{min-width:0;min-height:0;height:100dvh;overflow:auto}.rail{min-width:0;height:100dvh;overflow:hidden}
+.context-panel.collapsed{width:0;padding:0;overflow:hidden;border-right:0}.app-shell.context-collapsed{grid-template-columns:245px 0 minmax(520px,1fr) 300px}
+.drop-overlay,.upload-overlay,.call-panel,.incoming-call,.command-palette,.modal,.context-menu,.toast-stack{z-index:100}
+#global-page.discord-home-active{padding:0;overflow:hidden}.discord-home-active .page-head{display:none}.discord-home-active .page-body{padding:14px;overflow:hidden;display:flex}.discord-home-active .page-body>.orbit-discord-home{flex:1;min-height:0}
+.orbit-discord-home{width:100%;height:100%;min-height:0;overflow:hidden}
+.od-social-sidebar,.od-active-sidebar,.od-friends-main,.od-profile-main,.od-dm-main{min-height:0;overflow:hidden}
+.od-dm-list,.od-friends-list,.od-active-list,.od-profile-body{min-height:0;overflow:auto}
+@media(max-width:1250px){.app-shell{grid-template-columns:220px 220px minmax(0,1fr)}.right-panel{display:none}.app-shell.context-collapsed{grid-template-columns:220px 0 minmax(0,1fr)}}
+@media(max-width:980px){.app-shell{grid-template-columns:72px minmax(0,1fr)}.context-panel{display:none}.main{width:100%}.topbar{padding:0 12px}.page-body{padding:14px}.discord-home-active .page-body{padding:8px}.app-shell.context-collapsed{grid-template-columns:72px minmax(0,1fr)}}
+@media(max-width:650px){.topbar{height:56px;min-height:56px}.breadcrumbs{display:none}.top-actions .top-btn,.top-actions .status-pill{display:none}.chat-head{padding:0 10px}.head-actions .head-action b,.head-actions .secondary-channel-action{display:none}.messages{padding:14px 12px}.composer{margin:0 10px 10px}.page-head{padding:15px}.page-body{padding:12px}.discord-home-active .page-body{padding:0}.orbit-discord-home{border-radius:0;border-left:0;border-right:0}.od-active-sidebar{display:none}}
