@@ -234,13 +234,11 @@ $("#notifyBtn").onclick=openNotifications;
 $("#dmBtn").onclick=()=>setView("messages");$("#profileBtn").onclick=()=>setView("settings");$("#searchBtn").onclick=()=>openSearch();$("#commandBtn").onclick=()=>openSearch();
 function openSearch(){openModal("ORBIT Search",'<form id="searchForm" class="form"><label>Search people or communities<input id="searchQ" class="input" autofocus placeholder="Search a username, person or community"></label><button class="btn primary">Search</button></form><div id="searchResults" class="stack" style="margin-top:10px"></div>');$("#searchForm").onsubmit=async e=>{e.preventDefault();const q=$("#searchQ").value.trim();if(!q)return;const host=$("#searchResults");host.innerHTML='<div class="search-loading muted">Searching ORBIT…</div>';try{const d=await api("/api/search?q="+encodeURIComponent(q));const users=d.users||[],communities=d.communities||[];host.innerHTML=(users.length?'<div class="search-section"><div class="eyebrow">PEOPLE</div>'+users.map(u=>'<button class="search-result" data-user="'+esc(u.username)+'">'+avatar(u)+'<span><strong>'+esc(u.displayName||u.username)+'</strong><small>@'+esc(u.username)+'</small></span><b>Message</b></button>').join("")+'</div>':'')+(communities.length?'<div class="search-section"><div class="eyebrow">SERVERS</div>'+communities.map(c=>'<button class="search-result" data-community="'+esc(c.id)+'"><span class="search-glyph">◎</span><span><strong>'+esc(c.name)+'</strong><small>'+esc(c.description||"ORBIT community")+'</small></span><b>Open</b></button>').join("")+'</div>':'')||'<div class="empty-state" style="min-height:180px"><div class="empty-box"><h2>No matches</h2><p>Try a different username or community name.</p></div></div>';$$("[data-user]").forEach(b=>b.onclick=()=>startDirectFromSearch(b.dataset.user));$$("[data-community]").forEach(b=>b.onclick=()=>{closeModal();openCommunity(b.dataset.community)});}catch(x){host.innerHTML='<p class="muted">'+esc(x.message)+'</p>'}}}
 document.addEventListener("click",(event)=>{
- const button=event.target.closest(".settings-nav-item[data-setting], #context [data-setting]");
+ const button=event.target.closest("#context [data-setting], .settings-nav-item[data-setting]");
  if(!button)return;
  event.preventDefault();
  event.stopImmediatePropagation();
- const next=button.dataset.setting;
- if(!next||S.settingsTab===next)return;
- S.settingsTab=next;
+ S.settingsTab=button.dataset.setting;
  render();
 },true);
 
