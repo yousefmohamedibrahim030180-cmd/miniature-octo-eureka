@@ -488,7 +488,8 @@ io.on("connection",socket=>{
   const p=[...(io.sockets.adapter.rooms.get(room)||[])].filter(x=>x!==socket.id).map(sid=>{const s=io.sockets.sockets.get(sid);return s?{socketId:sid,user:userPublic(s.user)}:null}).filter(Boolean);
   socket.emit("call:participants",p);socket.to(room).emit("call:participant-joined",{socketId:socket.id,user:userPublic(socket.user),mode})
  });
- socket.on("call:leave",()=>{
+ socket.on("call:screen",({roomId,active=false,to}={})=>{if(!roomId||socket.callRoom!=="v2call:"+roomId||!conversationAccess(roomId,socket.userId))return;const target=io.sockets.sockets.get(String(to));if(target)target.emit("call:screen",{from:socket.id,active:Boolean(active),user:userPublic(socket.user)})});
+  socket.on("call:leave",()=>{
   if(!socket.callRoom)return;socket.leave(socket.callRoom);socket.to(socket.callRoom).emit("call:participant-left",{socketId:socket.id,userId:socket.userId});
   if(socket.callStarted){socket.user.callMinutes+=Math.max(1,Math.round((Date.now()-socket.callStarted)/60000));award(socket.user,10,0)}socket.callRoom=null;socket.callStarted=null;persist()
  });
