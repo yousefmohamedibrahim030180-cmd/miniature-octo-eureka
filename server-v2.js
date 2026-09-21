@@ -176,6 +176,10 @@ function ensureUserDefaults(u){
  u.frame=u.frame||"orbit";u.effect=u.effect||"none";u.nameplate=u.nameplate||"orbit";u.chatTheme=u.chatTheme||"orbit-dark";
  u.preferences=u.preferences||{};
  u.preferences.theme=u.preferences.theme||"void";
+ u.preferences.background=u.preferences.background||"nebula";
+ u.preferences.surface=u.preferences.surface||"glass";
+ u.preferences.radius=u.preferences.radius||"medium";
+ u.preferences.glow=u.preferences.glow||"medium";
  u.preferences.density=u.preferences.density||"comfortable";
  u.preferences.motion=u.preferences.motion!==false;
  u.preferences.accent=u.preferences.accent||"violet";
@@ -312,6 +316,10 @@ app.get("/api/me",auth,(req,res)=>{ensureInventory(req.user);res.json({user:user
 app.patch("/api/me/profile",auth,(req,res)=>{req.user.displayName=cleanName(req.body?.displayName,req.user.username);req.user.bio=String(req.body?.bio||"").trim().slice(0,280);req.user.avatarUrl=avatarField(req.body?.avatarUrl);persist();res.json({user:userPublic(req.user)})});
 app.patch("/api/me/preferences",auth,(req,res)=>{ensureUserDefaults(req.user);const b=req.body||{},p=req.user.preferences;
  if(["void","aurora","ice","midnight"].includes(String(b.theme)))p.theme=String(b.theme);
+ if(["nebula","aurora","cyber","grid","plain"].includes(String(b.background)))p.background=String(b.background);
+ if(["glass","solid","frost"].includes(String(b.surface)))p.surface=String(b.surface);
+ if(["sharp","medium","soft"].includes(String(b.radius)))p.radius=String(b.radius);
+ if(["low","medium","high"].includes(String(b.glow)))p.glow=String(b.glow);
  if(["comfortable","compact"].includes(String(b.density)))p.density=String(b.density);
  if(typeof b.motion==="boolean")p.motion=b.motion;
  if(["violet","cyan","gold","rose"].includes(String(b.accent)))p.accent=String(b.accent);
@@ -324,7 +332,7 @@ app.patch("/api/me/preferences",auth,(req,res)=>{ensureUserDefaults(req.user);co
  for(const k of ["messages","mentions","calls","social","desktop","badges","sound"])if(typeof b.notifications?.[k]==="boolean")p.notifications[k]=b.notifications[k];
  for(const k of ["presence","readReceipts","friendRequests","profileSearch","messageRequests"])if(typeof b.privacy?.[k]==="boolean")p.privacy[k]=b.privacy[k];
  for(const k of ["reducedMotion","highContrast","largeText"])if(typeof b.accessibility?.[k]==="boolean")p.accessibility[k]=b.accessibility[k];
- for(const k of ["echoCancellation","autoGain","noiseSuppression","hdVideo"])if(typeof b.calls?.[k]==="boolean")p.calls[k]=b.calls[k];
+ for(const k of ["echoCancellation","autoGain","noiseSuppression","hdVideo","joinSound"])if(typeof b.calls?.[k]==="boolean")p.calls[k]=b.calls[k];
  for(const k of ["compressUploads","saveDrafts","confirmExternalLinks"])if(typeof b.data?.[k]==="boolean")p.data[k]=b.data[k];
  persist();res.json({user:userPublic(req.user)});
 });
