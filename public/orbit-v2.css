@@ -374,3 +374,17 @@ html[data-orbitContrast="high"]{--line:#ffffff28;--line2:#ffffff42;--muted:#c4ce
 html[data-orbitLargeText="large"] .msg-text{font-size:calc(12px * var(--orbit-font-scale,1))}
 html[data-orbitLargeText="large"] .ctx-item strong,html[data-orbitLargeText="large"] .settings-nav-item span{font-size:10px}
 html[data-orbitNotifications="quiet"] #notifyCount{display:none}
+
+/* ORBIT real settings surfaces */
+.account-fact{min-height:54px;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:#ffffff03;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.account-fact span{font-size:7px;color:var(--muted)}
+.account-fact strong{font-size:8px;color:#fff;text-align:right}
+.account-fact + .account-fact{margin-top:6px}
+.session-list{display:grid;gap:6px}
+.session-row{min-height:58px;border:1px solid var(--line);border-radius:11px;background:#ffffff03;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.session-row strong,.session-row span{display:block}
+.session-row strong{font-size:8px}
+.session-row span{font-size:6px;color:var(--muted);margin-top:3px}
+.session-row b{font-size:6px;color:var(--cyan);letter-spacing:.12em}
+.message-avatar-hidden{visibility:hidden}
+@media(max-width:900px){.account-fact{min-height:50px}.session-row{align-items:flex-start}}
