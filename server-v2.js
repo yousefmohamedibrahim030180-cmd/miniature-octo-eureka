@@ -7,6 +7,7 @@ const jwt=require("jsonwebtoken");
 const {Server}=require("socket.io");
 
 const app=express();
+// ORBIT deploy marker: keep Railway source deploys aligned with main.
 const server=http.createServer(app);
 const io=new Server(server,{transports:["polling"],cors:{origin:true,credentials:true},allowUpgrades:false});
 const PORT=Number(process.env.PORT||8080);
