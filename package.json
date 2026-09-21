@@ -52,7 +52,8 @@
           ]
         }
       ],
-      "executableName": "ORBIT"
+      "executableName": "ORBIT",
+      "icon": "build/icon.svg"
     },
     "nsis": {
       "oneClick": false,
