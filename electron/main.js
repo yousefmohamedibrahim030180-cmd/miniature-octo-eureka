@@ -61,6 +61,16 @@ function createWindow(){
     }
   });
 
+  mainWindow.webContents.on("did-finish-load", async ()=>{ 
+    try{
+      const css=await mainWindow.webContents.insertCSS(require("fs").readFileSync(path.join(__dirname,"desktop.css"),"utf8"));
+      await mainWindow.webContents.executeJavaScript(require("fs").readFileSync(path.join(__dirname,"desktop-ui.js"),"utf8"), true);
+      void css;
+    }catch(e){
+      console.debug("ORBIT desktop customization unavailable",e);
+    }
+  });
+
   mainWindow.webContents.on("did-fail-load",(_event,errorCode,errorDescription)=>{
     if(errorCode !== -3){
       mainWindow.webContents.executeJavaScript(
