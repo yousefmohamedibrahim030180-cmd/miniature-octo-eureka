@@ -111,6 +111,15 @@ function bindPreferenceControls(){
 
 function settings(r){
  const tab=S.settingsTab,p=S.me?.preferences||{};
+ r.onclick=(event)=>{
+  const button=event.target.closest(".settings-nav-item[data-setting]");
+  if(!button||!r.contains(button))return;
+  event.preventDefault();
+  const next=button.dataset.setting;
+  if(!next||next===S.settingsTab)return;
+  S.settingsTab=next;
+  render();
+ };
  const navTabs=[
   ["profile","Profile","Identity & account"],
   ["appearance","Appearance","Theme, color & layout"],
