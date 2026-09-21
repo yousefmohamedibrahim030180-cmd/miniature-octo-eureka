@@ -74,10 +74,13 @@
   }
   var originalNavHandlerInstalled=false;
   document.addEventListener("click",function(e){
-    var b=e.target.closest("[data-view]");if(b){var v=b.dataset.view;if(v==="settings")setTimeout(function(){settingsView()},20);if(v==="communities")setTimeout(function(){serversView()},20)}
-    var t=e.target.closest("[data-control-tab]");if(t){settingsTab=t.dataset.controlTab;setTimeout(function(){settingsView()},0)}
+    var b=e.target.closest("[data-view]");
+    if(b){
+      var v=b.dataset.view;
+      if(v==="communities")setTimeout(function(){serversView()},20);
+    }
   },true);
-  function bootEnh(){if(originalNavHandlerInstalled)return;originalNavHandlerInstalled=true;setTimeout(function(){if(document.querySelector("#app:not(.hidden)")){var active=document.querySelector("#nav [data-view='settings'].active");if(active)settingsView()}},300)}
+  function bootEnh(){if(originalNavHandlerInstalled)return;originalNavHandlerInstalled=true;}
   var observer=new MutationObserver(function(){var b=document.querySelector("#nav [data-view='communities'] .nav-text");if(b&&b.textContent!=="Servers")b.textContent="Servers"});observer.observe(document.documentElement,{subtree:true,childList:true});
   bootEnh();
 })();
