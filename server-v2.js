@@ -30,7 +30,12 @@ function cleanName(v,fallback){return String(v||"").trim().replace(/\s+/g," ").s
 function hash(v){return crypto.createHash("sha256").update(String(v)).digest("hex")}
 function token(){return crypto.randomBytes(48).toString("base64url")}
 function escString(v){return String(v??"").slice(0,4000)}
-function avatarField(v){return String(v||"").slice(0,500)}
+function avatarField(v){
+ const value=String(v||"").trim();
+ if(/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(value))return value.length<=900000?value:"";
+ if(/^https:\/\//i.test(value))return value.slice(0,2000);
+ return "";
+}
 
 function serialize(){
  return {
