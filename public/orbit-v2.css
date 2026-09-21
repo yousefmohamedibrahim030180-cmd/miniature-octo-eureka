@@ -388,3 +388,90 @@ html[data-orbitNotifications="quiet"] #notifyCount{display:none}
 .session-row b{font-size:6px;color:var(--cyan);letter-spacing:.12em}
 .message-avatar-hidden{visibility:hidden}
 @media(max-width:900px){.account-fact{min-height:50px}.session-row{align-items:flex-start}}
+/* ORBIT Customization Center */
+html[data-orbitBackground="nebula"] body{
+  background:
+    radial-gradient(circle at 12% 18%,#725cff18 0,transparent 30%),
+    radial-gradient(circle at 88% 12%,#27d7ff16 0,transparent 30%),
+    radial-gradient(circle at 52% 92%,#7b61ff10 0,transparent 34%),
+    #060811;
+}
+html[data-orbitBackground="aurora"] body{
+  background:
+    radial-gradient(circle at 20% 10%,#5ef3ff24 0,transparent 32%),
+    radial-gradient(circle at 82% 30%,#a76cff1f 0,transparent 36%),
+    radial-gradient(circle at 50% 90%,#35e0be12 0,transparent 34%),
+    #071014;
+}
+html[data-orbitBackground="cyber"] body{
+  background:
+    linear-gradient(#7a63ff08 1px,transparent 1px),
+    linear-gradient(90deg,#31d9ff08 1px,transparent 1px),
+    radial-gradient(circle at 50% 0,#6c5cff16,transparent 44%),
+    #05070d;
+  background-size:28px 28px,28px 28px,100% 100%,auto;
+}
+html[data-orbitBackground="grid"] body{
+  background:
+    linear-gradient(#ffffff05 1px,transparent 1px),
+    linear-gradient(90deg,#ffffff05 1px,transparent 1px),
+    #070910;
+  background-size:36px 36px;
+}
+html[data-orbitBackground="plain"] body{background:#070910}
+
+html[data-orbitSurface="solid"] .card,
+html[data-orbitSurface="solid"] .setting-box,
+html[data-orbitSurface="solid"] .info-card,
+html[data-orbitSurface="solid"] .dm-list,
+html[data-orbitSurface="solid"] .chat-side{
+  background:#0d111a;
+  backdrop-filter:none;
+}
+html[data-orbitSurface="frost"] .card,
+html[data-orbitSurface="frost"] .setting-box,
+html[data-orbitSurface="frost"] .info-card,
+html[data-orbitSurface="frost"] .dm-list,
+html[data-orbitSurface="frost"] .chat-side{
+  background:#ffffff08;
+  backdrop-filter:blur(22px) saturate(145%);
+}
+html[data-orbitSurface="glass"] .card,
+html[data-orbitSurface="glass"] .setting-box,
+html[data-orbitSurface="glass"] .info-card,
+html[data-orbitSurface="glass"] .dm-list,
+html[data-orbitSurface="glass"] .chat-side{
+  backdrop-filter:blur(14px) saturate(125%);
+}
+
+html[data-orbitRadius="sharp"] .card,
+html[data-orbitRadius="sharp"] .setting-box,
+html[data-orbitRadius="sharp"] .info-card,
+html[data-orbitRadius="sharp"] .btn,
+html[data-orbitRadius="sharp"] .input,
+html[data-orbitRadius="sharp"] .textarea,
+html[data-orbitRadius="sharp"] .select{border-radius:7px}
+html[data-orbitRadius="soft"] .card,
+html[data-orbitRadius="soft"] .setting-box,
+html[data-orbitRadius="soft"] .info-card,
+html[data-orbitRadius="soft"] .btn,
+html[data-orbitRadius="soft"] .input,
+html[data-orbitRadius="soft"] .textarea,
+html[data-orbitRadius="soft"] .select{border-radius:18px}
+html[data-orbitRadius="medium"] .card,
+html[data-orbitRadius="medium"] .setting-box,
+html[data-orbitRadius="medium"] .info-card{border-radius:13px}
+
+html[data-orbitGlow="low"]{--orbit-glow-alpha:.08}
+html[data-orbitGlow="medium"]{--orbit-glow-alpha:.16}
+html[data-orbitGlow="high"]{--orbit-glow-alpha:.28}
+html[data-orbitGlow] .brand-mark,
+html[data-orbitGlow] .server-dot.active,
+html[data-orbitGlow] .btn.primary,
+html[data-orbitGlow] .top-action{
+  box-shadow:0 0 26px color-mix(in srgb,var(--cyan) calc(var(--orbit-glow-alpha, .16) * 100%),transparent);
+}
+@media(max-width:700px){
+  [data-orbit-preset]{min-height:42px}
+}
+
