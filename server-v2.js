@@ -329,6 +329,75 @@ app.patch("/api/me/preferences",auth,(req,res)=>{ensureUserDefaults(req.user);co
  persist();res.json({user:userPublic(req.user)});
 });
 
+app.get("/api/me/sessions",auth,(req,res)=>{
+ const current=hash(cookie(req,COOKIE)),rows=[];
+ for(const [sessionHash,session] of memory.sessions.entries()){
+  if(session.userId!==req.user.id)continue;
+  rows.push({
+   id:sessionHash.slice(0,12),
+   createdAt:session.createdAt||null,
+   expiresAt:session.expiresAt||null,
+   current:sessionHash===current,
+   ageHours:session.createdAt?Math.max(0,Math.round((Date.now()-session.createdAt)/3600000)):null
+  });
+ }
+ rows.sort((a,b)=>Number(b.current)-Number(a.current)||(b.createdAt||0)-(a.createdAt||0));
+ res.json({sessions:rows});
+});
+
+app.post("/api/me/sessions/revoke-others",auth,(req,res)=>{
+ const current=hash(cookie(req,COOKIE));let revoked=0;
+ for(const [sessionHash,session] of memory.sessions.entries()){
+  if(session.userId===req.user.id&&sessionHash!==current){memory.sessions.delete(sessionHash);revoked++}
+ }
+ persist();
+ res.json({ok:true,revoked});
+});
+
+app.post("/api/me/password",auth,async(req,res)=>{
+ const current=String(req.body?.currentPassword||""),next=String(req.body?.newPassword||"");
+ if(next.length<8||next.length>72)return res.status(400).json({error:"New password must be 8-72 characters."});
+ if(!current||!(await bcrypt.compare(current,req.user.passwordHash)))return res.status(401).json({error:"Current password is incorrect."});
+ if(current===next)return res.status(400).json({error:"Choose a different password."});
+ req.user.passwordHash=await bcrypt.hash(next,12);
+ const currentHash=hash(cookie(req,COOKIE));let revoked=0;
+ for(const [sessionHash,session] of memory.sessions.entries()){
+  if(session.userId===req.user.id&&sessionHash!==currentHash){memory.sessions.delete(sessionHash);revoked++}
+ }
+ audit(req.user.id,"password_changed",req.user.id,{revokedSessions:revoked});
+ persist();
+ res.json({ok:true,revoked});
+});
+
+app.get("/api/me/export",auth,(req,res)=>{
+ const convIds=new Set();
+ for(const [convId,members] of memory.convMembers.entries())if(members.has(req.user.id))convIds.add(convId);
+ const messages=[];
+ for(const convId of convIds){
+  const list=memory.messages.get(convId)||[];
+  for(const m of list)messages.push(m);
+ }
+ const notifications=[...(memory.notifications.get(req.user.id)||[])];
+ const memberships=[...memory.members.entries()].filter(([,members])=>members.has(req.user.id)).map(([communityId,members])=>{
+  const c=memory.communities.get(communityId);
+  return c?{id:c.id,name:c.name,role:members.get(req.user.id)||"member"}:null;
+ }).filter(Boolean);
+ const payload={
+  exportedAt:now(),
+  account:userPublic(req.user),
+  communities:memberships,
+  messages:messages.slice(-5000),
+  notifications,
+  sessionCount:[...memory.sessions.values()].filter(x=>x.userId===req.user.id).length,
+  note:"Secrets such as passwords, session tokens and internal hashes are never exported."
+ };
+ audit(req.user.id,"data_export",req.user.id,{messageCount:payload.messages.length});
+ persist();
+ res.setHeader("Content-Type","application/json; charset=utf-8");
+ res.setHeader("Content-Disposition","attachment; filename="orbit-data.json"");
+ res.send(JSON.stringify(payload,null,2));
+});
+
 app.get("/api/search",auth,(req,res)=>{
  const q=String(req.query.q||"").trim().toLowerCase();if(!q)return res.json({users:[],communities:[]});
  const users=[...memory.users.values()].filter(u=>u.username.includes(q)||u.displayName.toLowerCase().includes(q)).slice(0,20).map(userPublic);
