@@ -256,6 +256,7 @@ app.get("/",(req,res)=>res.sendFile(path.join(__dirname,"public","orbit-v2.html"
 app.get("/health",(req,res)=>res.json({ok:true,service:"orbit-v2",version:"2.0.0-aaa",persistence: persistMode,users:memory.users.size,communities:memory.communities.size,conversations:memory.conversations.size,time:now()}));
 app.get("/owner",(req,res)=>res.sendFile(path.join(__dirname,"public","owner-v2.html")));
 app.get("/owner-v2",(req,res)=>res.sendFile(path.join(__dirname,"public","owner-v2.html")));
+app.get("/download/orbit.exe",(req,res)=>res.redirect(302,"https://github.com/yousefmohamedibrahim030180-cmd/miniature-octo-eureka/releases/download/orbit-latest/ORBIT-2.0.0-aaa-x64.exe"));
 
 
 app.post("/api/auth/register",async(req,res)=>{
