@@ -40,5 +40,5 @@ document.addEventListener("click",async e=>{
  if(e.target.id==="lockBtn"){sessionStorage.removeItem("orbit_owner_v2_token");ownerToken="";gate("Owner console locked.");return}
  if(e.target.id==="backBtn")return location.href="/";
 });
-$("#gateForm").addEventListener("submit",async e=>{e.preventDefault();$("#gateError").textContent="";try{await unlock($("#ownerKey").value.trim());$("#ownerKey").value=""}catch(x){$("#gateError").textContent=x.message||"Could not unlock"}});$("#backBtn").onclick=()=>location.href="/";$$(".nav-btn").forEach(b=>b.onclick=()=>setView(b.dataset.view));
+$("#backBtn").onclick=()=>location.href="/";$(".nav-btn").forEach(b=>b.onclick=()=>setView(b.dataset.view));
 async function boot(){if(ownerToken){try{return await load()}catch{}}gate("Sign in to ORBIT first, then unlock owner mode.")}boot();
