@@ -394,7 +394,7 @@ app.get("/api/me/export",auth,(req,res)=>{
  audit(req.user.id,"data_export",req.user.id,{messageCount:payload.messages.length});
  persist();
  res.setHeader("Content-Type","application/json; charset=utf-8");
- res.setHeader("Content-Disposition","attachment; filename="orbit-data.json"");
+ res.setHeader("Content-Disposition","attachment; filename=\"orbit-data.json\"");
  res.send(JSON.stringify(payload,null,2));
 });
 
