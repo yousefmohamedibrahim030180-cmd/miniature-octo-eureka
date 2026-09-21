@@ -50,4 +50,8 @@ jobs:
             gh release create orbit-latest --title "ORBIT 2.0.0 AAA" --notes "Official ORBIT Windows x64 desktop release." --latest=false
           }
 
-          gh release upload orbit-latest $asset --clobber
+          $hash = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLower()
+          $checksum = "dist-desktop/ORBIT-2.0.0-aaa-x64.sha256"
+          "$hash  $([System.IO.Path]::GetFileName($asset))" | Out-File -FilePath $checksum -Encoding ascii
+
+          gh release upload orbit-latest $asset $checksum --clobber
