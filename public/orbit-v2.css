@@ -369,3 +369,8 @@ html[data-orbitFontScale="large"]{}
 html[data-orbitTheme] .setting-box{backdrop-filter:blur(10px)}
 @media(max-width:900px){.settings-shell{grid-template-columns:1fr}.settings-nav{position:relative}.pref-grid{grid-template-columns:1fr}.pref-select{width:140px}}
 @media(min-width:1051px){.pref-row{min-height:72px}.pref-copy strong{font-size:9px}.pref-copy span{font-size:7px}.settings-shell{grid-template-columns:265px minmax(0,1fr)}}
+
+html[data-orbitContrast="high"]{--line:#ffffff28;--line2:#ffffff42;--muted:#c4cede;--dim:#9aa8bc}
+html[data-orbitLargeText="large"] .msg-text{font-size:calc(12px * var(--orbit-font-scale,1))}
+html[data-orbitLargeText="large"] .ctx-item strong,html[data-orbitLargeText="large"] .settings-nav-item span{font-size:10px}
+html[data-orbitNotifications="quiet"] #notifyCount{display:none}
