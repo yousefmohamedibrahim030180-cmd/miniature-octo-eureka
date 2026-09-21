@@ -15,6 +15,7 @@ function createWindow(){
     backgroundColor: "#070910",
     show: false,
     title: "ORBIT",
+    icon: path.join(__dirname, "..", "build", "icon.svg"),
     autoHideMenuBar: true,
     titleBarStyle: "hidden",
     titleBarOverlay: {
