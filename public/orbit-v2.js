@@ -54,56 +54,115 @@ async function loadStudio(){const d=await api("/api/studio");S.me=d.user;S.shop=
 function missions(r){r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">MISSIONS</span><h1>Play the daily loop.</h1><p>Simple goals. Real rewards. No confusing progression trees.</p></div></div><div class="stack">'+S.missions.map(m=>{const p=Math.min(m.target,m.progress);return'<article class="mission"><div class="mission-head"><div><h3>'+esc(m.title)+'</h3><p>'+esc(m.description)+'</p></div><span style="font-size:7px;color:var(--gold)">✦ '+m.rewardCoins+' · +'+m.rewardXp+' XP</span></div><div class="bar"><i style="width:'+((p/m.target)*100)+'%"></i></div><div class="actions" style="justify-content:space-between;margin-top:9px"><span class="muted" style="font-size:6px">'+p+' / '+m.target+'</span>'+(m.claimed?'<span style="font-size:7px;color:var(--green)">Claimed</span>':p>=m.target?'<button class="btn gold" data-claim="'+esc(m.id)+'">Claim reward</button>':'<span class="muted" style="font-size:6px">Keep going</span>')+'</div></article>'}).join("")+'</div></div>';$$("[data-claim]").forEach(b=>b.onclick=()=>claimMission(b.dataset.claim))}
 async function claimMission(id){try{const d=await api("/api/missions/"+encodeURIComponent(id)+"/claim",{method:"POST"});S.me=d.user;await loadMissions();updateChrome();toast("Mission complete","+"+d.reward.coins+" Coins · +"+d.reward.xp+" XP")}catch(e){toast("Mission",e.message)}}
 async function loadMissions(){const d=await api("/api/missions");S.missions=d.missions||[]}
-function settings(r){
- const tab=S.settingsTab;
- if(tab==="profile"){
-  r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">SETTINGS</span><h1>Profile</h1><p>Upload your picture, edit your identity and keep your profile current.</p></div></div><div class="settings-grid"><div class="card pad"><div class="avatar-upload-preview"><div id="avatarPreview">'+avatar(S.me,"frame-preview")+'</div><button class="btn primary" type="button" id="uploadAvatarBtn">⬆ Upload picture</button><input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden><span class="muted avatar-upload-note">PNG, JPG, WEBP or GIF · max 5 MB · resized automatically</span></div></div><section class="setting-box"><form id="profileForm" class="form"><label>Display name<input id="sdn" class="input" value="'+esc(S.me.displayName)+'"></label><label>Bio<textarea id="sbio" class="textarea">'+esc(S.me.bio||"")+'</textarea></label><label>Image URL (optional)<input id="savatar" class="input" value="'+esc(S.me.avatarUrl||"")+'" placeholder="https://…"></label><span id="avatarState" class="muted avatar-upload-status">No new picture selected.</span><button class="btn primary">Save profile</button></form></section></div></div>';
-  let uploadedAvatar="";
-  const fileInput=$("#avatarFile");
-  const preview=$("#avatarPreview");
-  const state=$("#avatarState");
-  async function imageToDataUrl(file){
-   if(!file.type.startsWith("image/"))throw new Error("Please choose an image file.");
-   if(file.size>5_000_000)throw new Error("Image must be 5 MB or smaller.");
-   const objectUrl=URL.createObjectURL(file);
-   try{
-    const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error("Could not read that image."));img.src=objectUrl});
-    const max=640,scale=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));
-    const canvas=document.createElement("canvas");
-    canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
-    canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
-    const ctx=canvas.getContext("2d");
-    ctx.drawImage(image,0,0,canvas.width,canvas.height);
-    return canvas.toDataURL("image/webp",0.82);
-   }finally{URL.revokeObjectURL(objectUrl)}
-  }
-  $("#uploadAvatarBtn").onclick=()=>fileInput.click();
-  fileInput.onchange=async()=>{
-   const file=fileInput.files?.[0];
-   if(!file)return;
-   try{
-    uploadedAvatar=await imageToDataUrl(file);
-    preview.innerHTML=avatar({displayName:S.me.displayName,avatarUrl:uploadedAvatar,equipped:S.me.equipped},"frame-preview");
-    state.textContent="Ready to upload: "+(file.name||"image");
-   }catch(err){uploadedAvatar="";state.textContent=err.message;toast("Profile picture",err.message)}
-  };
-  $("#profileForm").onsubmit=async e=>{
-   e.preventDefault();
-   try{
-    const avatarUrl=uploadedAvatar||$("#savatar").value.trim();
-    const d=await api("/api/me/profile",{method:"PATCH",body:JSON.stringify({displayName:$("#sdn").value,bio:$("#sbio").value,avatarUrl})});
-    S.me=d.user;uploadedAvatar="";updateChrome();render();toast("Profile","Profile picture and profile saved.");
-   }catch(err){toast("Profile",err.message)}
-  };
- }else if(tab==="appearance"){
-  r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">SETTINGS</span><h1>Appearance</h1><p>ORBIT keeps advanced controls out of your way.</p></div></div><section class="setting-box"><div class="stack"><div class="card pad"><strong style="font-size:9px">Interface density</strong><p class="muted" style="font-size:7px">Balanced spacing is the default. Compact mode will be added without changing your data.</p></div><div class="card pad"><strong style="font-size:9px">Motion</strong><p class="muted" style="font-size:7px">Animations are subtle by design and can be reduced at the platform level.</p></div></div></section></div>';
- }else if(tab==="session"){
-  r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">SETTINGS</span><h1>Session</h1><p>Your account session is protected by an HttpOnly cookie.</p></div></div><section class="setting-box"><button class="btn danger" id="logoutBtn">Sign out</button></section></div>';
- }else{
-  r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">SETTINGS</span><h1>'+esc(tab)+'</h1><p>Clean controls for a complex platform.</p></div></div><section class="setting-box"><p class="muted" style="font-size:8px">ORBIT will keep these controls lightweight while the platform grows. Core permissions and privacy defaults stay safe.</p></section></div>';
- }
- if($("#logoutBtn"))$("#logoutBtn").onclick=async()=>{await api("/api/auth/logout",{method:"POST"});location.reload()};
+function applyPreferences(){
+ const p=S.me?.preferences||{},root=document.documentElement,body=document.body;
+ root.dataset.orbitTheme=p.theme||"void";
+ root.dataset.orbitAccent=p.accent||"violet";
+ root.dataset.orbitDensity=p.density||"comfortable";
+ root.dataset.orbitMessageDensity=p.messageDensity||"comfortable";
+ root.dataset.orbitSidebar=p.sidebar||"expanded";
+ root.dataset.orbitMotion=p.motion===false?"off":"on";
+ root.dataset.orbitReducedMotion=p.accessibility?.reducedMotion?"on":"off";
+ root.style.setProperty("--orbit-font-scale",(Number(p.fontScale||100)/100).toFixed(2));
+ body.dataset.orbitSidebar=p.sidebar||"expanded";
+ body.dataset.orbitMotion=p.motion===false||p.accessibility?.reducedMotion?"off":"on";
 }
+
+async function savePreferences(patch,label="Settings"){
+ try{
+  const d=await api("/api/me/preferences",{method:"PATCH",body:JSON.stringify(patch)});
+  S.me=d.user;applyPreferences();render();toast(label,"Saved successfully.");
+ }catch(e){toast(label,e.message)}
+}
+
+function settingToggle(id,label,description,key,group="root"){
+ const p=S.me?.preferences||{},value=group==="root"?p[key]!==false:p[group]?.[key]!==false;
+ return '<label class="pref-row" for="'+id+'"><span class="pref-copy"><strong>'+esc(label)+'</strong><span>'+esc(description)+'</span></span><input class="pref-toggle" id="'+id+'" type="checkbox" '+(value?"checked":"")+' data-pref-toggle="1" data-pref-group="'+esc(group)+'" data-pref-key="'+esc(key)+'"><span class="toggle-ui"></span></label>';
+}
+function settingSelect(id,label,description,key,options){
+ const p=S.me?.preferences||{},value=String(p[key]||options[0][0]);
+ return '<label class="pref-row pref-select-row"><span class="pref-copy"><strong>'+esc(label)+'</strong><span>'+esc(description)+'</span></span><select class="select pref-select" id="'+id+'" data-pref-select="'+esc(key)+'">'+options.map(o=>'<option value="'+esc(o[0])+'" '+(o[0]===value?"selected":"")+'>'+esc(o[1])+'</option>').join("")+'</select></label>';
+}
+function prefSection(title,desc,body){
+ return '<section class="setting-box pref-panel"><div class="pref-panel-head"><div><span class="eyebrow">ORBIT SETTINGS</span><h2>'+esc(title)+'</h2><p>'+esc(desc)+'</p></div></div><div class="pref-grid">'+body+'</div></section>';
+}
+function bindPreferenceControls(){
+ $$(".pref-toggle").forEach(el=>el.onchange=async()=>{
+   const group=el.dataset.prefGroup,key=el.dataset.prefKey,patch={};
+   if(group==="root")patch[key]=el.checked;else patch[group]={[key]:el.checked};
+   await savePreferences(patch,"Preferences");
+ });
+ $$(".pref-select").forEach(el=>el.onchange=async()=>{
+   await savePreferences({[el.dataset.prefSelect]:el.value},"Preferences");
+ });
+ $("#resetPrefsBtn")?.addEventListener("click",async()=>{
+   const defaults={theme:"void",density:"comfortable",motion:true,accent:"violet",fontScale:"100",language:"en",timeFormat:"24h",sidebar:"expanded",messageDensity:"comfortable",enterToSend:true,showAvatars:true,showTimestamps:true,autoplayMedia:true,linkPreviews:true,emojiReactions:true,typingIndicators:true,spellcheck:true,sounds:true,
+    notifications:{messages:true,mentions:true,calls:true,social:true,desktop:false,badges:true,sound:true},
+    privacy:{presence:true,readReceipts:true,friendRequests:true,profileSearch:true,messageRequests:true},
+    accessibility:{reducedMotion:false,highContrast:false,largeText:false},
+    calls:{echoCancellation:true,autoGain:true,noiseSuppression:true,hdVideo:true},
+    data:{compressUploads:true,saveDrafts:true,confirmExternalLinks:true}};
+   await savePreferences(defaults,"Reset settings");
+ });
+}
+
+function settings(r){
+ const tab=S.settingsTab,p=S.me?.preferences||{};
+ const navTabs=[
+  ["profile","Profile","Identity & account"],
+  ["appearance","Appearance","Theme, color & layout"],
+  ["notifications","Notifications","Alerts & badges"],
+  ["privacy","Privacy","Presence & discovery"],
+  ["chat","Chat","Messaging behavior"],
+  ["accessibility","Accessibility","Motion & readability"],
+  ["voice","Voice & Video","Call preferences"],
+  ["data","Data & Media","Uploads & storage behavior"],
+  ["language","Language & Region","Language & time format"],
+  ["security","Security","Session controls"]
+ ];
+ const nav='<div class="settings-shell"><aside class="settings-nav"><div class="settings-nav-title">CONTROL CENTER</div>'+navTabs.map(([id,l,d])=>'<button class="settings-nav-item '+(tab===id?"active":"")+'" data-setting="'+id+'"><span>'+esc(l)+'</span><small>'+esc(d)+'</small></button>').join("")+'</aside><div class="settings-content">';
+ const close="</div></div>";
+ if(tab==="profile"){
+  r.innerHTML='<div class="page">'+nav+'<div class="page-head"><div><span class="eyebrow">ACCOUNT</span><h1>Profile</h1><p>Your public identity on ORBIT.</p></div></div><div class="settings-grid"><div class="card pad"><div class="avatar-upload-preview"><div id="avatarPreview">'+avatar(S.me,"frame-preview")+'</div><button class="btn primary" type="button" id="uploadAvatarBtn">⬆ Upload picture</button><input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden><span class="muted avatar-upload-note">PNG, JPG, WEBP or GIF · max 5 MB</span></div></div><section class="setting-box"><form id="profileForm" class="form"><label>Display name<input id="sdn" class="input" value="'+esc(S.me.displayName)+'"></label><label>Bio<textarea id="sbio" class="textarea">'+esc(S.me.bio||"")+'</textarea></label><label>Image URL (optional)<input id="savatar" class="input" value="'+esc(S.me.avatarUrl||"")+'" placeholder="https://…"></label><span id="avatarState" class="muted avatar-upload-status">No new picture selected.</span><button class="btn primary">Save profile</button></form></section></div>'+close+'</div>';
+  let uploadedAvatar="";const fileInput=$("#avatarFile"),preview=$("#avatarPreview"),state=$("#avatarState");
+  async function imageToDataUrl(file){if(!file.type.startsWith("image/"))throw new Error("Please choose an image file.");if(file.size>5_000_000)throw new Error("Image must be 5 MB or smaller.");const objectUrl=URL.createObjectURL(file);try{const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error("Could not read that image."));img.src=objectUrl});const max=640,scale=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));canvas.getContext("2d").drawImage(image,0,0,canvas.width,canvas.height);return canvas.toDataURL("image/webp",.82)}finally{URL.revokeObjectURL(objectUrl)}}
+  $("#uploadAvatarBtn").onclick=()=>fileInput.click();
+  fileInput.onchange=async()=>{const file=fileInput.files?.[0];if(!file)return;try{uploadedAvatar=await imageToDataUrl(file);preview.innerHTML=avatar({displayName:S.me.displayName,avatarUrl:uploadedAvatar,equipped:S.me.equipped},"frame-preview");state.textContent="Ready to upload: "+(file.name||"image")}catch(err){uploadedAvatar="";state.textContent=err.message;toast("Profile picture",err.message)}};
+  $("#profileForm").onsubmit=async e=>{e.preventDefault();try{const avatarUrl=uploadedAvatar||$("#savatar").value.trim();const d=await api("/api/me/profile",{method:"PATCH",body:JSON.stringify({displayName:$("#sdn").value,bio:$("#sbio").value,avatarUrl})});S.me=d.user;uploadedAvatar="";updateChrome();render();toast("Profile","Profile saved.")}catch(err){toast("Profile",err.message)}};return;
+ }
+ if(tab==="appearance"){
+  r.innerHTML='<div class="page">'+nav+ '<div class="page-head"><div><span class="eyebrow">EXPERIENCE</span><h1>Appearance</h1><p>Change the way ORBIT looks and how much space it uses.</p></div></div>'+
+   prefSection("Visual system","All changes are stored on your account.",settingSelect("prefTheme","Theme","Choose the base atmosphere.","theme",[["void","Void"],["aurora","Aurora"],["ice","Ice"],["midnight","Midnight"]])+settingSelect("prefAccent","Accent","Choose the interface highlight.","accent",[["violet","Violet"],["cyan","Cyan"],["gold","Gold"],["rose","Rose"]])+settingSelect("prefDensity","Interface density","Overall component spacing.","density",[["comfortable","Comfortable"],["compact","Compact"]])+settingSelect("prefMessageDensity","Message density","Control vertical space in conversations.","messageDensity",[["comfortable","Comfortable"],["compact","Compact"],["spacious","Spacious"]])+settingSelect("prefSidebar","Sidebar mode","Choose how much navigation stays visible.","sidebar",[["expanded","Expanded"],["compact","Compact"],["minimal","Minimal"]])+settingSelect("prefFont","Text scale","Increase readable UI text.","fontScale",[["90","90%"],["100","100%"],["110","110%"],["125","125%"]])+settingToggle("prefMotion","Interface motion","Enable animated interface transitions.","motion"))+
+   '<section class="setting-box pref-panel"><div class="pref-actions"><button class="btn" id="resetPrefsBtn">Reset all preferences</button></div></section>'+close+'</div>';
+  bindPreferenceControls();return;
+ }
+ if(tab==="notifications"){
+  r.innerHTML='<div class="page">'+nav+'<div class="page-head"><div><span class="eyebrow">SIGNALS</span><h1>Notifications</h1><p>Control exactly which ORBIT events reach you.</p></div></div>'+prefSection("Notification routing","Each toggle is independent.",settingToggle("nMessages","Direct messages","New private messages.","messages","notifications")+settingToggle("nMentions","Mentions","When someone mentions you.","mentions","notifications")+settingToggle("nCalls","Calls","Incoming voice and video calls.","calls","notifications")+settingToggle("nSocial","Social activity","Friend requests and social events.","social","notifications")+settingToggle("nDesktop","Desktop notifications","Allow browser notification prompts when supported.","desktop","notifications")+settingToggle("nBadges","Unread badges","Show unread counters in ORBIT.","badges","notifications")+settingToggle("nSound","Notification sound","Play an alert sound for notifications.","sound","notifications"))+close+'</div>';bindPreferenceControls();return;
+ }
+ if(tab==="privacy"){
+  r.innerHTML='<div class="page">'+nav+'<div class="page-head"><div><span class="eyebrow">CONTROL</span><h1>Privacy</h1><p>Decide what other people can see and how they can contact you.</p></div></div>'+prefSection("Visibility & discovery","These controls are account-level preferences.",settingToggle("pPresence","Show online presence","Let people see when you are online.","presence","privacy")+settingToggle("pRead","Read receipts","Show when you have read a message.","readReceipts","privacy")+settingToggle("pFriends","Friend requests","Allow other users to send friend requests.","friendRequests","privacy")+settingToggle("pSearch","Profile discovery","Allow your profile to appear in search results.","profileSearch","privacy")+settingToggle("pRequests","Message requests","Allow people outside your contacts to start conversations.","messageRequests","privacy"))+close+'</div>';bindPreferenceControls();return;
+ }
+ if(tab==="chat"){
+  r.innerHTML='<div class="page">'+nav+'<div class="page-head"><div><span class="eyebrow">MESSAGING</span><h1>Chat</h1><p>Fine-tune how conversations feel and behave.</p></div></div>'+prefSection("Conversation behavior","These preferences apply across your ORBIT chats.",settingToggle("cEnter","Enter sends","Press Enter to send instead of creating a new line.","enterToSend")+settingToggle("cAvatars","Show avatars","Display profile images beside messages.","showAvatars")+settingToggle("cTimes","Show timestamps","Display message time next to sender names.","showTimestamps")+settingToggle("cAuto","Autoplay media","Automatically start supported media when visible.","autoplayMedia")+settingToggle("cLinks","Link previews","Allow rich previews for shared links.","linkPreviews")+settingToggle("cEmoji","Emoji reactions","Show quick emoji reaction controls.","emojiReactions")+settingToggle("cTyping","Typing indicators","Let people see when you are typing.","typingIndicators")+settingToggle("cSpell","Spellcheck","Enable browser spellcheck in message inputs.","spellcheck")+settingToggle("cSounds","Chat sounds","Play subtle sounds for relevant chat actions.","sounds"))+close+'</div>';bindPreferenceControls();return;
+ }
+ if(tab==="accessibility"){
+  r.innerHTML='<div class="page">'+nav+'<div class="page-head"><div><span class="eyebrow">ACCESS</span><h1>Accessibility</h1><p>Make ORBIT easier to read and more comfortable to use.</p></div></div>'+prefSection("Comfort & readability","These controls are persisted with your account.",settingToggle("aMotion","Reduce motion","Reduce animated transitions and moving effects.","reducedMotion","accessibility")+settingToggle("aContrast","High contrast","Increase contrast for secondary UI elements.","highContrast","accessibility")+settingToggle("aLarge","Large text","Increase readability where supported.","largeText","accessibility"))+close+'</div>';bindPreferenceControls();return;
+ }
+ if(tab==="voice"){
+  r.innerHTML='<div class="page">'+nav+'<div class="page-head"><div><span class="eyebrow">REALTIME</span><h1>Voice & Video</h1><p>Choose the processing features used when available in your browser.</p></div></div>'+prefSection("Call processing","These values are stored as your preferred call configuration.",settingToggle("vEcho","Echo cancellation","Reduce speaker-to-microphone feedback.","echoCancellation","calls")+settingToggle("vGain","Automatic gain","Keep microphone volume consistent.","autoGain","calls")+settingToggle("vNoise","Noise suppression","Reduce steady background noise.","noiseSuppression","calls")+settingToggle("vHd","HD video","Prefer higher video quality when bandwidth allows.","hdVideo","calls"))+'<section class="setting-box pref-panel"><div class="pref-note"><strong>Browser permissions</strong><span>Camera and microphone permissions are still controlled by your browser and operating system.</span></div></section>'+close+'</div>';bindPreferenceControls();return;
+ }
+ if(tab==="data"){
+  r.innerHTML='<div class="page">'+nav+'<div class="page-head"><div><span class="eyebrow">STORAGE</span><h1>Data & Media</h1><p>Control uploads, drafts, and external-content behavior.</p></div></div>'+prefSection("Media behavior","These choices affect how ORBIT handles future content.",settingToggle("dCompress","Compress uploads","Reduce image upload size before sending when supported.","compressUploads","data")+settingToggle("dDrafts","Save message drafts","Keep unsent message drafts on this device.","saveDrafts","data")+settingToggle("dLinks","Confirm external links","Show a confirmation before leaving ORBIT for an external site.","confirmExternalLinks","data"))+'<section class="setting-box pref-panel"><div class="pref-note"><strong>Storage</strong><span>Chat history is stored by ORBIT on the server. These preferences do not delete your conversations.</span></div></section>'+close+'</div>';bindPreferenceControls();return;
+ }
+ if(tab==="language"){
+  r.innerHTML='<div class="page">'+nav+'<div class="page-head"><div><span class="eyebrow">REGION</span><h1>Language & Region</h1><p>Choose your preferred interface language and time format.</p></div></div>'+prefSection("Regional format","Your choice is saved to your account.",settingSelect("lang","Interface language","Current language selection.","language",[["en","English"],["ar","العربية"]])+settingSelect("timeFmt","Time format","Used by supported timestamps.","timeFormat",[["24h","24-hour"],["12h","12-hour"]]))+close+'</div>';bindPreferenceControls();return;
+ }
+ if(tab==="security"){
+  r.innerHTML='<div class="page">'+nav+'<div class="page-head"><div><span class="eyebrow">ACCOUNT SECURITY</span><h1>Security</h1><p>Manage your current authenticated session.</p></div></div><section class="setting-box pref-panel"><div class="security-card"><div><strong>Current session</strong><span>Signed in as @'+esc(S.me.username)+' · HttpOnly session cookie</span></div><button class="btn danger" id="logoutBtn">Sign out</button></div></section><section class="setting-box pref-panel"><div class="pref-note"><strong>Browser permissions</strong><span>Camera, microphone, notifications, and location permissions are managed by your browser. ORBIT does not pretend to override those controls.</span></div></section>'+close+'</div>';
+  $("#logoutBtn").onclick=async()=>{try{await api("/api/auth/logout",{method:"POST"})}finally{location.reload()}};return;
+ }
+}
+
 function calls(r){r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">CALLS</span><h1>Voice and video, built in.</h1><p>Private realtime calls with screen sharing and identity-aware presence.</p></div></div><section class="card pad"><div class="grid g2"><div><span class="eyebrow">READY</span><h2 style="font:600 20px Space Grotesk">Open a conversation and press Voice or Video.</h2><p class="muted" style="font-size:8px;line-height:1.7">The same communication surface can become a full call stage without sending you to another product.</p></div><div class="card pad"><span class="eyebrow">FEATURES</span><p class="muted" style="font-size:8px;line-height:1.8">Microphone · Camera · Screen share · Presence · Multi-participant stage</p></div></div></section></div>'}
 async function newDm(){openModal("New conversation",'<form id="newDmForm" class="form"><label>Username<input id="newDmUser" class="input" placeholder="@username" required></label><button class="btn primary">Open conversation</button></form>');$("#newDmForm").onsubmit=async e=>{e.preventDefault();try{const d=await api("/api/dms",{method:"POST",body:JSON.stringify({username:$("#newDmUser").value})});closeModal();await loadDms();await openDm(d.dmId)}catch(x){toast("Conversation",x.message)}}}
 async function newCommunity(){openModal("Create community",'<form id="newComForm" class="form"><label>Name<input id="comName" class="input" required></label><label>Description<input id="comDesc" class="input"></label><button class="btn primary">Create community</button></form>');$("#newComForm").onsubmit=async e=>{e.preventDefault();try{const d=await api("/api/communities",{method:"POST",body:JSON.stringify({name:$("#comName").value,description:$("#comDesc").value})});closeModal();await loadCommunities();await openCommunity(d.community.id);toast("Community created","Join code: "+d.joinCode)}catch(x){toast("Community",x.message)}}}
