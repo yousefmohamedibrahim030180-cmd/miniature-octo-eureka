@@ -445,6 +445,7 @@ app.post("/api/conversations/:id/messages",auth,(req,res)=>{
  const list=memory.messages.get(req.params.id)||[];list.push(m);memory.messages.set(req.params.id,list.slice(-500));req.user.messages++;award(req.user,10,0);persist();io.to("conversation:"+req.params.id).emit("message:new",m);res.status(201).json({message:m})
 });
 
+app.get("/api/presence",auth,(req,res)=>{const users=[...memory.users.values()].filter(u=>u.status==="online"&&!u.suspended).slice(0,200).map(userPublic);res.json({users,time:now()})});
 app.get("/api/notifications",auth,(req,res)=>res.json({notifications:memory.notifications.get(req.user.id)||[]}));
 app.post("/api/notifications/read",auth,(req,res)=>{for(const n of memory.notifications.get(req.user.id)||[])n.read=true;persist();res.json({ok:true})});
 app.get("/api/friends",auth,(req,res)=>{const friends=[...memory.friends].filter(k=>k.startsWith(req.user.id+":")).map(k=>userPublic(memory.users.get(k.split(":")[1]))).filter(Boolean);res.json({friends})});
@@ -467,7 +468,7 @@ io.use((socket,next)=>{
  if(!u)return next(new Error("Unauthorized"));socket.userId=u.id;socket.user=u;u.status="online";ensureInventory(u);next();persist()
 });
 io.on("connection",socket=>{
- socket.join("user:"+socket.userId);socket.emit("session:ready",{user:userPublic(socket.user)});
+ socket.join("user:"+socket.userId);socket.emit("session:ready",{user:userPublic(socket.user)});io.emit("presence:update",{status:"online",user:userPublic(socket.user)});
  socket.on("conversation:join",cid=>{if(conversationAccess(cid,socket.userId))socket.join("conversation:"+cid)});
  socket.on("typing",({conversationId,isTyping}={})=>{if(conversationAccess(conversationId,socket.userId))socket.to("conversation:"+conversationId).emit("typing",{conversationId,userId:socket.userId,isTyping:Boolean(isTyping)})});
  socket.on("message:send",({conversationId,content,replyToId,metadata}={},ack)=>{
@@ -493,7 +494,7 @@ io.on("connection",socket=>{
  socket.on("rtc:offer",d=>{const s=io.sockets.sockets.get(d?.to);if(s)s.emit("rtc:offer",{from:socket.id,offer:d.offer,fromUser:userPublic(socket.user)})});
  socket.on("rtc:answer",d=>{const s=io.sockets.sockets.get(d?.to);if(s)s.emit("rtc:answer",{from:socket.id,answer:d.answer})});
  socket.on("rtc:ice",d=>{const s=io.sockets.sockets.get(d?.to);if(s)s.emit("rtc:ice",{from:socket.id,candidate:d.candidate})});
- socket.on("disconnect",()=>{socket.user.status="offline";if(socket.callRoom){socket.to(socket.callRoom).emit("call:participant-left",{socketId:socket.id,userId:socket.userId})}persist()})
+ socket.on("disconnect",()=>{socket.user.status="offline";if(socket.callRoom){socket.to(socket.callRoom).emit("call:participant-left",{socketId:socket.id,userId:socket.userId})}io.emit("presence:update",{status:"offline",user:userPublic(socket.user)});persist()})
 });
 
 async function start(){
