@@ -174,9 +174,30 @@ function auth(req,res,next){
 }
 function ensureUserDefaults(u){
  u.frame=u.frame||"orbit";u.effect=u.effect||"none";u.nameplate=u.nameplate||"orbit";u.chatTheme=u.chatTheme||"orbit-dark";
- u.preferences=u.preferences||{};u.preferences.theme=u.preferences.theme||"void";u.preferences.density=u.preferences.density||"comfortable";u.preferences.motion=u.preferences.motion!==false;u.preferences.accent=u.preferences.accent||"violet";
- u.preferences.notifications=u.preferences.notifications||{messages:true,mentions:true,calls:true,social:true};
- u.preferences.privacy=u.preferences.privacy||{presence:true,readReceipts:true,friendRequests:true};
+ u.preferences=u.preferences||{};
+ u.preferences.theme=u.preferences.theme||"void";
+ u.preferences.density=u.preferences.density||"comfortable";
+ u.preferences.motion=u.preferences.motion!==false;
+ u.preferences.accent=u.preferences.accent||"violet";
+ u.preferences.fontScale=u.preferences.fontScale||"100";
+ u.preferences.language=u.preferences.language||"en";
+ u.preferences.timeFormat=u.preferences.timeFormat||"24h";
+ u.preferences.sidebar=u.preferences.sidebar||"expanded";
+ u.preferences.messageDensity=u.preferences.messageDensity||"comfortable";
+ u.preferences.enterToSend=u.preferences.enterToSend!==false;
+ u.preferences.showAvatars=u.preferences.showAvatars!==false;
+ u.preferences.showTimestamps=u.preferences.showTimestamps!==false;
+ u.preferences.autoplayMedia=u.preferences.autoplayMedia!==false;
+ u.preferences.linkPreviews=u.preferences.linkPreviews!==false;
+ u.preferences.emojiReactions=u.preferences.emojiReactions!==false;
+ u.preferences.typingIndicators=u.preferences.typingIndicators!==false;
+ u.preferences.spellcheck=u.preferences.spellcheck!==false;
+ u.preferences.sounds=u.preferences.sounds!==false;
+ u.preferences.notifications=u.preferences.notifications||{messages:true,mentions:true,calls:true,social:true,desktop:false,badges:true,sound:true};
+ u.preferences.privacy=u.preferences.privacy||{presence:true,readReceipts:true,friendRequests:true,profileSearch:true,messageRequests:true};
+ u.preferences.accessibility=u.preferences.accessibility||{reducedMotion:false,highContrast:false,largeText:false};
+ u.preferences.calls=u.preferences.calls||{echoCancellation:true,autoGain:true,noiseSuppression:true,hdVideo:true};
+ u.preferences.data=u.preferences.data||{compressUploads:true,saveDrafts:true,confirmExternalLinks:true};
  u.xp=Number(u.xp||0);u.level=Math.max(1,Number(u.level||1));u.coins=Number(u.coins||250);
  u.messages=Number(u.messages||0);u.callMinutes=Number(u.callMinutes||0);u.friends=Number(u.friends||0);
  u.communitiesCreated=Number(u.communitiesCreated||0);u.communitiesJoined=Number(u.communitiesJoined||0);
@@ -289,7 +310,24 @@ app.post("/api/auth/login",async(req,res)=>{
 app.post("/api/auth/logout",auth,(req,res)=>{const t=cookie(req,COOKIE);memory.sessions.delete(hash(t));clearCookie(res);persist();res.json({ok:true})});
 app.get("/api/me",auth,(req,res)=>{ensureInventory(req.user);res.json({user:userPublic(req.user),dailyCheckIn:daily(req.user)})});
 app.patch("/api/me/profile",auth,(req,res)=>{req.user.displayName=cleanName(req.body?.displayName,req.user.username);req.user.bio=String(req.body?.bio||"").trim().slice(0,280);req.user.avatarUrl=avatarField(req.body?.avatarUrl);persist();res.json({user:userPublic(req.user)})});
-app.patch("/api/me/preferences",auth,(req,res)=>{ensureUserDefaults(req.user);const b=req.body||{};if(["void","aurora","ice","midnight"].includes(String(b.theme)))req.user.preferences.theme=String(b.theme);if(["comfortable","compact"].includes(String(b.density)))req.user.preferences.density=String(b.density);if(typeof b.motion==="boolean")req.user.preferences.motion=b.motion;if(["violet","cyan","gold","rose"].includes(String(b.accent)))req.user.preferences.accent=String(b.accent);for(const k of ["messages","mentions","calls","social"])if(typeof b.notifications?.[k]==="boolean")req.user.preferences.notifications[k]=b.notifications[k];for(const k of ["presence","readReceipts","friendRequests"])if(typeof b.privacy?.[k]==="boolean")req.user.preferences.privacy[k]=b.privacy[k];persist();res.json({user:userPublic(req.user)})});
+app.patch("/api/me/preferences",auth,(req,res)=>{ensureUserDefaults(req.user);const b=req.body||{},p=req.user.preferences;
+ if(["void","aurora","ice","midnight"].includes(String(b.theme)))p.theme=String(b.theme);
+ if(["comfortable","compact"].includes(String(b.density)))p.density=String(b.density);
+ if(typeof b.motion==="boolean")p.motion=b.motion;
+ if(["violet","cyan","gold","rose"].includes(String(b.accent)))p.accent=String(b.accent);
+ if(["90","100","110","125"].includes(String(b.fontScale)))p.fontScale=String(b.fontScale);
+ if(["en","ar"].includes(String(b.language)))p.language=String(b.language);
+ if(["12h","24h"].includes(String(b.timeFormat)))p.timeFormat=String(b.timeFormat);
+ if(["expanded","compact","minimal"].includes(String(b.sidebar)))p.sidebar=String(b.sidebar);
+ if(["comfortable","compact","spacious"].includes(String(b.messageDensity)))p.messageDensity=String(b.messageDensity);
+ for(const k of ["enterToSend","showAvatars","showTimestamps","autoplayMedia","linkPreviews","emojiReactions","typingIndicators","spellcheck","sounds"])if(typeof b[k]==="boolean")p[k]=b[k];
+ for(const k of ["messages","mentions","calls","social","desktop","badges","sound"])if(typeof b.notifications?.[k]==="boolean")p.notifications[k]=b.notifications[k];
+ for(const k of ["presence","readReceipts","friendRequests","profileSearch","messageRequests"])if(typeof b.privacy?.[k]==="boolean")p.privacy[k]=b.privacy[k];
+ for(const k of ["reducedMotion","highContrast","largeText"])if(typeof b.accessibility?.[k]==="boolean")p.accessibility[k]=b.accessibility[k];
+ for(const k of ["echoCancellation","autoGain","noiseSuppression","hdVideo"])if(typeof b.calls?.[k]==="boolean")p.calls[k]=b.calls[k];
+ for(const k of ["compressUploads","saveDrafts","confirmExternalLinks"])if(typeof b.data?.[k]==="boolean")p.data[k]=b.data[k];
+ persist();res.json({user:userPublic(req.user)});
+});
 
 app.get("/api/search",auth,(req,res)=>{
  const q=String(req.query.q||"").trim().toLowerCase();if(!q)return res.json({users:[],communities:[]});
