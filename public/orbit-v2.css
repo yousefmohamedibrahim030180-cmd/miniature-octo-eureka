@@ -46,3 +46,7 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:rad
 .server-dot.join{border-color:#ffffff10;color:#7bdcff;background:#52dfff08}
 @media(max-width:1050px){.app{grid-template-columns:78px 68px 0 minmax(0,1fr)}.server-dock{padding:10px 7px}.server-dot{width:44px;height:44px;min-height:44px;border-radius:14px}.server-dock-head{display:none}}
 @media(max-width:700px){.app{grid-template-columns:60px 58px 0 minmax(0,1fr)}.server-dot{width:40px;height:40px;min-height:40px;font-size:12px}}
+
+
+/* ORBIT profile image upload */
+.avatar-upload-preview{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:16px}.avatar-upload-preview #avatarPreview{min-height:96px;display:grid;place-items:center}.avatar-upload-note{font-size:7px;line-height:1.6;max-width:220px}.avatar-upload-status{font-size:7px;display:block;min-height:16px}
