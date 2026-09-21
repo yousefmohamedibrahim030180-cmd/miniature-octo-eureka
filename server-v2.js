@@ -312,9 +312,49 @@ app.post("/api/communities/join",auth,(req,res)=>{
  const code=String(req.body?.code||"").trim().toUpperCase(),c=[...memory.communities.values()].find(x=>x.joinCode===code);if(!c)return res.status(404).json({error:"Community code not found."});
  const m=memory.members.get(c.id)||new Map();const was=m.has(req.user.id);if(!was){m.set(req.user.id,"member");req.user.communitiesJoined++;award(req.user,75,0);memory.members.set(c.id,m);persist()}res.json({community:c})
 });
+function communityRole(communityId,userId){return (memory.members.get(communityId)||new Map()).get(userId)||null}
+function canManageCommunity(communityId,userId){const r=communityRole(communityId,userId);return r==="owner"||r==="admin"}
+function communityPayload(c,userId){const members=memory.members.get(c.id)||new Map();return {...c,role:members.get(userId)||"member",memberCount:members.size}}
 app.get("/api/communities/:id/channels",auth,(req,res)=>{
  if(!communityMember(req.params.id,req.user.id))return res.status(403).json({error:"Not a member."});
  res.json({channels:[...memory.channels.values()].filter(c=>c.communityId===req.params.id)})
+});
+app.get("/api/communities/:id/overview",auth,(req,res)=>{
+ const c=memory.communities.get(req.params.id);if(!c)return res.status(404).json({error:"Community not found."});if(!communityMember(c.id,req.user.id))return res.status(403).json({error:"Not a member."});
+ const members=memory.members.get(c.id)||new Map();
+ res.json({community:communityPayload(c,req.user.id),channels:[...memory.channels.values()].filter(x=>x.communityId===c.id),members:[...members].map(([uid,role])=>({user:userPublic(memory.users.get(uid)),role})).filter(x=>x.user),canManage:canManageCommunity(c.id,req.user.id)});
+});
+app.patch("/api/communities/:id",auth,(req,res)=>{
+ const c=memory.communities.get(req.params.id);if(!c)return res.status(404).json({error:"Community not found."});
+ if(c.ownerId!==req.user.id)return res.status(403).json({error:"Only the owner can change server settings."});
+ if(req.body?.name!==undefined)c.name=cleanName(req.body.name,c.name);if(req.body?.description!==undefined)c.description=String(req.body.description||"").slice(0,300);if(req.body?.iconUrl!==undefined)c.iconUrl=avatarField(req.body.iconUrl);if(req.body?.accent!==undefined&&["violet","cyan","gold","rose"].includes(String(req.body.accent)))c.accent=String(req.body.accent);if(req.body?.verificationLevel!==undefined&&["standard","verified","strict"].includes(String(req.body.verificationLevel)))c.verificationLevel=String(req.body.verificationLevel);persist();res.json({community:communityPayload(c,req.user.id)});
+});
+app.post("/api/communities/:id/invite/regenerate",auth,(req,res)=>{
+ const c=memory.communities.get(req.params.id);if(!c)return res.status(404).json({error:"Community not found."});if(c.ownerId!==req.user.id)return res.status(403).json({error:"Only the owner can regenerate the invite."});
+ c.joinCode="ORB-"+crypto.randomBytes(4).toString("hex").toUpperCase();persist();res.json({joinCode:c.joinCode});
+});
+app.post("/api/communities/:id/channels",auth,(req,res)=>{
+ const c=memory.communities.get(req.params.id);if(!c)return res.status(404).json({error:"Community not found."});if(!canManageCommunity(c.id,req.user.id))return res.status(403).json({error:"You do not have permission."});
+ const name=String(req.body?.name||"general").trim().replace(/s+/g,"-").slice(0,32);if(!name)return res.status(400).json({error:"Channel name is required."});
+ const conv={id:id("conv"),kind:"channel",createdAt:now()};memory.conversations.set(conv.id,conv);memory.convMembers.set(conv.id,new Set());
+ const ch={id:id("ch"),communityId:c.id,name,type:req.body?.type==="voice"?"voice":"text",topic:String(req.body?.topic||"").slice(0,160),conversationId:conv.id,createdAt:now()};memory.channels.set(ch.id,ch);persist();res.status(201).json({channel:ch});
+});
+app.patch("/api/communities/:id/channels/:channelId",auth,(req,res)=>{
+ const ch=memory.channels.get(req.params.channelId);if(!ch||ch.communityId!==req.params.id)return res.status(404).json({error:"Channel not found."});if(!canManageCommunity(ch.communityId,req.user.id))return res.status(403).json({error:"You do not have permission."});
+ if(req.body?.name!==undefined)ch.name=String(req.body.name||"channel").trim().replace(/s+/g,"-").slice(0,32);if(req.body?.topic!==undefined)ch.topic=String(req.body.topic||"").slice(0,160);persist();res.json({channel:ch});
+});
+app.delete("/api/communities/:id/channels/:channelId",auth,(req,res)=>{
+ const ch=memory.channels.get(req.params.channelId);if(!ch||ch.communityId!==req.params.id)return res.status(404).json({error:"Channel not found."});if(!canManageCommunity(ch.communityId,req.user.id))return res.status(403).json({error:"You do not have permission."});
+ const count=[...memory.channels.values()].filter(x=>x.communityId===ch.communityId).length;if(count<=1)return res.status(400).json({error:"A server must keep at least one channel."});memory.channels.delete(ch.id);memory.conversations.delete(ch.conversationId);memory.convMembers.delete(ch.conversationId);memory.messages.delete(ch.conversationId);persist();res.json({ok:true});
+});
+app.patch("/api/communities/:id/members/:userId",auth,(req,res)=>{
+ const c=memory.communities.get(req.params.id);if(!c)return res.status(404).json({error:"Community not found."});if(c.ownerId!==req.user.id)return res.status(403).json({error:"Only the owner can change roles."});
+ const role=String(req.body?.role||"member");if(!["member","mod","admin"].includes(role))return res.status(400).json({error:"Invalid role."});if(req.params.userId===c.ownerId)return res.status(400).json({error:"The owner role cannot be changed."});
+ const m=memory.members.get(c.id)||new Map();if(!m.has(req.params.userId))return res.status(404).json({error:"Member not found."});m.set(req.params.userId,role);memory.members.set(c.id,m);persist();res.json({ok:true,role});
+});
+app.delete("/api/communities/:id/members/:userId",auth,(req,res)=>{
+ const c=memory.communities.get(req.params.id);if(!c)return res.status(404).json({error:"Community not found."});if(!canManageCommunity(c.id,req.user.id))return res.status(403).json({error:"You do not have permission."});if(req.params.userId===c.ownerId)return res.status(400).json({error:"The owner cannot be removed."});
+ const m=memory.members.get(c.id)||new Map();if(!m.has(req.params.userId))return res.status(404).json({error:"Member not found."});m.delete(req.params.userId);memory.members.set(c.id,m);persist();res.json({ok:true});
 });
 
 app.get("/api/dms",auth,(req,res)=>{
