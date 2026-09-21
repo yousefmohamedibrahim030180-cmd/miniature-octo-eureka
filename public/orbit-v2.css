@@ -50,3 +50,30 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:rad
 
 /* ORBIT profile image upload */
 .avatar-upload-preview{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:16px}.avatar-upload-preview #avatarPreview{min-height:96px;display:grid;place-items:center}.avatar-upload-note{font-size:7px;line-height:1.6;max-width:220px}.avatar-upload-status{font-size:7px;display:block;min-height:16px}
+
+
+/* ORBIT readability scale — larger desktop UI */
+@media(min-width:1051px){
+  .app{grid-template-columns:248px 88px 318px minmax(0,1fr)}
+  .rail{padding:20px 14px}
+  .brand{gap:11px;padding:3px 9px 20px}.brand-mark{width:43px;height:43px;border-radius:14px;font-size:24px}.brand strong{font-size:17px}.brand small{font-size:7px}
+  .rail-search{height:43px;padding:0 12px}.rail-search span:nth-child(2){font-size:10px}.rail-search kbd{font-size:8px}
+  .rail-label{font-size:8px;padding:20px 10px 8px}#nav{gap:4px}#nav button{height:45px;padding:0 12px;gap:11px}.nav-text{font-size:10px}
+  .mini-wallet{padding:10px;gap:10px;margin-bottom:10px}.mini-wallet strong{font-size:13px}.mini-wallet small{font-size:7px}.rail-profile{padding:9px;gap:9px}.profile-copy strong{font-size:9px}.profile-copy small{font-size:7px}
+  .topbar{height:70px;min-height:70px;padding:0 21px}.crumb{gap:9px}.crumb span{font-size:8px}.crumb strong{font-size:15px}.top-actions{gap:6px}.top-action,.top-icon,.online{height:36px}.top-action{padding:0 12px;font-size:9px}.top-icon{width:36px}.online{padding:0 11px;font-size:8px}
+  .page{padding:24px 27px 32px}.page-head{gap:16px;margin-bottom:18px}.page-head h1{font-size:31px}.page-head p{font-size:10px}.eyebrow{font-size:7px}
+  .btn{height:39px;padding:0 13px;border-radius:10px;font-size:9px}.grid{gap:14px}.card{border-radius:16px}.pad{padding:18px}.hero{padding:27px;min-height:250px}.hero h1{font-size:40px}.hero p{font-size:12px}.metric{font-size:30px}
+  .ctx-head{height:70px;min-height:70px;padding:17px}.ctx-head small{font-size:7px}.ctx-head strong{font-size:16px}.ctx-body{height:calc(100dvh - 70px);padding:13px}.ctx-section{margin-bottom:16px}.ctx-title{padding:4px 5px 9px}.ctx-title span{font-size:7px}.ctx-item{height:41px;gap:9px;padding:0 10px}.ctx-item strong{font-size:9px}.ctx-item span{font-size:7px}.ctx-input{height:39px;padding:0 11px;font-size:9px}
+  .avatar{width:36px;height:36px;min-width:36px;border-radius:12px;font-size:11px}.frame-preview{width:106px;height:106px;font-size:28px}
+  .chat-head{height:72px;min-height:72px;padding:0 18px;gap:10px}.chat-head-main strong{font-size:11px}.chat-head-main span{font-size:7px}.chat-action{height:34px;padding:0 10px;font-size:8px}.messages{padding:20px 25px}.msg{gap:10px;padding:8px 0}.msg-head strong{font-size:9px}.msg-head time{font-size:7px}.msg-text{font-size:11px}.msg-attachment{max-width:440px}.composer-wrap{padding:0 18px 18px}.composer{padding:8px;border-radius:14px}.composer input{font-size:10px}.tool,.send{height:37px}.send{padding:0 14px;font-size:9px}
+  .chat-side{padding:17px}.info-card{padding:15px;margin-bottom:10px}.info-card h3{font-size:13px}.info-card p{font-size:8px}.media-cell{height:66px;font-size:8px}
+  .dm-shell{grid-template-columns:292px minmax(0,1fr)}.dm-search{padding:14px}.dm-item{padding:10px 12px}.dm-copy strong{font-size:9px}.dm-copy span{font-size:7px}
+  .studio{grid-template-columns:340px minmax(0,1fr);gap:16px}.preview-card{padding:20px;min-height:410px}.profile-preview .name{font-size:14px}.profile-preview .handle{font-size:8px}.tab{height:34px;padding:0 10px;font-size:8px}.shop-grid{gap:10px}.shop-item{padding:12px}.shop-item strong{font-size:9px}.shop-item span{font-size:7px}
+  .settings-grid{grid-template-columns:245px 1fr}.setting-box{padding:17px}.form{gap:10px}.form label{font-size:8px}.input,.textarea,.select{font-size:9px}.input,.select{height:38px}.textarea{height:110px}
+  .modal-bg{padding:22px}.modal{border-radius:19px}.modal-head{padding:16px 18px}.modal-head strong{font-size:14px}.modal-body{padding:18px}.icon-btn{width:34px;height:34px}
+}
+@media(min-width:701px) and (max-width:1050px){
+  .app{grid-template-columns:88px 76px 0 minmax(0,1fr)}
+  .server-dot{width:48px;height:48px;min-height:48px}
+  .page{padding:20px 22px 28px}.page-head h1{font-size:30px}.hero h1{font-size:36px}.btn{height:38px;font-size:9px}.msg-text{font-size:11px}.avatar{width:35px;height:35px;min-width:35px}
+}
