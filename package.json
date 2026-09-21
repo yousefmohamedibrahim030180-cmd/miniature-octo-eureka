@@ -8,15 +8,14 @@
     "start": "node server-v2.js",
     "dev": "node server-v2.js",
     "desktop": "electron .",
-    "desktop:dist": "electron-builder --win nsis portable --publish never"
+    "desktop:dist": "electron-builder --win nsis portable --publish never",
+    "build": "node --check server-v2.js && node --check public/orbit-v2.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.16.3",
-    "socket.io": "^4.8.1",
-    "@huggingface/transformers": "^3.8.1"
+    "socket.io": "^4.8.1"
   },
   "engines": {
     "node": ">=22.0.0 <23.0.0"
