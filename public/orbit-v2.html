@@ -44,7 +44,13 @@
     <button class="call-window-btn" id="callClose" title="Close">×</button>
    </div>
   </header>
-  <div class="call-stage" id="callStage"></div>
+  <div class="call-body">
+   <div class="call-stage" id="callStage"></div>
+   <aside class="call-participants" id="callParticipants">
+    <div class="call-participants-head"><div><span class="eyebrow">LIVE PEOPLE</span><strong id="callParticipantCount">0 Participants</strong></div></div>
+    <div class="call-participant-list" id="callParticipantList"></div>
+   </aside>
+  </div>
   <div class="call-controls">
    <div class="call-left">
     <button id="micBtn" class="call-control" title="Microphone">🎙</button>
