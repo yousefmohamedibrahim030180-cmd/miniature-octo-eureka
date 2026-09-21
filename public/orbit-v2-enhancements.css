@@ -1,0 +1,18 @@
+
+.server-glyph,.server-avatar{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:0 0 auto;background:linear-gradient(135deg,rgba(124,92,255,.28),rgba(72,210,255,.18));border:1px solid rgba(255,255,255,.1);overflow:hidden;font:700 16px "Space Grotesk";color:#fff}
+.server-glyph img,.server-avatar img{width:100%;height:100%;object-fit:cover}
+.server-avatar{width:58px;height:58px;border-radius:18px;font-size:22px}
+.server-card{min-height:190px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);color:var(--muted);font-size:7px}
+.control-row{display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid var(--line)}
+.control-row:last-child{border-bottom:0}
+.control-row>div:first-child:not(.grow){min-width:42px}
+.control-row strong,.control-row span{display:block}
+.control-row strong{font-size:9px}
+.control-row span{font-size:7px;color:var(--muted);margin-top:3px}
+.control-switch{width:44px;height:24px;border:0;border-radius:999px;background:rgba(255,255,255,.1);padding:3px;cursor:pointer;flex:0 0 auto}
+.control-switch i{display:block;width:18px;height:18px;border-radius:50%;background:#8992a3;transition:.18s}
+.control-switch.on{background:linear-gradient(90deg,#7c5cff,#43d7ff)}
+.control-switch.on i{transform:translateX(20px);background:white}
+.member-mini{display:flex;align-items:center;gap:9px;flex:1}
+.control-row .member-mini .server-avatar{width:32px;height:32px;border-radius:10px;font-size:12px}
