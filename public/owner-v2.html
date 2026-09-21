@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ORBIT — Owner Command</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/owner-v2.css?v=20260921-1">
+</head>
+<body>
+<div id="gate" class="gate">
+  <div class="gate-orbit one"></div><div class="gate-orbit two"></div>
+  <div class="gate-card">
+    <div class="brand"><span>◈</span><div><strong>ORBIT</strong><small>OWNER COMMAND</small></div></div>
+    <div class="gate-kicker">PLATFORM CONTROL · PRIVATE</div>
+    <h1>Command the whole Orbit.</h1>
+    <p>Platform-wide visibility and owner-only actions. Every destructive action is protected and audit logged.</p>
+    <form id="gateForm">
+      <label class="field"><span>OWNER KEY</span><input id="ownerKey" type="password" autocomplete="off" placeholder="Enter owner key" required></label>
+      <div id="gateError" class="gate-error"></div>
+      <button class="primary-btn" type="submit">Unlock command center <span>↗</span></button>
+    </form>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+  <header class="topbar">
+    <div class="brand mini"><span>◈</span><div><strong>ORBIT</strong><small>OWNER COMMAND</small></div></div>
+    <div class="top-status"><span class="pulse"></span><span id="statusText">LIVE</span></div>
+    <div class="top-actions">
+      <button id="refreshBtn" class="ghost-btn">↻ Refresh</button>
+      <button id="backBtn" class="ghost-btn">Back to Orbit</button>
+      <button id="lockBtn" class="danger-ghost">Lock</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="side-label">CONTROL</div>
+      <button class="nav-btn active" data-view="overview"><span>⌂</span><div><b>Overview</b><small>Platform pulse</small></div></button>
+      <button class="nav-btn" data-view="users"><span>◉</span><div><b>Users</b><small>Accounts & access</small></div></button>
+      <button class="nav-btn" data-view="economy"><span>✦</span><div><b>Economy</b><small>Coins & cosmetics</small></div></button>
+      <button class="nav-btn" data-view="servers"><span>◎</span><div><b>Servers</b><small>Communities</small></div></button>
+      <button class="nav-btn" data-view="content"><span>◈</span><div><b>Content</b><small>Messages & cleanup</small></div></button>
+      <button class="nav-btn" data-view="live"><span>◌</span><div><b>Live</b><small>Calls & sessions</small></div></button>
+      <button class="nav-btn" data-view="audit"><span>⌁</span><div><b>Audit</b><small>Owner activity</small></div></button>
+      <div class="side-bottom">
+        <div class="security-card"><span>OWNER MODE</span><strong>Full platform access</strong><small>8h owner session · actions logged</small></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section id="view-overview" class="view active"></section>
+      <section id="view-users" class="view"></section>
+      <section id="view-economy" class="view"></section>
+      <section id="view-servers" class="view"></section>
+      <section id="view-content" class="view"></section>
+      <section id="view-live" class="view"></section>
+      <section id="view-audit" class="view"></section>
+    </main>
+  </div>
+</div>
+
+<div id="drawer" class="drawer hidden"><div class="drawer-bg" data-close-drawer></div><aside class="drawer-panel">
+  <header class="drawer-head"><div><span class="eyebrow">ACCOUNT COMMAND</span><h2 id="drawerTitle">User</h2><small id="drawerMeta"></small></div><button class="icon-btn" data-close-drawer>×</button></header>
+  <div id="drawerBody" class="drawer-body"></div>
+</aside></div>
+<div id="toast"></div>
+<script src="/owner-v2.js?v=20260921-1"></script>
+</body>
+</html>
