@@ -9,7 +9,7 @@
     "dev": "node server-v2.js",
     "desktop": "electron .",
     "desktop:dist": "electron-builder --win nsis portable --publish never",
-    "build": "node --check server-v2.js && node --check public/orbit-v2.js"
+    "build": "node --check server-v2.js && node --check public/orbit-v2.js && node --check electron/main.js && node --check electron/desktop-ui.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
