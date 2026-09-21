@@ -76,11 +76,24 @@ function applyPreferences(){
  body.dataset.orbitMotion=p.motion===false||p.accessibility?.reducedMotion?"off":"on";
 }
 
+function mergePreferencePatch(target,patch){
+ const out={...target,...patch};
+ for(const group of ["notifications","privacy","accessibility","calls","data"]){
+  if(patch[group])out[group]={...(target[group]||{}),...patch[group]};
+ }
+ return out;
+}
 async function savePreferences(patch,label="Settings"){
+ const before=S.me?.preferences||{};
+ const optimistic=mergePreferencePatch(before,patch);
+ if(S.me){S.me.preferences=optimistic;applyPreferences();render()}
  try{
   const d=await api("/api/me/preferences",{method:"PATCH",body:JSON.stringify(patch)});
   S.me=d.user;applyPreferences();render();toast(label,"Saved successfully.");
- }catch(e){toast(label,e.message)}
+ }catch(e){
+  if(S.me){S.me.preferences=before;applyPreferences();render()}
+  toast(label,e.message)
+ }
 }
 
 function settingToggle(id,label,description,key,group="root"){
