@@ -231,3 +231,81 @@ body.omx-active .main{background:radial-gradient(circle at 48% 0,#9b6dff12,trans
 @media(max-width:1050px){.app.messages-mode{grid-template-columns:78px minmax(0,1fr)}.omx-root{grid-template-columns:255px minmax(0,1fr)}.omx-profile{display:none}.omx-empty-main{grid-column:1 / 3}.omx-msg{max-width:780px}}
 @media(max-width:720px){.omx-root{grid-template-columns:1fr}.omx-direct{display:none}.omx-chat{grid-template-columns:1fr}.omx-empty-main{grid-column:1}.omx-chat-head{padding:0 13px}.omx-message-scroll{padding:16px 12px}.omx-composer{padding:8px 10px 10px}}
 @media(prefers-reduced-motion:reduce){.omx-orbit-logo i,.omx-spinner{animation:none}}
+
+
+/* ORBIT CHAT WIDTH TUNE — 2026-09-21 */
+@media (min-width: 1051px){
+  .app{
+    grid-template-columns: 230px 78px 252px minmax(0,1fr);
+  }
+
+  .surface{
+    min-width:0;
+  }
+
+  .dm-shell{
+    grid-template-columns: 238px minmax(0,1fr);
+  }
+
+  .chat{
+    grid-template-columns:minmax(0,1fr) 220px;
+  }
+
+  .messages{
+    padding:20px 28px;
+  }
+
+  .chat-head{
+    padding:0 20px;
+  }
+
+  .composer-wrap{
+    padding:0 20px 20px;
+  }
+
+  .chat-side{
+    padding:15px;
+  }
+
+  .msg{
+    max-width:920px;
+  }
+}
+
+@media (min-width: 1450px){
+  .app{
+    grid-template-columns: 238px 82px 258px minmax(0,1fr);
+  }
+
+  .dm-shell{
+    grid-template-columns:250px minmax(0,1fr);
+  }
+
+  .chat{
+    grid-template-columns:minmax(0,1fr) 236px;
+  }
+}
+
+@media (max-width: 1050px){
+  .dm-shell{
+    grid-template-columns:minmax(210px,26vw) minmax(0,1fr);
+  }
+
+  .chat{
+    grid-template-columns:minmax(0,1fr) 210px;
+  }
+}
+
+@media (max-width: 850px){
+  .dm-shell{
+    grid-template-columns:220px minmax(0,1fr);
+  }
+
+  .chat{
+    grid-template-columns:minmax(0,1fr);
+  }
+
+  .chat-side{
+    display:none;
+  }
+}
