@@ -77,3 +77,26 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:rad
   .server-dot{width:48px;height:48px;min-height:48px}
   .page{padding:20px 22px 28px}.page-head h1{font-size:30px}.hero h1{font-size:36px}.btn{height:38px;font-size:9px}.msg-text{font-size:11px}.avatar{width:35px;height:35px;min-width:35px}
 }
+
+#notifyCount{position:absolute;top:-4px;right:-4px;min-width:15px;height:15px;padding:0 4px;border-radius:99px;display:grid;place-items:center;background:var(--purple);color:#fff;font:700 7px/1 Arial,sans-serif;border:2px solid #0a1019;box-sizing:border-box}
+#notifyBtn{position:relative}
+#notifyCount:empty{display:none}
+.notif-list{display:flex;flex-direction:column;gap:1px;max-height:58vh;overflow:auto}
+.notif-row{width:100%;display:flex;gap:9px;align-items:flex-start;text-align:left;border:1px solid transparent;border-radius:10px;background:#ffffff03;color:inherit;padding:11px 10px;cursor:pointer}
+.notif-row:hover{background:#ffffff08;border-color:var(--line)}
+.notif-row.read{opacity:.7}
+.notif-dot{width:7px;height:7px;min-width:7px;border-radius:50%;margin-top:5px;background:var(--cyan)}
+.notif-row.read .notif-dot{opacity:.2}
+.notif-copy{min-width:0;display:flex;flex-direction:column;gap:3px}
+.notif-copy strong{font-size:8px}
+.notif-copy span{font-size:7px;color:var(--muted);line-height:1.45}
+.notif-copy time{font-size:6px;color:var(--dim)}
+.search-section{display:flex;flex-direction:column;gap:5px;margin-top:12px}
+.search-result{width:100%;display:flex;align-items:center;gap:9px;text-align:left;border:1px solid var(--line);background:#ffffff03;color:inherit;border-radius:11px;padding:10px;cursor:pointer}
+.search-result:hover{background:#ffffff08;border-color:var(--line2)}
+.search-result>span:not(.search-glyph){flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.search-result strong{font-size:8px}
+.search-result small{font-size:6px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-result b{font-size:6px;color:var(--cyan);font-weight:600}
+.search-glyph{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;border:1px solid var(--line);background:#ffffff05}
+.search-loading{padding:14px;text-align:center;font-size:7px}
