@@ -1,7 +1,7 @@
 (()=>{"use strict";
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const S={me:null,view:"home",communities:[],activeCommunity:null,channels:[],dms:[],activeDm:null,activeConversation:null,messages:[],socket:null,shop:[],missions:[],studioTab:"frames",settingsTab:"profile",pendingCall:null,call:null};
-const NAV=[["home","⌂","Home"],["messages","◈","Messages"],["communities","◎","Communities"],["calls","◉","Calls"],["missions","✦","Missions"],["studio","◇","ORBIT Studio"],["settings","⚙","Settings"]];
+const NAV=[["home","⌂","Home"],["messages","◈","Messages"],["communities","◎","Servers"],["calls","◉","Calls"],["missions","✦","Missions"],["studio","◇","ORBIT Studio"],["settings","⚙","Settings"]];
 const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const letter=u=>String(u?.displayName||u?.username||"O").slice(0,1).toUpperCase();
 function avatar(u={},size=""){const e=u.equipped||{};return '<span class="avatar '+size+' frame-'+esc(e.frame||"orbit")+' effect-'+esc(e.effect||"none")+'">'+(u.avatarUrl?'<img src="'+esc(u.avatarUrl)+'" alt="">':esc(letter(u)))+'</span>'}
