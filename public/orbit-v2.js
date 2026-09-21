@@ -63,6 +63,9 @@ function applyPreferences(){
  root.dataset.orbitSidebar=p.sidebar||"expanded";
  root.dataset.orbitMotion=p.motion===false?"off":"on";
  root.dataset.orbitReducedMotion=p.accessibility?.reducedMotion?"on":"off";
+ root.dataset.orbitContrast=p.accessibility?.highContrast?"high":"normal";
+ root.dataset.orbitLargeText=p.accessibility?.largeText?"large":"normal";
+ root.dataset.orbitNotifications=p.notifications?.badges===false?"quiet":"visible";
  root.style.setProperty("--orbit-font-scale",(Number(p.fontScale||100)/100).toFixed(2));
  body.dataset.orbitSidebar=p.sidebar||"expanded";
  body.dataset.orbitMotion=p.motion===false||p.accessibility?.reducedMotion?"off":"on";
