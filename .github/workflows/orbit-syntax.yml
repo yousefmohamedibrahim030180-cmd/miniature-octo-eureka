@@ -1,0 +1,24 @@
+name: ORBIT Syntax Guard
+
+on:
+  push:
+    paths:
+      - "public/orbit-v2.js"
+      - "server-v2.js"
+      - ".github/workflows/orbit-syntax.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check frontend JavaScript
+        run: node --check public/orbit-v2.js
+      - name: Check backend JavaScript
+        run: node --check server-v2.js
