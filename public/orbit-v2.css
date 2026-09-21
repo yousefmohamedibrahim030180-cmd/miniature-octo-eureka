@@ -128,3 +128,5 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:rad
   .avatar.frame-plasma,.avatar.frame-hologram,.avatar.frame-quasar,.avatar.frame-singularity{animation:none}
   .avatar.frame-plasma::before,.avatar.frame-plasma::after,.avatar.frame-hologram::before,.avatar.frame-hologram::after,.avatar.frame-quantum::before,.avatar.frame-quantum::after,.avatar.frame-quasar::before,.avatar.frame-quasar::after,.avatar.frame-singularity::before,.avatar.frame-singularity::after{animation:none}
 }
+
+.shop-item .sample.avatar{width:80px;height:80px;min-width:80px;border-radius:22px;font-size:20px;position:relative;overflow:visible}
