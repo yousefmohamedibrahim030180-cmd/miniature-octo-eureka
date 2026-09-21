@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, shell, Menu, ipcMain } = require("electron");
+const { app, BrowserWindow, session, shell, Menu, ipcMain, desktopCapturer } = require("electron");
 const path = require("path");
 
 const ORBIT_URL = process.env.ORBIT_DESKTOP_URL || "https://miniature-octo-eureka-production.up.railway.app/";
@@ -89,6 +89,13 @@ app.whenReady().then(()=>{
     const allowed = new Set(["media","notifications","clipboard-read","clipboard-sanitized-write"]);
     callback(allowed.has(permission));
   });
+
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    desktopCapturer.getSources({ types: ["screen", "window"] }).then((sources) => {
+      if (!sources.length) return callback(null);
+      callback({ video: sources[0] });
+    }).catch(() => callback(null));
+  }, { useSystemPicker: true });
 
   Menu.setApplicationMenu(null);
   createWindow();
