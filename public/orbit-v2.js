@@ -132,8 +132,8 @@ function settings(r){
   ["language","Language & Region","Language & time format"],
   ["security","Security","Session controls"]
  ];
- const nav='<div class="settings-shell"><aside class="settings-nav"><div class="settings-nav-title">CONTROL CENTER</div>'+navTabs.map(([id,l,d])=>'<button class="settings-nav-item '+(tab===id?"active":"")+'" data-setting="'+id+'"><span>'+esc(l)+'</span><small>'+esc(d)+'</small></button>').join("")+'</aside><div class="settings-content">';
- const close="</div></div>";
+ const nav='<div class="settings-content">';
+ const close="</div>";
  if(tab==="profile"){
   r.innerHTML='<div class="page">'+nav+'<div class="page-head"><div><span class="eyebrow">ACCOUNT</span><h1>Profile</h1><p>Your public identity on ORBIT.</p></div></div><div class="settings-grid"><div class="card pad"><div class="avatar-upload-preview"><div id="avatarPreview">'+avatar(S.me,"frame-preview")+'</div><button class="btn primary" type="button" id="uploadAvatarBtn">⬆ Upload picture</button><input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden><span class="muted avatar-upload-note">PNG, JPG, WEBP or GIF · max 5 MB</span></div></div><section class="setting-box"><form id="profileForm" class="form"><label>Display name<input id="sdn" class="input" value="'+esc(S.me.displayName)+'"></label><label>Bio<textarea id="sbio" class="textarea">'+esc(S.me.bio||"")+'</textarea></label><label>Image URL (optional)<input id="savatar" class="input" value="'+esc(S.me.avatarUrl||"")+'" placeholder="https://…"></label><span id="avatarState" class="muted avatar-upload-status">No new picture selected.</span><button class="btn primary">Save profile</button></form></section></div>'+close+'</div>';
   let uploadedAvatar="";const fileInput=$("#avatarFile"),preview=$("#avatarPreview"),state=$("#avatarState");
