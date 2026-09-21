@@ -1,0 +1,53 @@
+name: Build ORBIT Windows Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+      - electron/**
+      - build/**
+      - .github/workflows/build-orbit-windows.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build ORBIT Windows installer
+        run: npx electron-builder --win nsis --publish never
+
+      - name: Publish latest ORBIT EXE
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $asset = "dist-desktop/ORBIT-2.0.0-aaa-x64.exe"
+          if (!(Test-Path $asset)) {
+            Write-Error "Expected installer not found: $asset"
+            exit 1
+          }
+
+          gh release view orbit-latest 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create orbit-latest --title "ORBIT 2.0.0 AAA" --notes "Official ORBIT Windows x64 desktop release." --latest=false
+          }
+
+          gh release upload orbit-latest $asset --clobber
