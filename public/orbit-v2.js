@@ -51,7 +51,56 @@ async function loadStudio(){const d=await api("/api/studio");S.me=d.user;S.shop=
 function missions(r){r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">MISSIONS</span><h1>Play the daily loop.</h1><p>Simple goals. Real rewards. No confusing progression trees.</p></div></div><div class="stack">'+S.missions.map(m=>{const p=Math.min(m.target,m.progress);return'<article class="mission"><div class="mission-head"><div><h3>'+esc(m.title)+'</h3><p>'+esc(m.description)+'</p></div><span style="font-size:7px;color:var(--gold)">✦ '+m.rewardCoins+' · +'+m.rewardXp+' XP</span></div><div class="bar"><i style="width:'+((p/m.target)*100)+'%"></i></div><div class="actions" style="justify-content:space-between;margin-top:9px"><span class="muted" style="font-size:6px">'+p+' / '+m.target+'</span>'+(m.claimed?'<span style="font-size:7px;color:var(--green)">Claimed</span>':p>=m.target?'<button class="btn gold" data-claim="'+esc(m.id)+'">Claim reward</button>':'<span class="muted" style="font-size:6px">Keep going</span>')+'</div></article>'}).join("")+'</div></div>';$$("[data-claim]").forEach(b=>b.onclick=()=>claimMission(b.dataset.claim))}
 async function claimMission(id){try{const d=await api("/api/missions/"+encodeURIComponent(id)+"/claim",{method:"POST"});S.me=d.user;await loadMissions();updateChrome();toast("Mission complete","+"+d.reward.coins+" Coins · +"+d.reward.xp+" XP")}catch(e){toast("Mission",e.message)}}
 async function loadMissions(){const d=await api("/api/missions");S.missions=d.missions||[]}
-function settings(r){const tab=S.settingsTab;if(tab==="profile")r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">SETTINGS</span><h1>Profile</h1><p>Only the controls you actually need.</p></div></div><div class="settings-grid"><div class="card pad"><div style="display:grid;place-items:center;padding:18px">'+avatar(S.me,"frame-preview")+'</div></div><section class="setting-box"><form id="profileForm" class="form"><label>Display name<input id="sdn" class="input" value="'+esc(S.me.displayName)+'"></label><label>Bio<textarea id="sbio" class="textarea">'+esc(S.me.bio||"")+'</textarea></label><label>Avatar image URL<input id="savatar" class="input" value="'+esc(S.me.avatarUrl||"")+'"></label><button class="btn primary">Save profile</button></form></section></div></div>';else if(tab==="appearance")r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">SETTINGS</span><h1>Appearance</h1><p>ORBIT keeps advanced controls out of your way.</p></div></div><section class="setting-box"><div class="stack"><div class="card pad"><strong style="font-size:9px">Interface density</strong><p class="muted" style="font-size:7px">Balanced spacing is the default. Compact mode will be added without changing your data.</p></div><div class="card pad"><strong style="font-size:9px">Motion</strong><p class="muted" style="font-size:7px">Animations are subtle by design and can be reduced at the platform level.</p></div></div></section></div>';else if(tab==="session")r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">SETTINGS</span><h1>Session</h1><p>Your account session is protected by an HttpOnly cookie.</p></div></div><section class="setting-box"><button class="btn danger" id="logoutBtn">Sign out</button></section></div>';else r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">SETTINGS</span><h1>'+esc(tab)+'</h1><p>Clean controls for a complex platform.</p></div></div><section class="setting-box"><p class="muted" style="font-size:8px">ORBIT will keep these controls lightweight while the platform grows. Core permissions and privacy defaults stay safe.</p></section></div>';if($("#profileForm"))$("#profileForm").onsubmit=async e=>{e.preventDefault();const d=await api("/api/me/profile",{method:"PATCH",body:JSON.stringify({displayName:$("#sdn").value,bio:$("#sbio").value,avatarUrl:$("#savatar").value})});S.me=d.user;updateChrome();render();toast("Profile","Saved.")};if($("#logoutBtn"))$("#logoutBtn").onclick=async()=>{await api("/api/auth/logout",{method:"POST"});location.reload()}}
+function settings(r){
+ const tab=S.settingsTab;
+ if(tab==="profile"){
+  r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">SETTINGS</span><h1>Profile</h1><p>Upload your picture, edit your identity and keep your profile current.</p></div></div><div class="settings-grid"><div class="card pad"><div class="avatar-upload-preview"><div id="avatarPreview">'+avatar(S.me,"frame-preview")+'</div><button class="btn primary" type="button" id="uploadAvatarBtn">⬆ Upload picture</button><input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden><span class="muted avatar-upload-note">PNG, JPG, WEBP or GIF · max 5 MB · resized automatically</span></div></div><section class="setting-box"><form id="profileForm" class="form"><label>Display name<input id="sdn" class="input" value="'+esc(S.me.displayName)+'"></label><label>Bio<textarea id="sbio" class="textarea">'+esc(S.me.bio||"")+'</textarea></label><label>Image URL (optional)<input id="savatar" class="input" value="'+esc(S.me.avatarUrl||"")+'" placeholder="https://…"></label><span id="avatarState" class="muted avatar-upload-status">No new picture selected.</span><button class="btn primary">Save profile</button></form></section></div></div>';
+  let uploadedAvatar="";
+  const fileInput=$("#avatarFile");
+  const preview=$("#avatarPreview");
+  const state=$("#avatarState");
+  async function imageToDataUrl(file){
+   if(!file.type.startsWith("image/"))throw new Error("Please choose an image file.");
+   if(file.size>5_000_000)throw new Error("Image must be 5 MB or smaller.");
+   const objectUrl=URL.createObjectURL(file);
+   try{
+    const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error("Could not read that image."));img.src=objectUrl});
+    const max=640,scale=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));
+    const canvas=document.createElement("canvas");
+    canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+    canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+    const ctx=canvas.getContext("2d");
+    ctx.drawImage(image,0,0,canvas.width,canvas.height);
+    return canvas.toDataURL("image/webp",0.82);
+   }finally{URL.revokeObjectURL(objectUrl)}
+  }
+  $("#uploadAvatarBtn").onclick=()=>fileInput.click();
+  fileInput.onchange=async()=>{
+   const file=fileInput.files?.[0];
+   if(!file)return;
+   try{
+    uploadedAvatar=await imageToDataUrl(file);
+    preview.innerHTML=avatar({displayName:S.me.displayName,avatarUrl:uploadedAvatar,equipped:S.me.equipped},"frame-preview");
+    state.textContent="Ready to upload: "+(file.name||"image");
+   }catch(err){uploadedAvatar="";state.textContent=err.message;toast("Profile picture",err.message)}
+  };
+  $("#profileForm").onsubmit=async e=>{
+   e.preventDefault();
+   try{
+    const avatarUrl=uploadedAvatar||$("#savatar").value.trim();
+    const d=await api("/api/me/profile",{method:"PATCH",body:JSON.stringify({displayName:$("#sdn").value,bio:$("#sbio").value,avatarUrl})});
+    S.me=d.user;uploadedAvatar="";updateChrome();render();toast("Profile","Profile picture and profile saved.");
+   }catch(err){toast("Profile",err.message)}
+  };
+ }else if(tab==="appearance"){
+  r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">SETTINGS</span><h1>Appearance</h1><p>ORBIT keeps advanced controls out of your way.</p></div></div><section class="setting-box"><div class="stack"><div class="card pad"><strong style="font-size:9px">Interface density</strong><p class="muted" style="font-size:7px">Balanced spacing is the default. Compact mode will be added without changing your data.</p></div><div class="card pad"><strong style="font-size:9px">Motion</strong><p class="muted" style="font-size:7px">Animations are subtle by design and can be reduced at the platform level.</p></div></div></section></div>';
+ }else if(tab==="session"){
+  r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">SETTINGS</span><h1>Session</h1><p>Your account session is protected by an HttpOnly cookie.</p></div></div><section class="setting-box"><button class="btn danger" id="logoutBtn">Sign out</button></section></div>';
+ }else{
+  r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">SETTINGS</span><h1>'+esc(tab)+'</h1><p>Clean controls for a complex platform.</p></div></div><section class="setting-box"><p class="muted" style="font-size:8px">ORBIT will keep these controls lightweight while the platform grows. Core permissions and privacy defaults stay safe.</p></section></div>';
+ }
+ if($("#logoutBtn"))$("#logoutBtn").onclick=async()=>{await api("/api/auth/logout",{method:"POST"});location.reload()};
+}
 function calls(r){r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">CALLS</span><h1>Voice and video, built in.</h1><p>Private realtime calls with screen sharing and identity-aware presence.</p></div></div><section class="card pad"><div class="grid g2"><div><span class="eyebrow">READY</span><h2 style="font:600 20px Space Grotesk">Open a conversation and press Voice or Video.</h2><p class="muted" style="font-size:8px;line-height:1.7">The same communication surface can become a full call stage without sending you to another product.</p></div><div class="card pad"><span class="eyebrow">FEATURES</span><p class="muted" style="font-size:8px;line-height:1.8">Microphone · Camera · Screen share · Presence · Multi-participant stage</p></div></div></section></div>'}
 async function newDm(){openModal("New conversation",'<form id="newDmForm" class="form"><label>Username<input id="newDmUser" class="input" placeholder="@username" required></label><button class="btn primary">Open conversation</button></form>');$("#newDmForm").onsubmit=async e=>{e.preventDefault();try{const d=await api("/api/dms",{method:"POST",body:JSON.stringify({username:$("#newDmUser").value})});closeModal();await loadDms();await openDm(d.dmId)}catch(x){toast("Conversation",x.message)}}}
 async function newCommunity(){openModal("Create community",'<form id="newComForm" class="form"><label>Name<input id="comName" class="input" required></label><label>Description<input id="comDesc" class="input"></label><button class="btn primary">Create community</button></form>');$("#newComForm").onsubmit=async e=>{e.preventDefault();try{const d=await api("/api/communities",{method:"POST",body:JSON.stringify({name:$("#comName").value,description:$("#comDesc").value})});closeModal();await loadCommunities();await openCommunity(d.community.id);toast("Community created","Join code: "+d.joinCode)}catch(x){toast("Community",x.message)}}}
