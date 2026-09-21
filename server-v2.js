@@ -237,9 +237,14 @@ function conversationAccess(conversationId,userId){
  return Boolean(channel&&communityMember(channel.communityId,userId));
 }
 function conversationUsers(conversationId){return [...(memory.convMembers.get(conversationId)||new Set())]}
-function messageRows(conversationId){
- return (memory.messages.get(conversationId)||[]).map(m=>({...m,sender:userPublic(memory.users.get(m.senderId))}));
-}
+function conversationState(c){c.lastMessage=c.lastMessage&&typeof c.lastMessage==="object"?c.lastMessage:null;c.updatedAt=c.updatedAt||c.createdAt||now();c.unread=c.unread&&typeof c.unread==="object"?c.unread:{};return c;}
+function messagePreview(m){if(!m)return null;const raw=String(m.content||"").trim();const preview=m.deleted_at?"Message deleted":raw||((m.metadata?.attachment?.kind==="image")?"Photo":"Attachment");return {id:m.id,senderId:m.senderId,content:preview.slice(0,180),created_at:m.created_at,deleted_at:m.deleted_at||null};}
+function appendConversationMessage(conversationId,m){const c=conversationState(memory.conversations.get(conversationId)||{id:conversationId});memory.conversations.set(conversationId,c);c.lastMessage=messagePreview(m);c.updatedAt=m.created_at;const members=memory.convMembers.get(conversationId)||new Set();for(const uid of members)if(String(uid)!==String(m.senderId))c.unread[String(uid)]=Number(c.unread[String(uid)]||0)+1;}
+function markConversationRead(conversationId,userId){const c=memory.conversations.get(conversationId);if(!c)return false;conversationState(c);if(Number(c.unread[String(userId)]||0)===0)return false;c.unread[String(userId)]=0;return true;}
+function messageRows(conversationId){return (memory.messages.get(conversationId)||[]).map(m=>({...m,sender:userPublic(memory.users.get(m.senderId))}));}
+function directSummary(c,userId){conversationState(c);const members=memory.convMembers.get(c.id)||new Set(),other=[...members].find(x=>String(x)!==String(userId)),u=memory.users.get(other);return u?{id:c.id,kind:"dm",otherUser:userPublic(u),lastMessage:c.lastMessage,updatedAt:c.updatedAt,unread:Number(c.unread?.[String(userId)]||0)}:null;}
+function createMessage(conversationId,user,text,replyToId=null,metadata={}){return {id:id("msg"),conversation_id:conversationId,senderId:user.id,content:escString(text).trim(),replyToId:replyToId||null,metadata:metadata&&typeof metadata==="object"?metadata:{},created_at:now(),username:user.username,display_name:user.displayName,avatar_url:user.avatarUrl,avatar_frame:user.frame,avatar_effect:user.effect};}
+function pushMessage(conversationId,m){const list=memory.messages.get(conversationId)||[];list.push(m);memory.messages.set(conversationId,list.slice(-1000));appendConversationMessage(conversationId,m);return m;}
 function ensureHome(u){
  const existing=[...memory.members.entries()].find(([cid,m])=>m.has(u.id)&&memory.communities.get(cid)?.name==="ORBIT Lobby");
  if(existing)return existing[0];
@@ -428,27 +433,46 @@ app.get("/api/owner/shop",ownerAuth,(req,res)=>{if(!requireOwner(req,res))return
 app.get("/api/owner/content",ownerAuth,(req,res)=>{if(!requireOwner(req,res))return;const limit=Math.min(500,Math.max(1,Number(req.query?.limit||200)));const messages=[];for(const [cid,list] of memory.messages){const ch=[...memory.channels.values()].find(x=>x.conversationId===cid);for(const m of list)messages.push({...m,kind:ch?"channel":"dm",conversationId:cid,channelName:ch?.name||"direct",serverId:ch?.communityId||null,username:m.username||memory.users.get(m.senderId)?.username||"unknown"})}messages.sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));res.json({ok:true,messages:messages.slice(0,limit)})});
 app.get("/api/dms",auth,(req,res)=>{
  const result=[];
- for(const c of memory.conversations.values()){
-  if(c.kind!=="dm")continue;
-  const members=memory.convMembers.get(c.id)||new Set();if(!members.has(req.user.id))continue;
-  const other=[...members].find(x=>x!==req.user.id),u=memory.users.get(other);if(u)result.push({id:c.id,otherUser:userPublic(u)})
- }
- res.json({dms:result})
+ for(const c of memory.conversations.values()){if(c.kind!=="dm")continue;const members=memory.convMembers.get(c.id)||new Set();if(!members.has(req.user.id))continue;const summary=directSummary(c,req.user.id);if(summary)result.push(summary);}
+ result.sort((a,b)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")));res.json({dms:result});
 });
 app.post("/api/dms",auth,(req,res)=>{
- const username=cleanUsername(req.body?.username),u=[...memory.users.values()].find(x=>x.username===username);if(!u||u.id===req.user.id)return res.status(404).json({error:"User not found."});
- for(const c of memory.conversations.values())if(c.kind==="dm"){const m=memory.convMembers.get(c.id)||new Set();if(m.has(req.user.id)&&m.has(u.id)&&m.size===2)return res.json({dmId:c.id})}
- const c={id:id("dm"),kind:"dm",createdAt:now()};memory.conversations.set(c.id,c);memory.convMembers.set(c.id,new Set([req.user.id,u.id]));persist();res.status(201).json({dmId:c.id})
+ const username=cleanUsername(req.body?.username),u=[...memory.users.values()].find(x=>x.username===username);
+ if(!u||u.id===req.user.id)return res.status(404).json({error:"User not found."});
+ for(const c of memory.conversations.values())if(c.kind==="dm"){const m=memory.convMembers.get(c.id)||new Set();if(m.has(req.user.id)&&m.has(u.id)&&m.size===2){conversationState(c);return res.json({dmId:c.id});}}
+ const c=conversationState({id:id("dm"),kind:"dm",createdAt:now(),updatedAt:now(),lastMessage:null,unread:{}});
+ memory.conversations.set(c.id,c);memory.convMembers.set(c.id,new Set([req.user.id,u.id]));persist();res.status(201).json({dmId:c.id});
 });
 app.get("/api/conversations/:id/messages",auth,(req,res)=>{
  if(!conversationAccess(req.params.id,req.user.id))return res.status(403).json({error:"Conversation access denied."});
- res.json({messages:messageRows(req.params.id)})
+ const all=memory.messages.get(req.params.id)||[],limit=Math.min(200,Math.max(20,Number(req.query?.limit||100)));
+ const rows=all.slice(-limit).map(m=>({...m,sender:userPublic(memory.users.get(m.senderId))}));
+ const changed=markConversationRead(req.params.id,req.user.id);if(changed)persist();
+ res.json({messages:rows,hasMore:all.length>limit,conversation:conversationState(memory.conversations.get(req.params.id)||{})});
+});
+app.post("/api/conversations/:id/read",auth,(req,res)=>{
+ if(!conversationAccess(req.params.id,req.user.id))return res.status(403).json({error:"Conversation access denied."});
+ markConversationRead(req.params.id,req.user.id);persist();res.json({ok:true});
 });
 app.post("/api/conversations/:id/messages",auth,(req,res)=>{
  if(!conversationAccess(req.params.id,req.user.id))return res.status(403).json({error:"Conversation access denied."});
+ const text=escString(req.body?.content).trim();if(!text&&!req.body?.metadata?.attachment)return res.status(400).json({error:"Message is empty."});
+ const m=pushMessage(req.params.id,createMessage(req.params.id,req.user,text,req.body?.replyToId,req.body?.metadata));
+ req.user.messages++;award(req.user,10,0);persist();io.to("conversation:"+req.params.id).emit("message:new",m);res.status(201).json({message:m});
+});
+app.patch("/api/conversations/:id/messages/:messageId",auth,(req,res)=>{
+ if(!conversationAccess(req.params.id,req.user.id))return res.status(403).json({error:"Conversation access denied."});
+ const list=memory.messages.get(req.params.id)||[],m=list.find(x=>String(x.id)===String(req.params.messageId));
+ if(!m)return res.status(404).json({error:"Message not found."});if(String(m.senderId)!==String(req.user.id))return res.status(403).json({error:"You can only edit your own messages."});if(m.deleted_at)return res.status(409).json({error:"Deleted messages cannot be edited."});
  const text=escString(req.body?.content).trim();if(!text)return res.status(400).json({error:"Message is empty."});
- const m={id:id("msg"),conversation_id:req.params.id,senderId:req.user.id,content:text,replyToId:req.body?.replyToId||null,metadata:req.body?.metadata||{},created_at:now(),username:req.user.username,display_name:req.user.displayName,avatar_url:req.user.avatarUrl,avatar_frame:req.user.frame,avatar_effect:req.user.effect};
- const list=memory.messages.get(req.params.id)||[];list.push(m);memory.messages.set(req.params.id,list.slice(-500));req.user.messages++;award(req.user,10,0);persist();io.to("conversation:"+req.params.id).emit("message:new",m);res.status(201).json({message:m})
+ m.content=text;m.edited_at=now();memory.messages.set(req.params.id,list);appendConversationMessage(req.params.id,m);persist();io.to("conversation:"+req.params.id).emit("message:update",m);res.json({message:m});
+});
+app.delete("/api/conversations/:id/messages/:messageId",auth,(req,res)=>{
+ if(!conversationAccess(req.params.id,req.user.id))return res.status(403).json({error:"Conversation access denied."});
+ const list=memory.messages.get(req.params.id)||[],m=list.find(x=>String(x.id)===String(req.params.messageId));
+ if(!m)return res.status(404).json({error:"Message not found."});if(String(m.senderId)!==String(req.user.id))return res.status(403).json({error:"You can only delete your own messages."});
+ if(!m.deleted_at){m.deleted_at=now();m.content="";m.metadata={};m.edited_at=null;memory.messages.set(req.params.id,list);appendConversationMessage(req.params.id,m);persist();io.to("conversation:"+req.params.id).emit("message:delete",{messageId:m.id,conversationId:req.params.id});}
+ res.json({ok:true,message:m});
 });
 
 app.get("/api/presence",auth,(req,res)=>{const users=[...memory.users.values()].filter(u=>u.status==="online"&&!u.suspended).slice(0,200).map(userPublic);res.json({users,time:now()})});
@@ -477,12 +501,11 @@ io.on("connection",socket=>{
  socket.join("user:"+socket.userId);socket.emit("session:ready",{user:userPublic(socket.user)});io.emit("presence:update",{status:"online",user:userPublic(socket.user)});
  socket.on("conversation:join",cid=>{if(conversationAccess(cid,socket.userId))socket.join("conversation:"+cid)});
  socket.on("typing",({conversationId,isTyping}={})=>{if(conversationAccess(conversationId,socket.userId))socket.to("conversation:"+conversationId).emit("typing",{conversationId,userId:socket.userId,isTyping:Boolean(isTyping)})});
- socket.on("message:send",({conversationId,content,replyToId,metadata}={},ack)=>{
-  if(!conversationAccess(conversationId,socket.userId))return ack?.({ok:false,error:"Conversation access denied."});
-  const text=escString(content).trim();if(!text)return ack?.({ok:false,error:"Message is empty."});
-  const u=memory.users.get(socket.userId),m={id:id("msg"),conversation_id:conversationId,senderId:u.id,content:text,replyToId:replyToId||null,metadata:metadata||{},created_at:now(),username:u.username,display_name:u.displayName,avatar_url:u.avatarUrl,avatar_frame:u.frame,avatar_effect:u.effect};
-  const list=memory.messages.get(conversationId)||[];list.push(m);memory.messages.set(conversationId,list.slice(-500));u.messages++;award(u,10,0);persist();io.to("conversation:"+conversationId).emit("message:new",m);ack?.({ok:true,message:m})
- });
+ socket.on("conversation:read",(conversationId,ack)=>{if(!conversationAccess(conversationId,socket.userId))return ack?.({ok:false,error:"Conversation access denied."});markConversationRead(conversationId,socket.userId);persist();socket.to("conversation:"+conversationId).emit("message:read",{conversationId,userId:socket.userId,at:now()});ack?.({ok:true});});
+ socket.on("message:send",({conversationId,content,replyToId,metadata}={},ack)=>{if(!conversationAccess(conversationId,socket.userId))return ack?.({ok:false,error:"Conversation access denied."});const text=escString(content).trim();if(!text&&!metadata?.attachment)return ack?.({ok:false,error:"Message is empty."});const u=memory.users.get(socket.userId),m=pushMessage(conversationId,createMessage(conversationId,u,text,replyToId,metadata));u.messages++;award(u,10,0);persist();io.to("conversation:"+conversationId).emit("message:new",m);ack?.({ok:true,message:m});});
+ socket.on("message:update",({conversationId,messageId,content}={},ack)=>{if(!conversationAccess(conversationId,socket.userId))return ack?.({ok:false,error:"Conversation access denied."});const list=memory.messages.get(conversationId)||[],m=list.find(x=>String(x.id)===String(messageId));if(!m)return ack?.({ok:false,error:"Message not found."});if(String(m.senderId)!==String(socket.userId))return ack?.({ok:false,error:"You can only edit your own messages."});if(m.deleted_at)return ack?.({ok:false,error:"Deleted messages cannot be edited."});const text=escString(content).trim();if(!text)return ack?.({ok:false,error:"Message is empty."});m.content=text;m.edited_at=now();memory.messages.set(conversationId,list);appendConversationMessage(conversationId,m);persist();io.to("conversation:"+conversationId).emit("message:update",m);ack?.({ok:true,message:m});});
+ socket.on("message:delete",({conversationId,messageId}={},ack)=>{if(!conversationAccess(conversationId,socket.userId))return ack?.({ok:false,error:"Conversation access denied."});const list=memory.messages.get(conversationId)||[],m=list.find(x=>String(x.id)===String(messageId));if(!m)return ack?.({ok:false,error:"Message not found."});if(String(m.senderId)!==String(socket.userId))return ack?.({ok:false,error:"You can only delete your own messages."});if(!m.deleted_at){m.deleted_at=now();m.content="";m.metadata={};m.edited_at=null;memory.messages.set(conversationId,list);appendConversationMessage(conversationId,m);persist();io.to("conversation:"+conversationId).emit("message:delete",{messageId:m.id,conversationId});}ack?.({ok:true});});
+
  socket.on("call:invite",({conversationId,mode="video"}={})=>{
   if(!conversationAccess(conversationId,socket.userId))return;
   for(const uid of conversationUsers(conversationId))if(uid!==socket.userId)io.to("user:"+uid).emit("call:incoming",{conversationId,mode,caller:userPublic(socket.user)})
