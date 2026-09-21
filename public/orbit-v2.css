@@ -100,3 +100,31 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:rad
 .search-result b{font-size:6px;color:var(--cyan);font-weight:600}
 .search-glyph{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;border:1px solid var(--line);background:#ffffff05}
 .search-loading{padding:14px;text-align:center;font-size:7px}
+
+/* ORBIT animated identity frames */
+@keyframes orbitFrameSpin{to{transform:rotate(360deg)}}
+@keyframes orbitFrameSpinReverse{to{transform:rotate(-360deg)}}
+@keyframes orbitFramePulse{0%,100%{transform:scale(.98);opacity:.75}50%{transform:scale(1.04);opacity:1}}
+@keyframes orbitFrameScan{0%{transform:translateY(-110%)}100%{transform:translateY(110%)}}
+@keyframes orbitFrameFlicker{0%,100%{opacity:.8}45%{opacity:1}47%{opacity:.55}49%{opacity:1}72%{opacity:.7}}
+.avatar{isolation:isolate}
+.avatar img{position:relative;z-index:2}
+.avatar.frame-plasma{box-shadow:0 0 0 2px #a855f7,0 0 14px #a855f766,0 0 34px #22d3ee33;animation:orbitFramePulse 2.4s ease-in-out infinite}
+.avatar.frame-plasma::before{content:"";position:absolute;inset:-4px;border-radius:inherit;border:2px solid transparent;border-top-color:#22d3ee;border-right-color:#a855f7;animation:orbitFrameSpin 1.35s linear infinite;z-index:1;pointer-events:none}
+.avatar.frame-plasma::after{content:"";position:absolute;inset:-7px;border-radius:inherit;border:1px dashed #f0abfc66;animation:orbitFrameSpinReverse 2.8s linear infinite;z-index:0;pointer-events:none}
+.avatar.frame-hologram{box-shadow:0 0 0 2px #52dfff,0 0 20px #52dfff55,0 0 38px #9b6dff22;animation:orbitFrameFlicker 3.6s ease-in-out infinite}
+.avatar.frame-hologram::before{content:"";position:absolute;inset:-4px;border-radius:inherit;border:1px solid #baf7ff99;box-shadow:inset 0 0 12px #52dfff44;animation:orbitFramePulse 1.8s ease-in-out infinite;z-index:1;pointer-events:none}
+.avatar.frame-hologram::after{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;border-radius:inherit;background:repeating-linear-gradient(to bottom,transparent 0 3px,#8bf3ff20 4px,#8bf3ff20 5px);mix-blend-mode:screen;animation:orbitFrameScan 2.2s linear infinite}
+.avatar.frame-quantum{box-shadow:0 0 0 2px #8b5cf6,0 0 18px #8b5cf666,0 0 42px #38bdf833}
+.avatar.frame-quantum::before{content:"";position:absolute;inset:-6px;border-radius:inherit;border:2px solid transparent;border-left-color:#38bdf8;border-bottom-color:#8b5cf6;animation:orbitFrameSpin 1.9s linear infinite;z-index:1;pointer-events:none}
+.avatar.frame-quantum::after{content:"";position:absolute;inset:-10px;border-radius:inherit;border:1px dotted #ffffff55;animation:orbitFrameSpinReverse 3.7s linear infinite;z-index:0;pointer-events:none}
+.avatar.frame-quasar{box-shadow:0 0 0 2px #f8c66d,0 0 22px #f8c66d77,0 0 50px #fb718522;animation:orbitFramePulse 1.9s ease-in-out infinite}
+.avatar.frame-quasar::before{content:"✦";position:absolute;inset:-8px;display:grid;place-items:start end;color:#ffe9a8;font:700 10px/1 Arial,sans-serif;text-shadow:0 0 12px #fff4bd;animation:orbitFrameSpin 3s linear infinite;z-index:4;pointer-events:none}
+.avatar.frame-quasar::after{content:"";position:absolute;inset:-5px;border-radius:inherit;border:2px solid transparent;border-top-color:#fff1b5;border-right-color:#fb923c;animation:orbitFrameSpinReverse 1.15s linear infinite;z-index:1;pointer-events:none}
+.avatar.frame-singularity{box-shadow:0 0 0 2px #f0f4ff,0 0 18px #c084fc88,0 0 48px #7c3aed66;animation:orbitFramePulse 2.7s ease-in-out infinite}
+.avatar.frame-singularity::before{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid transparent;border-top-color:#fff;border-right-color:#c084fc;border-bottom-color:#7c3aed;animation:orbitFrameSpin .85s linear infinite;z-index:1;pointer-events:none}
+.avatar.frame-singularity::after{content:"";position:absolute;inset:-11px;border-radius:50%;border:1px dashed #e9d5ff77;animation:orbitFrameSpinReverse 1.9s linear infinite;z-index:0;pointer-events:none}
+@media (prefers-reduced-motion:reduce){
+  .avatar.frame-plasma,.avatar.frame-hologram,.avatar.frame-quasar,.avatar.frame-singularity{animation:none}
+  .avatar.frame-plasma::before,.avatar.frame-plasma::after,.avatar.frame-hologram::before,.avatar.frame-hologram::after,.avatar.frame-quantum::before,.avatar.frame-quantum::after,.avatar.frame-quasar::before,.avatar.frame-quasar::after,.avatar.frame-singularity::before,.avatar.frame-singularity::after{animation:none}
+}
