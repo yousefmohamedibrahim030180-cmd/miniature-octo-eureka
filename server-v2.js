@@ -494,6 +494,10 @@ io.on("connection",socket=>{
   socket.emit("call:participants",p);socket.to(room).emit("call:participant-joined",{socketId:socket.id,user:userPublic(socket.user),mode})
  });
  socket.on("call:screen",({roomId,active=false,to}={})=>{if(!roomId||socket.callRoom!=="v2call:"+roomId||!conversationAccess(roomId,socket.userId))return;const target=io.sockets.sockets.get(String(to));if(target)target.emit("call:screen",{from:socket.id,active:Boolean(active),user:userPublic(socket.user)})});
+  socket.on("screen:offer",({to,offer}={})=>{if(!to||!offer||!socket.callRoom||!conversationAccess(String(socket.callRoom).slice(7),socket.userId))return;const target=io.sockets.sockets.get(String(to));if(target&&target.callRoom===socket.callRoom)target.emit("screen:offer",{from:socket.id,offer,fromUser:userPublic(socket.user)})});
+  socket.on("screen:answer",({to,answer}={})=>{if(!to||!answer||!socket.callRoom||!conversationAccess(String(socket.callRoom).slice(7),socket.userId))return;const target=io.sockets.sockets.get(String(to));if(target&&target.callRoom===socket.callRoom)target.emit("screen:answer",{from:socket.id,answer})});
+  socket.on("screen:ice",({to,candidate}={})=>{if(!to||!candidate||!socket.callRoom||!conversationAccess(String(socket.callRoom).slice(7),socket.userId))return;const target=io.sockets.sockets.get(String(to));if(target&&target.callRoom===socket.callRoom)target.emit("screen:ice",{from:socket.id,candidate})});
+  socket.on("screen:stop",({to}={})=>{if(!to||!socket.callRoom||!conversationAccess(String(socket.callRoom).slice(7),socket.userId))return;const target=io.sockets.sockets.get(String(to));if(target&&target.callRoom===socket.callRoom)target.emit("screen:stop",{from:socket.id})});
   socket.on("call:leave",()=>{
   if(!socket.callRoom)return;socket.leave(socket.callRoom);socket.to(socket.callRoom).emit("call:participant-left",{socketId:socket.id,userId:socket.userId});
   if(socket.callStarted){socket.user.callMinutes+=Math.max(1,Math.round((Date.now()-socket.callStarted)/60000));award(socket.user,10,0)}socket.callRoom=null;socket.callStarted=null;persist()
