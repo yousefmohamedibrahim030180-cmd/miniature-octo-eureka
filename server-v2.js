@@ -117,6 +117,7 @@ function userPublic(u){
   status:u.status||"offline",level:Number(u.level||1),xp:Number(u.xp||0),coins:Number(u.coins||250),
   equipped:{frame:u.frame||"orbit",effect:u.effect||"none",nameplate:u.nameplate||"orbit",chatTheme:u.chatTheme||"orbit-dark"},
   stats:{messages:Number(u.messages||0),callMinutes:Number(u.callMinutes||0),friends:Number(u.friends||0),communitiesCreated:Number(u.communitiesCreated||0),communitiesJoined:Number(u.communitiesJoined||0)},
+  preferences:u.preferences||{},
   createdAt:u.createdAt||null
  };
 }
@@ -156,6 +157,9 @@ function auth(req,res,next){
 }
 function ensureUserDefaults(u){
  u.frame=u.frame||"orbit";u.effect=u.effect||"none";u.nameplate=u.nameplate||"orbit";u.chatTheme=u.chatTheme||"orbit-dark";
+ u.preferences=u.preferences||{};u.preferences.theme=u.preferences.theme||"void";u.preferences.density=u.preferences.density||"comfortable";u.preferences.motion=u.preferences.motion!==false;u.preferences.accent=u.preferences.accent||"violet";
+ u.preferences.notifications=u.preferences.notifications||{messages:true,mentions:true,calls:true,social:true};
+ u.preferences.privacy=u.preferences.privacy||{presence:true,readReceipts:true,friendRequests:true};
  u.xp=Number(u.xp||0);u.level=Math.max(1,Number(u.level||1));u.coins=Number(u.coins||250);
  u.messages=Number(u.messages||0);u.callMinutes=Number(u.callMinutes||0);u.friends=Number(u.friends||0);
  u.communitiesCreated=Number(u.communitiesCreated||0);u.communitiesJoined=Number(u.communitiesJoined||0);
@@ -253,6 +257,7 @@ app.post("/api/auth/login",async(req,res)=>{
 app.post("/api/auth/logout",auth,(req,res)=>{const t=cookie(req,COOKIE);memory.sessions.delete(hash(t));clearCookie(res);persist();res.json({ok:true})});
 app.get("/api/me",auth,(req,res)=>{ensureInventory(req.user);res.json({user:userPublic(req.user),dailyCheckIn:daily(req.user)})});
 app.patch("/api/me/profile",auth,(req,res)=>{req.user.displayName=cleanName(req.body?.displayName,req.user.username);req.user.bio=String(req.body?.bio||"").trim().slice(0,280);req.user.avatarUrl=avatarField(req.body?.avatarUrl);persist();res.json({user:userPublic(req.user)})});
+app.patch("/api/me/preferences",auth,(req,res)=>{ensureUserDefaults(req.user);const b=req.body||{};if(["void","aurora","ice","midnight"].includes(String(b.theme)))req.user.preferences.theme=String(b.theme);if(["comfortable","compact"].includes(String(b.density)))req.user.preferences.density=String(b.density);if(typeof b.motion==="boolean")req.user.preferences.motion=b.motion;if(["violet","cyan","gold","rose"].includes(String(b.accent)))req.user.preferences.accent=String(b.accent);for(const k of ["messages","mentions","calls","social"])if(typeof b.notifications?.[k]==="boolean")req.user.preferences.notifications[k]=b.notifications[k];for(const k of ["presence","readReceipts","friendRequests"])if(typeof b.privacy?.[k]==="boolean")req.user.preferences.privacy[k]=b.privacy[k];persist();res.json({user:userPublic(req.user)})});
 
 app.get("/api/search",auth,(req,res)=>{
  const q=String(req.query.q||"").trim().toLowerCase();if(!q)return res.json({users:[],communities:[]});
@@ -294,13 +299,13 @@ app.post("/api/missions/:id/claim",auth,(req,res)=>{
 });
 
 app.get("/api/communities",auth,(req,res)=>{
- const rows=[...memory.communities.values()].filter(c=>communityMember(c.id,req.user.id)).map(c=>({...c,role:(memory.members.get(c.id)||new Map()).get(req.user.id)||"member"}));
+ const rows=[...memory.communities.values()].filter(c=>communityMember(c.id,req.user.id)).map(c=>{const members=memory.members.get(c.id)||new Map();return {...c,role:members.get(req.user.id)||"member",memberCount:members.size}});
  res.json({communities:rows})
 });
 app.post("/api/communities",auth,(req,res)=>{
- const c={id:id("com"),name:cleanName(req.body?.name,"New Community"),description:String(req.body?.description||"").slice(0,300),joinCode:"ORB-"+crypto.randomBytes(4).toString("hex").toUpperCase(),ownerId:req.user.id,createdAt:now()};
+ const c={id:id("com"),name:cleanName(req.body?.name,"New Community"),description:String(req.body?.description||"").slice(0,300),iconUrl:avatarField(req.body?.iconUrl),accent:["violet","cyan","gold","rose"].includes(String(req.body?.accent))?String(req.body.accent):"violet",verificationLevel:"standard",joinCode:"ORB-"+crypto.randomBytes(4).toString("hex").toUpperCase(),ownerId:req.user.id,createdAt:now()};
  memory.communities.set(c.id,c);memory.members.set(c.id,new Map([[req.user.id,"owner"]]));const conv={id:id("conv"),kind:"channel",createdAt:now()};memory.conversations.set(conv.id,conv);memory.convMembers.set(conv.id,new Set());
- memory.channels.set(id("ch"),{id:id("ch"),communityId:c.id,name:"general",type:"text",conversationId:conv.id,createdAt:now()});
+ memory.channels.set(id("ch"),{id:id("ch"),communityId:c.id,name:"general",type:"text",topic:"Welcome to your new ORBIT server.",conversationId:conv.id,createdAt:now()});
  req.user.communitiesCreated++;req.user.communitiesJoined++;award(req.user,100,0);persist();res.status(201).json({community:c,joinCode:c.joinCode})
 });
 app.post("/api/communities/join",auth,(req,res)=>{
