@@ -32,7 +32,8 @@
     "asar": true,
     "files": [
       "electron/**",
-      "package.json"
+      "package.json",
+      "build/**"
     ],
     "directories": {
       "output": "dist-desktop"
