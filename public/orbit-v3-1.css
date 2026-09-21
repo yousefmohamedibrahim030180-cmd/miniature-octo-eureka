@@ -1,0 +1,29 @@
+/* ORBIT 3.1 — live layer */
+.orbit31-backdrop{position:fixed;inset:0;z-index:540;background:rgba(1,3,9,.74);backdrop-filter:blur(20px);display:grid;place-items:center;padding:18px}
+.orbit31-backdrop[hidden]{display:none}
+.orbit31-panel{width:min(1000px,96vw);max-height:90vh;overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:26px;background:linear-gradient(145deg,rgba(18,25,41,.98),rgba(5,9,16,.99));box-shadow:0 50px 180px rgba(0,0,0,.7),0 0 90px rgba(100,92,255,.12);display:grid;grid-template-rows:auto 1fr}
+.orbit31-head{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+.orbit31-kicker{display:block;color:#77859c;font-size:7px;letter-spacing:.22em}
+.orbit31-title{display:block;margin-top:4px;font:700 20px Space Grotesk}
+.orbit31-close{width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:#fff1;color:#dfe7f5;cursor:pointer}
+.orbit31-body{overflow:auto;padding:20px}
+.orbit31-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.orbit31-stat{padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:#fff04}
+.orbit31-stat b{display:block;font:700 22px Space Grotesk}
+.orbit31-stat span{display:block;color:#6f7c91;font-size:7px;margin-top:4px;letter-spacing:.12em}
+.orbit31-list{display:grid;gap:8px}
+.orbit31-row{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.07);background:#0003}
+.orbit31-avatar{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,#765cff40,#4fe4ff22);font:800 12px Space Grotesk}
+.orbit31-avatar img{width:100%;height:100%;object-fit:cover}
+.orbit31-main{min-width:0;flex:1}.orbit31-main strong{display:block;font-size:9px}.orbit31-main span{display:block;margin-top:3px;color:#67748a;font-size:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orbit31-status{display:flex;align-items:center;gap:6px;color:#72e5b2;font-size:7px}
+.orbit31-dot{width:6px;height:6px;border-radius:50%;background:#49dfa1;box-shadow:0 0 14px #49dfa1aa}
+.orbit31-action{padding:9px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:#fff05;color:#cdd7e7;cursor:pointer;font-size:7px}
+.orbit31-action:hover{background:#fff09}
+.orbit31-notif{position:relative}
+.orbit31-unread{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;display:grid;place-items:center;background:linear-gradient(90deg,#7b60ff,#44dfff);color:#fff;font:800 8px Inter}
+.orbit31-time{color:#5f6b80;font-size:6px;white-space:nowrap}
+.orbit31-empty{padding:30px;text-align:center;color:#667389;border:1px dashed rgba(255,255,255,.08);border-radius:14px;font-size:8px}
+.orbit31-livebar{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.08);background:#fff04;color:#91a0b7;font-size:7px;white-space:nowrap}
+.orbit31-livebar .orbit31-dot{width:5px;height:5px}
+@media(max-width:700px){.orbit31-summary{grid-template-columns:1fr}.orbit31-livebar{display:none}}
