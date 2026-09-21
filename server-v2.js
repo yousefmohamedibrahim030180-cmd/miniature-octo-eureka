@@ -19,7 +19,7 @@ const JWT_SECRET=String(process.env.JWT_SECRET||"orbit-guest-dev-secret");
 const memory={
  users:new Map(),sessions:new Map(),communities:new Map(),members:new Map(),channels:new Map(),
  conversations:new Map(),convMembers:new Map(),messages:new Map(),notifications:new Map(),
- inventory:new Map(),missionClaims:new Set(),daily:new Set(),friends:new Set()
+ inventory:new Map(),missionClaims:new Set(),daily:new Set(),friends:new Set(),audit:[]
 };
 let persistTimer=null,persistBusy=false,persistPending=false,persistMode="memory";
 
@@ -58,6 +58,7 @@ function restore(data){
  memory.missionClaims=new Set(data.missionClaims||[]);
  memory.daily=new Set(data.daily||[]);
  memory.friends=new Set(data.friends||[]);
+ memory.audit=Array.isArray(data.audit)?data.audit.slice(0,500):[];
 }
 async function sidecar(method,body){
  if(!PERSIST_URL||!PERSIST_SECRET)return {found:false};
