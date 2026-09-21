@@ -474,4 +474,83 @@ html[data-orbitGlow] .top-action{
 @media(max-width:700px){
   [data-orbit-preset]{min-height:42px}
 }
+/* ORBIT customization - live workspace surfaces */
+html[data-orbitBackground="nebula"] .app{
+  background:
+    radial-gradient(circle at 18% 18%,#725cff1d 0,transparent 30%),
+    radial-gradient(circle at 88% 8%,#27d7ff18 0,transparent 30%),
+    radial-gradient(circle at 58% 92%,#7b61ff12 0,transparent 36%),
+    #060811;
+}
+html[data-orbitBackground="aurora"] .app{
+  background:
+    radial-gradient(circle at 16% 8%,#5ef3ff28 0,transparent 34%),
+    radial-gradient(circle at 84% 20%,#a76cff24 0,transparent 36%),
+    radial-gradient(circle at 50% 90%,#35e0be16 0,transparent 36%),
+    #071014;
+}
+html[data-orbitBackground="cyber"] .app{
+  background:
+    linear-gradient(#7a63ff0b 1px,transparent 1px),
+    linear-gradient(90deg,#31d9ff0b 1px,transparent 1px),
+    radial-gradient(circle at 50% 0,#6c5cff1c,transparent 46%),
+    #05070d;
+  background-size:28px 28px,28px 28px,100% 100%,auto;
+}
+html[data-orbitBackground="grid"] .app{
+  background:
+    linear-gradient(#ffffff06 1px,transparent 1px),
+    linear-gradient(90deg,#ffffff06 1px,transparent 1px),
+    #070910;
+  background-size:36px 36px;
+}
+html[data-orbitBackground="plain"] .app{background:#070910}
+
+html[data-orbitSurface="solid"] .rail,
+html[data-orbitSurface="solid"] .context,
+html[data-orbitSurface="solid"] .topbar{
+  background:#090e17;
+  backdrop-filter:none;
+}
+html[data-orbitSurface="frost"] .rail,
+html[data-orbitSurface="frost"] .context,
+html[data-orbitSurface="frost"] .topbar{
+  background:#ffffff09;
+  backdrop-filter:blur(26px) saturate(155%);
+}
+html[data-orbitSurface="glass"] .rail,
+html[data-orbitSurface="glass"] .context,
+html[data-orbitSurface="glass"] .topbar{
+  background:#080d15c7;
+  backdrop-filter:blur(28px) saturate(135%);
+}
+
+html[data-orbitRadius="sharp"] .rail-search,
+html[data-orbitRadius="sharp"] .rail-profile,
+html[data-orbitRadius="sharp"] .top-action,
+html[data-orbitRadius="sharp"] .top-icon,
+html[data-orbitRadius="sharp"] #nav button,
+html[data-orbitRadius="sharp"] .server-dot{border-radius:7px!important}
+html[data-orbitRadius="soft"] .rail-search,
+html[data-orbitRadius="soft"] .rail-profile,
+html[data-orbitRadius="soft"] .top-action,
+html[data-orbitRadius="soft"] .top-icon,
+html[data-orbitRadius="soft"] #nav button,
+html[data-orbitRadius="soft"] .server-dot{border-radius:17px!important}
+
+html[data-orbitGlow="low"] .brand-mark,
+html[data-orbitGlow="low"] .btn.primary,
+html[data-orbitGlow="low"] .top-action{box-shadow:none}
+html[data-orbitGlow="medium"] .brand-mark{box-shadow:0 0 28px #8c6aff35}
+html[data-orbitGlow="high"] .brand-mark{box-shadow:0 0 48px #8c6aff75,0 0 80px #52dfff28}
+html[data-orbitGlow="high"] .btn.primary,
+html[data-orbitGlow="high"] .server-dot.active,
+html[data-orbitGlow="high"] .top-action{box-shadow:0 0 30px color-mix(in srgb,var(--cyan) 30%,transparent)}
+
+html[data-orbitFontScale="90"] .nav-text,
+html[data-orbitFontScale="90"] .ctx-item strong{font-size:calc(8px * .9)}
+html[data-orbitFontScale="110"] .nav-text,
+html[data-orbitFontScale="110"] .ctx-item strong{font-size:calc(8px * 1.1)}
+html[data-orbitFontScale="125"] .nav-text,
+html[data-orbitFontScale="125"] .ctx-item strong{font-size:calc(8px * 1.25)}
 
