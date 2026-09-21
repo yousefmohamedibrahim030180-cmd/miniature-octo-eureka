@@ -143,7 +143,7 @@ function audit(userId,action,target,details={}){memory.audit.unshift({id:id("aud
 function ownerAttemptKey(req){return String(req.ip||req.headers["x-forwarded-for"]||"unknown")+":"+String(req.user?.id||"unknown")}
 function ownerTokenFor(){return jwt.sign({owner:true,userId:"owner"},JWT_SECRET,{expiresIn:"8h"})}
 function hasOwnerToken(req){const raw=String(req.headers["x-owner-token"]||"").trim();if(!raw)return false;try{const p=jwt.verify(raw,JWT_SECRET);return Boolean(p?.owner)&&String(p.userId)==="owner"}catch{return false}}
-function ownerAuth(req,res,next){if(!hasOwnerToken(req))return res.status(401).json({error:"Owner session expired or missing"});req.ownerActor={id:"owner",username:"owner"};next()}
+function ownerAuth(req,res,next){if(!hasOwnerToken(req))return res.status(401).json({error:"Owner session expired or missing"});req.ownerActor={id:"owner",username:"owner"};req.user={id:"owner",username:"owner",displayName:"Platform Owner",status:"online",suspended:false};next()}
 function requireOwner(req,res){if(!hasOwnerToken(req)){res.status(401).json({error:"Owner session expired or missing"});return false}if(!req.ownerActor)req.ownerActor={id:"owner",username:"owner"};return true}
 function cookie(req,name){
  const raw=String(req.headers.cookie||"");
