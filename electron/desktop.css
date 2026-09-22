@@ -1,6 +1,6 @@
 :root{--orbit-desktop-scale:1.1}
 body.orbit-desktop-shell{--orbit-chat-gap:10px;--orbit-chat-font:13px;--orbit-composer-font:12px}
-body.orbit-desktop-shell .app{grid-template-columns:250px 310px minmax(0,1fr)}
+body.orbit-desktop-shell .app{grid-template-columns:250px 88px 310px minmax(0,1fr)}
 body.orbit-desktop-shell .rail{padding:20px 14px}
 body.orbit-desktop-shell .brand{padding:4px 9px 20px}
 body.orbit-desktop-shell .brand strong{font-size:17px}
@@ -70,6 +70,6 @@ body.orbit-desktop-shell .profile-copy small{font-size:8px}
 .odt-footer button{flex:1;height:36px;border:1px solid #ffffff12;border-radius:9px;background:#ffffff05;color:#c8d0dd;font-weight:700;cursor:pointer}
 .odt-footer .primary{background:linear-gradient(120deg,#9066ff,#54dfff);color:#fff;border:0}
 @media (max-width:1150px){
-body.orbit-desktop-shell .app{grid-template-columns:230px 275px minmax(0,1fr)}
+body.orbit-desktop-shell .app{grid-template-columns:230px 78px 275px minmax(0,1fr)}
 body.orbit-desktop-shell .chat{grid-template-columns:minmax(0,1fr) 270px}
 }
