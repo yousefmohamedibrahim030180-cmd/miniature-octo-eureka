@@ -52,6 +52,8 @@
 
   function setView(v){
     S.view=v;
+    const app=$("#app");
+    if(app)app.classList.toggle("messages-mode",v==="messages");
     $("#top-title").textContent=({home:"Home",space:"Network",messages:"Messages",communities:"Communities",live:"Live",discover:"Explore",events:"Events",projects:"Projects",files:"Files",ai:"AI Assistant",settings:"Settings",friends:"Friends",notifications:"Notifications",channel:"Chat"}[v]||"Home");
     renderNav();renderContext();renderSurface();
   }
