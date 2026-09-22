@@ -554,3 +554,44 @@ html[data-orbitFontScale="110"] .ctx-item strong{font-size:calc(8px * 1.1)}
 html[data-orbitFontScale="125"] .nav-text,
 html[data-orbitFontScale="125"] .ctx-item strong{font-size:calc(8px * 1.25)}
 
+
+
+/* ORBIT MESSAGES — WIDER CONVERSATION LIST */
+@media (min-width: 1051px){
+  .dm-shell{
+    grid-template-columns:318px minmax(0,1fr) !important;
+  }
+  .dm-list{
+    padding:0 10px;
+  }
+  .dm-item{
+    gap:10px;
+    padding:10px 12px;
+    min-height:58px;
+    border-radius:11px;
+  }
+  .dm-item .avatar{
+    width:40px;
+    height:40px;
+    min-width:40px;
+  }
+  .dm-copy strong{
+    font-size:9px;
+  }
+  .dm-copy span{
+    font-size:7px;
+  }
+}
+
+@media (min-width: 1450px){
+  .dm-shell{
+    grid-template-columns:342px minmax(0,1fr) !important;
+  }
+  .dm-list{
+    padding:0 12px;
+  }
+  .dm-item{
+    min-height:60px;
+    padding:10px 13px;
+  }
+}
