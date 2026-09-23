@@ -125,7 +125,29 @@
     renderHomeDMs();loadPeople()
   }
   function renderHomeDMs(){const r=$("#home-dm-list");if(!r)return;r.innerHTML=S.dms.slice(0,5).map(d=>'<button class="row" data-home-dm="'+esc(d.id)+'">'+avatar(d.otherUser||{})+'<span class="row-main"><strong>'+esc(d.otherUser?.display_name||d.otherUser?.username||"Conversation")+'</strong><span>'+esc(d.lastMessage?.content||"No messages yet")+'</span></span></button>').join("")||'<span class="muted" style="font-size:8px;padding:10px">No direct messages yet.</span>';$$("[data-home-dm]").forEach(b=>b.onclick=()=>openDM(b.dataset.homeDm))}
-  async function loadPeople(){try{const d=await api("/api/pulse"),r=$("#home-people");if(r)r.innerHTML=(d.users||[]).filter(u=>u.status!=="offline").slice(0,6).map(u=>row(u)).join("")||'<span class="muted" style="font-size:8px;padding:10px">No active people.</span>'}catch{}}
+  async function loadPeople(){
+    try{
+      const d=await api("/api/pulse"),r=$("#home-people");
+      if(!r)return;
+      // Home's people panel must not duplicate users already listed in Direct Messages.
+      // Match by id, username, or display name so the same account is shown only once.
+      const dmKeys=new Set();
+      (S.dms||[]).forEach(dm=>{
+        const u=dm?.otherUser||{};
+        if(u.id!=null)dmKeys.add("id:"+String(u.id));
+        if(u.username)dmKeys.add("username:"+String(u.username).toLowerCase());
+        if(u.display_name)dmKeys.add("display:"+String(u.display_name).toLowerCase());
+      });
+      const people=(d.users||[]).filter(u=>{
+        if(String(u.status||"").toLowerCase()==="offline")return false;
+        if(u.id!=null&&dmKeys.has("id:"+String(u.id)))return false;
+        if(u.username&&dmKeys.has("username:"+String(u.username).toLowerCase()))return false;
+        if(u.display_name&&dmKeys.has("display:"+String(u.display_name).toLowerCase()))return false;
+        return true;
+      }).slice(0,6);
+      r.innerHTML=people.map(u=>row(u)).join("")||'<span class="muted" style="font-size:8px;padding:10px">Everyone active is already in Direct Messages.</span>';
+    }catch{}
+  }
 
   async function renderChannel(root){
     if(!S.channel){root.innerHTML=empty("Choose a channel","Select a community channel.");return}
