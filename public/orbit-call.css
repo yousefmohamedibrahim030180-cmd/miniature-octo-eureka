@@ -125,3 +125,84 @@
 }
 
 .video-tile.screen-presenting .call-avatar{display:none!important}
+
+/* ORBIT screen focus mode */
+.call-window.screen-focus{
+  position:fixed!important;
+  inset:0!important;
+  left:0!important;
+  top:0!important;
+  width:100vw!important;
+  height:100vh!important;
+  min-width:0!important;
+  min-height:0!important;
+  max-width:none!important;
+  max-height:none!important;
+  margin:0!important;
+  border-radius:0!important;
+  z-index:9999!important;
+}
+.call-overlay:has(.call-window.screen-focus){
+  padding:0!important;
+  z-index:9998!important;
+}
+.call-window.screen-focus .call-header,
+.call-window.screen-focus .call-controls{
+  display:none!important;
+}
+.call-window.screen-focus .call-stage{
+  position:absolute!important;
+  inset:0!important;
+  padding:0!important;
+  display:block!important;
+  overflow:hidden!important;
+  background:#000!important;
+}
+.call-window.screen-focus .call-stage .video-tile:not(.screen-share){
+  display:none!important;
+}
+.call-window.screen-focus .call-stage .screen-share{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+.call-window.screen-focus .call-stage .screen-share video{
+  object-fit:contain!important;
+}
+.call-window.screen-focus .screen-share-head{
+  opacity:0;
+  transition:opacity .18s ease;
+}
+.call-window.screen-focus .screen-share:hover .screen-share-head{
+  opacity:1;
+}
+.call-window.screen-focus .screen-share-zoom{
+  right:18px!important;
+  bottom:18px!important;
+}
+.call-window.screen-focus .screen-share .video-label{
+  display:none!important;
+}
+body.orbit-screen-focus #orbit-desktop-titlebar{
+  display:none!important;
+}
+body.orbit-screen-focus.orbit-desktop-app{
+  padding-top:0!important;
+}
+body.orbit-screen-focus.orbit-desktop-app #app{
+  height:100vh!important;
+  min-height:100vh!important;
+}
+#screenFocusBtn{
+  min-width:86px!important;
+}
+#screenFocusBtn.active{
+  background:linear-gradient(120deg,rgba(131,103,255,.28),rgba(69,224,255,.14))!important;
+  border-color:rgba(112,218,255,.30)!important;
+}
