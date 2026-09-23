@@ -542,3 +542,176 @@ body[data-orbit-light="light"] .composer input{color:#182234}
 .atmos-range b{display:grid;place-items:center;height:30px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.03);font-size:9px}
 @media(max-width:1050px){.atmos-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.atmos-current{width:180px;min-width:180px}}
 @media(max-width:780px){.atmos-grid{grid-template-columns:1fr}.atmos-current{width:100%;min-width:0}.atmos-panel .pref-panel-head{display:grid}.atmos-range label{grid-template-columns:1fr}.atmos-range b{width:44px}}
+
+
+/* ORBIT GLOBAL ATMOSPHERE — the selected world belongs to the whole app */
+html,body,#app,.app,.main,.surface,.page{background:transparent!important}
+body:before{display:none!important}
+
+.app{position:relative;isolation:isolate}
+.app:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 50% 14%,rgba(116,113,255,.055),transparent 30%),
+    radial-gradient(circle at 10% 88%,rgba(50,210,255,.045),transparent 26%);
+}
+
+.rail,
+.context,
+.server-dock,
+.topbar{
+  background:rgba(6,11,19,.50)!important;
+  border-color:rgba(255,255,255,.055)!important;
+  backdrop-filter:blur(28px) saturate(145%)!important;
+}
+
+.main{min-width:0;min-height:0}
+.surface{position:relative;z-index:1;overflow:auto}
+
+.card,
+.hero,
+.setting-box,
+.pref-panel,
+.info-card,
+.shop-item,
+.mission,
+.preview-card,
+.settings-grid>.card,
+.account-fact,
+.tab,
+.ctx-input,
+.rail-search,
+.rail-profile,
+.mini-wallet,
+.top-action,
+.top-icon,
+.online,
+.btn:not(.primary):not(.gold),
+.setting-nav button.active,
+.ctx-item.active,
+.chat-action,
+.tool,
+.composer,
+.media-cell,
+.reaction,
+.notif-row,
+.search-result{
+  background:rgba(10,17,29,.46)!important;
+  backdrop-filter:blur(18px) saturate(135%);
+}
+
+.card,.setting-box,.pref-panel,.info-card,.shop-item,.mission{
+  border-color:rgba(255,255,255,.07)!important;
+}
+
+.hero{
+  background:
+    radial-gradient(circle at 80% 5%,rgba(123,112,255,.14),transparent 28%),
+    radial-gradient(circle at 16% 90%,rgba(41,214,255,.07),transparent 26%),
+    rgba(10,17,29,.40)!important;
+}
+
+.dm-shell,
+.chat,
+.chat-main,
+.chat-side{
+  background:transparent!important;
+}
+
+.dm-shell>.dm-list{
+  background:rgba(7,12,21,.46)!important;
+  backdrop-filter:blur(28px) saturate(145%);
+}
+
+.chat-head,
+.topbar{
+  background:rgba(7,12,21,.46)!important;
+}
+
+.chat-side{
+  background:rgba(8,13,22,.38)!important;
+  backdrop-filter:blur(28px) saturate(145%);
+}
+
+.messages{
+  background:transparent!important;
+}
+
+.composer-wrap{
+  background:linear-gradient(180deg,transparent,rgba(4,7,13,.18))!important;
+}
+
+.modal-bg,
+.call-overlay{
+  background:rgba(2,4,11,.54)!important;
+  backdrop-filter:blur(20px) saturate(125%);
+}
+
+.modal,
+.call-window,
+.incoming{
+  background:rgba(8,14,23,.64)!important;
+  backdrop-filter:blur(28px) saturate(145%);
+}
+
+.call-stage{
+  background:transparent!important;
+}
+
+.video-tile{
+  background:rgba(8,14,23,.52)!important;
+  backdrop-filter:blur(16px);
+}
+
+.toast{
+  background:rgba(8,14,23,.66)!important;
+  backdrop-filter:blur(24px) saturate(135%);
+}
+
+body[data-orbit-light="light"] .rail,
+body[data-orbit-light="light"] .context,
+body[data-orbit-light="light"] .server-dock,
+body[data-orbit-light="light"] .topbar{
+  background:rgba(226,235,246,.40)!important;
+}
+
+body[data-orbit-light="light"] .card,
+body[data-orbit-light="light"] .hero,
+body[data-orbit-light="light"] .setting-box,
+body[data-orbit-light="light"] .pref-panel,
+body[data-orbit-light="light"] .info-card,
+body[data-orbit-light="light"] .shop-item,
+body[data-orbit-light="light"] .mission{
+  background:rgba(244,248,253,.46)!important;
+  border-color:rgba(45,67,94,.12)!important;
+}
+
+body[data-orbit-light="light"] .chat-head,
+body[data-orbit-light="light"] .topbar{
+  color:#122033!important;
+}
+
+body[data-orbit-light="light"] .dm-shell>.dm-list,
+body[data-orbit-light="light"] .chat-side{
+  background:rgba(224,234,246,.36)!important;
+}
+
+body[data-orbit-light="light"] .composer,
+body[data-orbit-light="light"] .tool,
+body[data-orbit-light="light"] .chat-action{
+  background:rgba(248,251,255,.66)!important;
+}
+
+body[data-orbit-light="light"] .modal,
+body[data-orbit-light="light"] .call-window{
+  background:rgba(238,245,252,.72)!important;
+  color:#102035!important;
+}
+
+@media(max-width:900px){
+  .rail,.context,.server-dock,.topbar{backdrop-filter:blur(22px) saturate(135%)!important}
+}
