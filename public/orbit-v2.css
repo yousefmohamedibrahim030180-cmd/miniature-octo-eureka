@@ -595,3 +595,22 @@ html[data-orbitFontScale="125"] .ctx-item strong{font-size:calc(8px * 1.25)}
     padding:10px 13px;
   }
 }
+
+
+/* ORBIT CHAT EXPANSION — 2026-09-23 */
+@media (min-width:1051px){
+  .app{grid-template-columns:212px 72px 238px minmax(0,1fr)!important}
+  .dm-shell{grid-template-columns:224px minmax(0,1fr)!important}
+  .chat{grid-template-columns:minmax(0,1fr) 190px!important}
+  .messages{padding:24px 34px 30px!important}
+  .messages .msg{max-width:1080px!important}
+  .messages .msg-body{max-width:min(82%,860px)!important}
+  .chat-head{padding:0 24px!important}
+  .composer-wrap{padding:0 26px 24px!important}
+}
+@media (min-width:1450px){
+  .app{grid-template-columns:220px 74px 242px minmax(0,1fr)!important}
+  .dm-shell{grid-template-columns:232px minmax(0,1fr)!important}
+  .chat{grid-template-columns:minmax(0,1fr) 200px!important}
+  .messages{padding-left:42px!important;padding-right:42px!important}
+}
