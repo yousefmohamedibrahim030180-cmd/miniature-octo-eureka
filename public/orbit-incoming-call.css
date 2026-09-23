@@ -1,0 +1,158 @@
+/* ORBIT — centered incoming-call experience */
+#incoming.incoming-call-upgrade{
+  position:fixed!important;
+  inset:0!important;
+  z-index:99999!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:24px!important;
+  background:
+    radial-gradient(circle at 50% 45%,rgba(80,111,255,.18),transparent 34%),
+    rgba(2,5,10,.78)!important;
+  backdrop-filter:blur(18px)!important;
+  -webkit-backdrop-filter:blur(18px)!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+}
+#incoming.incoming-call-upgrade.hidden{display:none!important}
+#incoming.incoming-call-upgrade .incoming-card{
+  width:min(470px,calc(100vw - 40px))!important;
+  min-height:440px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:0!important;
+  padding:42px 38px 34px!important;
+  border:1px solid rgba(160,180,255,.22)!important;
+  border-radius:34px!important;
+  background:
+    radial-gradient(circle at 50% 0%,rgba(102,126,255,.20),transparent 44%),
+    linear-gradient(145deg,rgba(17,24,38,.98),rgba(6,10,17,.98))!important;
+  box-shadow:0 40px 120px rgba(0,0,0,.65),0 0 90px rgba(73,98,255,.18)!important;
+  position:relative!important;
+  overflow:hidden!important;
+  animation:orbitIncomingIn .32s cubic-bezier(.2,.8,.2,1)!important;
+}
+#incoming.incoming-call-upgrade .incoming-card:before{
+  content:"";
+  position:absolute;
+  width:250px;height:250px;
+  border-radius:50%;
+  border:1px solid rgba(111,139,255,.16);
+  box-shadow:0 0 0 26px rgba(111,139,255,.035),0 0 0 52px rgba(111,139,255,.025);
+  top:92px;left:50%;
+  transform:translateX(-50%);
+  animation:orbitCallPulse 1.9s ease-out infinite;
+  pointer-events:none;
+}
+#incoming.incoming-call-upgrade .incoming-avatar-wrap{
+  position:relative!important;
+  z-index:2!important;
+  width:128px!important;
+  height:128px!important;
+  display:grid!important;
+  place-items:center!important;
+  margin-bottom:25px!important;
+}
+#incoming.incoming-call-upgrade #incoming-avatar{
+  width:112px!important;
+  height:112px!important;
+  min-width:112px!important;
+  min-height:112px!important;
+  border-radius:50%!important;
+  display:grid!important;
+  place-items:center!important;
+  font:800 42px/1 Inter,sans-serif!important;
+  color:#fff!important;
+  background:linear-gradient(145deg,#657cff,#303e9c)!important;
+  border:4px solid rgba(255,255,255,.14)!important;
+  box-shadow:0 0 0 8px rgba(100,125,255,.09),0 18px 55px rgba(49,67,170,.42)!important;
+  overflow:hidden!important;
+}
+#incoming.incoming-call-upgrade #incoming-avatar img{
+  width:100%!important;height:100%!important;object-fit:cover!important;
+}
+#incoming.incoming-call-upgrade .incoming-copy{
+  position:relative!important;
+  z-index:2!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  text-align:center!important;
+  gap:8px!important;
+  margin-bottom:30px!important;
+}
+#incoming.incoming-call-upgrade #incoming-title{
+  font:800 26px/1.2 Space Grotesk,Inter,sans-serif!important;
+  color:#fff!important;
+  letter-spacing:-.02em!important;
+}
+#incoming.incoming-call-upgrade #incoming-subtitle{
+  font:600 12px/1.4 Inter,sans-serif!important;
+  color:#98a5bd!important;
+  letter-spacing:.08em!important;
+  text-transform:uppercase!important;
+}
+#incoming.incoming-call-upgrade .incoming-actions{
+  position:relative!important;
+  z-index:2!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:16px!important;
+  width:100%!important;
+}
+#incoming.incoming-call-upgrade .incoming-actions button{
+  border:0!important;
+  cursor:pointer!important;
+  min-height:60px!important;
+  border-radius:19px!important;
+  font:800 13px Inter,sans-serif!important;
+  transition:transform .16s ease,filter .16s ease,box-shadow .16s ease!important;
+}
+#incoming.incoming-call-upgrade .incoming-actions button:hover{
+  transform:translateY(-2px)!important;
+  filter:brightness(1.08)!important;
+}
+#incoming.incoming-call-upgrade .accept{
+  flex:1!important;
+  color:#fff!important;
+  background:linear-gradient(145deg,#29c982,#168a5a)!important;
+  box-shadow:0 14px 35px rgba(31,190,119,.22)!important;
+}
+#incoming.incoming-call-upgrade .decline{
+  flex:1!important;
+  color:#fff!important;
+  background:linear-gradient(145deg,#e85c70,#a62d43)!important;
+  box-shadow:0 14px 35px rgba(205,54,79,.22)!important;
+}
+#incoming.incoming-call-upgrade .incoming-ringing{
+  position:relative!important;
+  z-index:2!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:7px!important;
+  margin-top:21px!important;
+  color:#73809a!important;
+  font:600 10px Inter,sans-serif!important;
+  letter-spacing:.08em!important;
+  text-transform:uppercase!important;
+}
+#incoming.incoming-call-upgrade .incoming-ringing i{
+  width:6px;height:6px;border-radius:50%;
+  background:#5c8cff;
+  box-shadow:0 0 12px rgba(92,140,255,.9);
+  animation:orbitRingDot .8s ease-in-out infinite alternate;
+}
+@keyframes orbitIncomingIn{from{opacity:0;transform:scale(.92) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes orbitCallPulse{0%{transform:translateX(-50%) scale(.7);opacity:.75}70%{transform:translateX(-50%) scale(1.12);opacity:.08}100%{transform:translateX(-50%) scale(1.18);opacity:0}}
+@keyframes orbitRingDot{from{opacity:.35;transform:scale(.8)}to{opacity:1;transform:scale(1.15)}}
+@media(max-width:560px){
+  #incoming.incoming-call-upgrade{padding:16px!important}
+  #incoming.incoming-call-upgrade .incoming-card{min-height:400px!important;padding:34px 22px 26px!important;border-radius:28px!important}
+  #incoming.incoming-call-upgrade #incoming-title{font-size:22px!important}
+  #incoming.incoming-call-upgrade .incoming-actions{gap:10px!important}
+}
