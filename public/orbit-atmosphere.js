@@ -127,6 +127,7 @@
   }
 
   window.__ORBIT_ATMOSPHERES = MODES;
+  window.__ORBIT_GET_ATMOSPHERE = () => ({...prefs});
   window.__ORBIT_ATMOSPHERE_DEFAULTS = defaults;
   window.__ORBIT_SET_ATMOSPHERE = apply;
   window.__ORBIT_ATMOSPHERE_PREVIEW = createPreview;
