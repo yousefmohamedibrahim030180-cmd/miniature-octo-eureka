@@ -347,3 +347,28 @@ body[data-orbit-light="light"] .dm-head{background:rgba(234,241,250,.72)!importa
   .app.messages-mode .dm-body .msg-body{max-width:88%;padding:8px 11px}
   .app.messages-mode .dm-body .msg-text{font-size:12.5px}
 }
+
+.atmosphere-hero{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:18px;align-items:stretch}
+.experience-hero-copy{padding:4px 2px}
+.experience-hero-copy h3{margin:8px 0 7px;font:700 22px "Space Grotesk";letter-spacing:-.03em}
+.experience-hero-copy p{max-width:650px}
+.experience-current{position:relative;min-height:145px}
+.experience-current .atmosphere-mini-preview{height:100%;min-height:145px;border:1px solid rgba(255,255,255,.07);border-radius:16px}
+.experience-current-label{position:absolute;left:14px;bottom:12px;padding:6px 9px;border-radius:8px;background:rgba(3,7,14,.70);border:1px solid rgba(255,255,255,.08);font:700 9px Inter;color:#fff;backdrop-filter:blur(12px)}
+.light-balance{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:13px}
+.light-balance button{height:42px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(255,255,255,.025);color:var(--text);font-size:9px;cursor:pointer}
+.light-balance button.active{background:linear-gradient(135deg,rgba(111,104,255,.20),rgba(64,205,255,.10));border-color:rgba(121,151,255,.30);box-shadow:0 0 22px rgba(73,108,255,.12)}
+.settings-slider-row{display:grid;grid-template-columns:minmax(150px,1fr) minmax(150px,1.7fr) 42px;gap:12px;align-items:center;padding:13px 0;border-top:1px solid rgba(255,255,255,.045)}
+.settings-slider-row>div{display:grid;gap:4px}.settings-slider-row strong{font-size:10px}.settings-slider-row span{font-size:8px;color:var(--muted)}
+.settings-slider-row input{width:100%;accent-color:#777dff}
+.settings-slider-row output{display:grid;place-items:center;height:30px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.03);font-size:9px;color:#dbe4ff}
+body[data-orbit-light="light"] .experience-current .atmosphere-mini-preview{background:linear-gradient(135deg,#dceaff,#f7fbff)}
+body[data-orbit-light="light"] .atmosphere-option{background:rgba(255,255,255,.16);border-color:rgba(40,68,108,.10)}
+body[data-orbit-light="light"] .settings-slider-row,
+body[data-orbit-light="light"] .light-balance button{border-color:rgba(44,63,91,.12)}
+@media(max-width:780px){
+  .atmosphere-hero{grid-template-columns:1fr}
+  .experience-current{min-height:120px}
+  .settings-slider-row{grid-template-columns:1fr}
+  .settings-slider-row output{width:44px}
+}
