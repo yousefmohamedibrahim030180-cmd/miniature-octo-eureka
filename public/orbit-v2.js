@@ -40,7 +40,7 @@ async function loadConversation(){if(!S.activeConversation){S.messages=[];return
 async function sendMessage(){const i=$("#messageInput");if(!i)return;const text=i.value.trim();if(!text)return;S.socket?.emit("message:send",{conversationId:S.activeConversation,content:text},ack=>{if(!ack?.ok)toast("Message",ack?.error||"Failed")});i.value="";try{if(S.me?.preferences?.saveDrafts&&window.sessionStorage)sessionStorage.removeItem("orbit-draft:"+S.activeConversation)}catch{}i.focus()}
 async function recordVoiceMessage(){
  if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder==="undefined")return toast("Voice message","Your browser does not support voice recording.");
- if(S.voiceRecorder?.state==="recording")return;
+ if(S.voiceRecorder?.state==="recording"){try{S.voiceRecorder.stop()}catch{}return;}
  const status=$("#voiceStatus"),btn=$("#voiceMessageBtn");
  let stream=null,recorder=null,timer=null,start=0,chunks=[];
  try{
@@ -48,7 +48,7 @@ async function recordVoiceMessage(){
   const preferred=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"].find(t=>MediaRecorder.isTypeSupported?.(t));
   recorder=new MediaRecorder(stream,preferred?{mimeType:preferred}:undefined);S.voiceRecorder=recorder;start=Date.now();
   btn?.classList.add("recording");if(status)status.textContent="● Recording 0:00 — click the microphone to stop";
-  timer=setInterval(()=>{const s=Math.floor((Date.now()-start)/1000);if(status)status.textContent="● Recording "+String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")+" — click the microphone to stop";if(s>=60)recorder.stop()},250);
+  timer=setInterval(()=>{const s=Math.floor((Date.now()-start)/1000);if(status)status.textContent="● Recording "+String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")+" — click the microphone to stop";if(s>=60&&recorder.state==="recording"){try{recorder.stop()}catch{}}},250);
   recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};
   recorder.onstop=async()=>{
    clearInterval(timer);stream.getTracks().forEach(t=>t.stop());S.voiceRecorder=null;btn?.classList.remove("recording");
