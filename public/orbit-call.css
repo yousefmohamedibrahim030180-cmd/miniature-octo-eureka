@@ -206,15 +206,3 @@ body.orbit-screen-focus.orbit-desktop-app #app{
   background:linear-gradient(120deg,rgba(131,103,255,.28),rgba(69,224,255,.14))!important;
   border-color:rgba(112,218,255,.30)!important;
 }
-
-
-/* ORBIT Screen Share Quality Menu */
-.screen-quality-wrap{position:relative;display:flex;align-items:center}
-.screen-quality-menu{position:absolute;left:0;bottom:52px;width:230px;padding:8px;border:1px solid rgba(255,255,255,.11);border-radius:14px;background:rgba(5,10,18,.94);backdrop-filter:blur(20px);box-shadow:0 22px 55px rgba(0,0,0,.45),0 0 35px rgba(114,94,255,.10);z-index:80}
-.screen-quality-menu.hidden{display:none!important}
-.screen-quality-title{padding:6px 8px 8px;color:#728197;font-size:6px;font-weight:800;letter-spacing:.14em}
-.screen-quality-menu button{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:9px;border:1px solid transparent;border-radius:9px;background:transparent;color:#dce7f7;text-align:left;cursor:pointer}
-.screen-quality-menu button:hover{background:rgba(255,255,255,.06)}
-.screen-quality-menu button.active{background:linear-gradient(120deg,rgba(128,100,255,.18),rgba(71,218,255,.08));border-color:rgba(112,218,255,.24)}
-.screen-quality-menu button strong{font-size:8px}.screen-quality-menu button span{font-size:6px;color:#74839a}
-@media(max-width:700px){.screen-quality-menu{left:auto;right:0;bottom:48px;width:210px}}
