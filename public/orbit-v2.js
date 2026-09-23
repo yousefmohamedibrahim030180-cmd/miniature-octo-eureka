@@ -439,7 +439,32 @@ $("#callModeFocusBottom")?.addEventListener("click",()=>setCallMode("focus"));$(
 $("#callMinimize")?.addEventListener("click",()=>$("#callWindow")?.classList.toggle("minimized"));
 $("#callMaximize")?.addEventListener("click",()=>$("#callWindow")?.classList.toggle("fullscreen"));
 (function bindCallDragResize(){const w=$("#callWindow"),h=$("#callDragHandle"),o=$("#callOverlay");if(!w||!h||!o)return;let drag=false,ox=0,oy=0,sl=0,st=0;h.addEventListener("pointerdown",e=>{if(e.target.closest("button"))return;drag=true;w.setPointerCapture?.(e.pointerId);const r=w.getBoundingClientRect();sl=r.left;st=r.top;ox=e.clientX;oy=e.clientY;w.style.left=sl+"px";w.style.top=st+"px";w.style.margin="0";w.style.position="fixed"});h.addEventListener("pointermove",e=>{if(!drag)return;let x=sl+(e.clientX-ox),y=st+(e.clientY-oy);const pad=8,maxX=innerWidth-w.offsetWidth-pad,maxY=innerHeight-w.offsetHeight-pad;x=Math.max(pad,Math.min(maxX,x));y=Math.max(pad,Math.min(maxY,y));w.style.left=x+"px";w.style.top=y+"px"});h.addEventListener("pointerup",()=>drag=false);h.addEventListener("pointercancel",()=>drag=false)})();
-async function setScreenQuality(key,notify=true){\n  const profile=SCREEN_QUALITY[key]||SCREEN_QUALITY.auto;\n  if(!S.call)return;\n  S.call.screenQuality=key||"auto";\n  $("[data-screen-quality]").forEach(b=>b.classList.toggle("active",b.dataset.screenQuality===S.call.screenQuality));\n  const btn=$("#screenQualityBtn");if(btn)btn.textContent="⚙ "+profile.label;\n  const track=S.call.screen?.getVideoTracks?.()[0];\n  if(track){\n    const constraints=key==="auto"?{width:{ideal:2560,max:2560},height:{ideal:1440,max:1440},frameRate:{ideal:60,max:60}}:{width:{ideal:profile.width,max:profile.width},height:{ideal:profile.height,max:profile.height},frameRate:{ideal:profile.fps,max:profile.fps}};\n    track.applyConstraints?.(constraints).catch(()=>{});\n    try{track.contentHint="detail"}catch{}\n    for(const p of Object.values(S.call.screenPeers||{})){\n      const sender=p?.pc?.getSenders?.().find(x=>x.track?.kind==="video");\n      if(!sender)continue;\n      const params=sender.getParameters?.()||{};\n      params.degradationPreference="maintain-resolution";\n      params.encodings=params.encodings||[{}];\n      params.encodings[0].maxBitrate=profile.bitrate;\n      params.encodings[0].maxFramerate=profile.fps;\n      sender.setParameters?.(params).catch?.(()=>{});\n    }\n  }\n  if(notify)toast("Screen share quality",profile.label+(track?" applied":" selected for the next share"));\n}\nfunction toggleScreenQualityMenu(){const m=$("#screenQualityMenu");if(!m)return;m.classList.toggle("hidden");}\nfunction stopScreenShare(){if(!S.call?.screen)return;const old=S.call.screen;S.call.screen=null;$("#tile-local")?.classList.remove("screen-presenting","screen-share");setScreenFocus(false);$("#screenFocusBtn")?.classList.add("hidden");for(const [id,p] of Object.entries(S.call.screenPeers||{})){if(p.local){if(p.pc)try{p.pc.close()}catch{};S.socket.emit("screen:stop",{to:id});delete S.call.screenPeers[id]}}old.getTracks().forEach(t=>t.stop());localPreview(S.call.stream)}
+async function setScreenQuality(key,notify=true){
+  const profile=SCREEN_QUALITY[key]||SCREEN_QUALITY.auto;
+  if(!S.call)return;
+  S.call.screenQuality=key||"auto";
+  $("[data-screen-quality]").forEach(b=>b.classList.toggle("active",b.dataset.screenQuality===S.call.screenQuality));
+  const btn=$("#screenQualityBtn");if(btn)btn.textContent="⚙ "+profile.label;
+  const track=S.call.screen?.getVideoTracks?.()[0];
+  if(track){
+    const constraints=key==="auto"?{width:{ideal:2560,max:2560},height:{ideal:1440,max:1440},frameRate:{ideal:60,max:60}}:{width:{ideal:profile.width,max:profile.width},height:{ideal:profile.height,max:profile.height},frameRate:{ideal:profile.fps,max:profile.fps}};
+    track.applyConstraints?.(constraints).catch(()=>{});
+    try{track.contentHint="detail"}catch{}
+    for(const p of Object.values(S.call.screenPeers||{})){
+      const sender=p?.pc?.getSenders?.().find(x=>x.track?.kind==="video");
+      if(!sender)continue;
+      const params=sender.getParameters?.()||{};
+      params.degradationPreference="maintain-resolution";
+      params.encodings=params.encodings||[{}];
+      params.encodings[0].maxBitrate=profile.bitrate;
+      params.encodings[0].maxFramerate=profile.fps;
+      sender.setParameters?.(params).catch?.(()=>{});
+    }
+  }
+  if(notify)toast("Screen share quality",profile.label+(track?" applied":" selected for the next share"));
+}
+function toggleScreenQualityMenu(){const m=$("#screenQualityMenu");if(!m)return;m.classList.toggle("hidden");}
+function stopScreenShare(){if(!S.call?.screen)return;const old=S.call.screen;S.call.screen=null;$("#tile-local")?.classList.remove("screen-presenting","screen-share");setScreenFocus(false);$("#screenFocusBtn")?.classList.add("hidden");for(const [id,p] of Object.entries(S.call.screenPeers||{})){if(p.local){if(p.pc)try{p.pc.close()}catch{};S.socket.emit("screen:stop",{to:id});delete S.call.screenPeers[id]}}old.getTracks().forEach(t=>t.stop());localPreview(S.call.stream)}
 $("#screenBtn").onclick=async()=>{if(!S.call)return;try{if(!navigator.mediaDevices?.getDisplayMedia)throw new Error("Screen sharing is not supported in this browser.");if(!S.call.screen){const shared=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:60,max:60},cursor:"always",displaySurface:"monitor"},audio:false,selfBrowserSurface:"exclude",surfaceSwitching:"include"});const screen=shared.getVideoTracks()[0];if(!screen)throw new Error("No screen video track was returned.");
 try{
   screen.contentHint="detail";
