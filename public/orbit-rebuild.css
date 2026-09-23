@@ -144,3 +144,57 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:rad
     display:none;
   }
 }
+
+
+/* ORBIT CORE UI 2.1 — readable chat + call workspace */
+.app.messages-mode .dm{grid-template-columns:360px minmax(0,1fr)}
+.app.messages-mode .dm-left{min-width:0}
+.app.messages-mode .dm-item{min-height:70px;padding:12px 13px;gap:13px}
+.app.messages-mode .dm-item .avatar{width:46px;height:46px;min-width:46px;border-radius:13px}
+.app.messages-mode .dm-copy strong{font-size:12px}
+.app.messages-mode .dm-copy span{font-size:9px;margin-top:4px}
+.app.messages-mode .dm-head{height:78px;min-height:78px;padding:0 24px;gap:13px}
+.app.messages-mode .dm-head .avatar{width:46px;height:46px;min-width:46px}
+.app.messages-mode .dm-head-main strong{font-size:15px}
+.app.messages-mode .dm-head-main span{font-size:9px}
+.app.messages-mode .dm-body{padding:24px 34px}
+.app.messages-mode .dm-body .msg{gap:13px;padding:11px 0}
+.app.messages-mode .dm-body .msg .avatar{width:44px;height:44px;min-width:44px;border-radius:13px}
+.app.messages-mode .dm-body .msg-head strong{font-size:12px}
+.app.messages-mode .dm-body .msg-head time{font-size:9px}
+.app.messages-mode .dm-body .msg-text{font-size:14px;line-height:1.75}
+.app.messages-mode .composer-wrap{padding:0 28px 24px}
+.app.messages-mode .composer{min-height:52px;padding:9px 10px;border-radius:15px}
+.app.messages-mode .composer input{font-size:13px}
+.app.messages-mode .tool,.app.messages-mode .send{height:42px}
+.app.messages-mode .tool{width:42px}
+.app.messages-mode .send{padding:0 18px;font-size:10px}
+
+.call-win{width:min(1320px,94vw);height:min(860px,90vh);border-radius:20px}
+.call-top{cursor:grab;height:74px;min-height:74px;padding:0 20px}
+.call-top:active{cursor:grabbing}
+.call-top strong{font-size:16px}
+.call-top small{font-size:9px}
+.call-stage{padding:16px;gap:14px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.call-stage .tile{min-height:240px;border-radius:16px}
+.tile>.avatar{position:absolute;left:14px;top:14px;width:54px;height:54px;min-width:54px;border-radius:16px;border:2px solid #ffffff2b;box-shadow:0 12px 30px #0008;z-index:3}
+.tile>.tile-label{position:absolute;left:14px;bottom:14px;padding:7px 10px;background:#000b;border-radius:8px;font-size:10px;z-index:4}
+.call-bar{height:82px;min-height:82px;padding:0 20px}
+.call-btn{height:44px;padding:0 13px;border-radius:11px;font-size:10px}
+.leave{height:44px;padding:0 18px;border-radius:11px;font-size:10px}
+
+@media(max-width:900px){
+  .app.messages-mode .dm{grid-template-columns:minmax(0,1fr)}
+  .app.messages-mode .dm-left{display:none}
+  .app.messages-mode .dm-body{padding:18px}
+}
+@media(max-width:700px){
+  .app.messages-mode .dm-head{height:68px;min-height:68px;padding:0 14px}
+  .app.messages-mode .dm-head-main strong{font-size:13px}
+  .app.messages-mode .dm-body{padding:16px 12px}
+  .app.messages-mode .dm-body .msg-text{font-size:13px}
+  .app.messages-mode .composer-wrap{padding:0 12px 14px}
+  .call-top{height:66px;min-height:66px}
+  .call-stage{grid-template-columns:1fr;padding:10px}
+  .call-stage .tile{min-height:210px}
+}
