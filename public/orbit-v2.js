@@ -77,8 +77,25 @@ function shopCard(x){const action=x.owned?('<button class="btn" data-equip="'+es
 async function buyItem(id){try{const d=await api("/api/studio/buy",{method:"POST",body:JSON.stringify({itemId:id})});await loadStudio();toast("ORBIT Studio","Item added to your collection.")}catch(e){toast("Shop",e.message)}}
 async function equipItem(id,type){try{const d=await api("/api/studio/equip",{method:"POST",body:JSON.stringify({itemId:id,type})});S.me=d.user;updateChrome();render()}catch(e){toast("Studio",e.message)}}
 async function loadStudio(){const d=await api("/api/studio");S.me=d.user;S.shop=d.shop;render()}
-function missions(r){r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">MISSIONS</span><h1>Play the daily loop.</h1><p>Simple goals. Real rewards. No confusing progression trees.</p></div></div><div class="stack">'+S.missions.map(m=>{const p=Math.min(m.target,m.progress);return'<article class="mission"><div class="mission-head"><div><h3>'+esc(m.title)+'</h3><p>'+esc(m.description)+'</p></div><span style="font-size:7px;color:var(--gold)">✦ '+m.rewardCoins+' · +'+m.rewardXp+' XP</span></div><div class="bar"><i style="width:'+((p/m.target)*100)+'%"></i></div><div class="actions" style="justify-content:space-between;margin-top:9px"><span class="muted" style="font-size:6px">'+p+' / '+m.target+'</span>'+(m.claimed?'<span style="font-size:7px;color:var(--green)">Claimed</span>':p>=m.target?'<button class="btn gold" data-claim="'+esc(m.id)+'">Claim reward</button>':'<span class="muted" style="font-size:6px">Keep going</span>')+'</div></article>'}).join("")+'</div></div>';$$("[data-claim]").forEach(b=>b.onclick=()=>claimMission(b.dataset.claim))}
-async function claimMission(id){try{const d=await api("/api/missions/"+encodeURIComponent(id)+"/claim",{method:"POST"});S.me=d.user;await loadMissions();updateChrome();toast("Mission complete","+"+d.reward.coins+" Coins · +"+d.reward.xp+" XP")}catch(e){toast("Mission",e.message)}}
+function missions(r){
+ const groups=[
+  ["daily","DAILY QUESTS","Reset every day."],
+  ["weekly","WEEKLY QUESTS","Bigger goals. Bigger rewards."],
+  ["lifetime","LIFETIME","Permanent milestones."]
+ ];
+ const completed=S.missions.filter(m=>m.claimed).length;
+ const totalRewards=S.missions.reduce((n,m)=>n+(m.rewardCoins||m.coins||0),0);
+ r.innerHTML='<div class="page"><div class="page-head"><div><span class="eyebrow">ORBIT QUESTS</span><h1>Turn activity into progress.</h1><p>Complete real actions across ORBIT to earn XP, Coins and unlock your next level.</p></div><div class="mission-overview"><span><b>'+completed+'</b> claimed</span><span><b>'+S.missions.length+'</b> quests</span><span><b>✦ '+totalRewards+'</b> total coins</span></div></div><div class="mission-groups">'+groups.map(([cadence,title,sub])=>{
+   const rows=S.missions.filter(m=>m.cadence===cadence);
+   if(!rows.length)return "";
+   return '<section class="mission-group"><div class="mission-group-head"><div><span class="eyebrow">'+title+'</span><p>'+sub+'</p></div><span class="mission-count">'+rows.length+'</span></div><div class="mission-grid">'+rows.map(m=>{
+    const p=Math.min(m.target,m.progress||0),pct=Math.min(100,Math.round((p/m.target)*100));
+    const status=m.claimed?"CLAIMED":p>=m.target?"READY":"IN PROGRESS";
+    return '<article class="mission '+(m.claimed?"claimed":"")+'"><div class="mission-head"><div><div class="mission-status">'+status+'</div><h3>'+esc(m.title)+'</h3><p>'+esc(m.description)+'</p></div><span class="mission-reward">✦ '+m.coins+' · +'+m.xp+' XP</span></div><div class="bar"><i style="width:'+pct+'%"></i></div><div class="mission-foot"><span>'+p+' / '+m.target+' · '+pct+'%</span>'+(m.claimed?'<span class="mission-done">✓ Reward claimed</span>':p>=m.target?'<button class="btn gold" data-claim="'+esc(m.id)+'">Claim reward</button>':'<span class="mission-keep">Keep going</span>')+'</div></article>'
+   }).join("")+'</div></section>'
+ }).join("")+'</div></div>';
+ $$("[data-claim]").forEach(btn=>btn.onclick=()=>claimMission(btn.dataset.claim));
+}async function claimMission(id){try{const d=await api("/api/missions/"+encodeURIComponent(id)+"/claim",{method:"POST"});S.me=d.user;await loadMissions();updateChrome();toast("Mission complete","+"+d.reward.coins+" Coins · +"+d.reward.xp+" XP")}catch(e){toast("Mission",e.message)}}
 async function loadMissions(){const d=await api("/api/missions");S.missions=d.missions||[]}
 function applyPreferences(){
  const p=S.me?.preferences||{},root=document.documentElement,body=document.body;
