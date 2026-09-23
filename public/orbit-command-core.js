@@ -54,6 +54,7 @@
   }
 
   function core(){
+    if(!isHome()){removeCore();return}
     if($("#orbitCore"))return;
     const page=$("#surface .page");
     if(!page)return;
@@ -85,7 +86,10 @@
     presenceCount().then(n=>{if(n!=null){const e=$("#orbitPresenceCount");if(e)e.textContent=n}});
   }
 
-  function isHome(){return $("#viewTitle")?.textContent?.trim()==="Home" && !!$("#surface .page");}
+  function isHome(){
+    const active=$("#nav button.active");
+    return !!active && active.dataset.view==="home" && !!$("#surface .page");
+  }
   function removeCore(){
     const el=$("#orbitCore");
     if(el)el.remove();
