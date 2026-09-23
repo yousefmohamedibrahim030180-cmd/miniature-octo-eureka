@@ -9,7 +9,7 @@ const {Server}=require("socket.io");
 const app=express();
 // ORBIT deploy marker: keep Railway source deploys aligned with main.
 const server=http.createServer(app);
-const io=new Server(server,{transports:["polling"],cors:{origin:true,credentials:true},allowUpgrades:false});
+const io=new Server(server,{transports:["polling"],cors:{origin:true,credentials:true},allowUpgrades:false,maxHttpBufferSize:8*1024*1024,pingTimeout:60000,pingInterval:25000});
 const PORT=Number(process.env.PORT||8080);
 const PERSIST_URL=String(process.env.ORBIT_PERSIST_URL||"").trim().replace(/\/$/,"");
 const PERSIST_SECRET=String(process.env.ORBIT_PERSIST_SECRET||"").trim();
@@ -263,7 +263,7 @@ function conversationAccess(conversationId,userId){
 }
 function conversationUsers(conversationId){return [...(memory.convMembers.get(conversationId)||new Set())]}
 function conversationState(c){c.lastMessage=c.lastMessage&&typeof c.lastMessage==="object"?c.lastMessage:null;c.updatedAt=c.updatedAt||c.createdAt||now();c.unread=c.unread&&typeof c.unread==="object"?c.unread:{};return c;}
-function messagePreview(m){if(!m)return null;const raw=String(m.content||"").trim();const preview=m.deleted_at?"Message deleted":raw||((m.metadata?.attachment?.kind==="image")?"Photo":"Attachment");return {id:m.id,senderId:m.senderId,content:preview.slice(0,180),created_at:m.created_at,deleted_at:m.deleted_at||null};}
+function messagePreview(m){if(!m)return null;const raw=String(m.content||"").trim();const preview=m.deleted_at?"Message deleted":raw||((m.metadata?.attachment?.kind==="image")?"Photo":(m.metadata?.attachment?.kind==="voice"?"Voice message":"Attachment"));return {id:m.id,senderId:m.senderId,content:preview.slice(0,180),created_at:m.created_at,deleted_at:m.deleted_at||null};}
 function appendConversationMessage(conversationId,m,bumpUnread=true){const c=conversationState(memory.conversations.get(conversationId)||{id:conversationId});memory.conversations.set(conversationId,c);c.lastMessage=messagePreview(m);c.updatedAt=m.created_at;if(!bumpUnread)return;const members=memory.convMembers.get(conversationId)||new Set();for(const uid of members)if(String(uid)!==String(m.senderId))c.unread[String(uid)]=Number(c.unread[String(uid)]||0)+1;}
 function markConversationRead(conversationId,userId){const c=memory.conversations.get(conversationId);if(!c)return false;conversationState(c);if(Number(c.unread[String(userId)]||0)===0)return false;c.unread[String(userId)]=0;return true;}
 function messageRows(conversationId){return (memory.messages.get(conversationId)||[]).map(m=>({...m,sender:userPublic(memory.users.get(m.senderId))}));}
