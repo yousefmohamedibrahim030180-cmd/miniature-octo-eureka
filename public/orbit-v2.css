@@ -663,3 +663,13 @@ html[data-orbitFontScale="125"] .ctx-item strong{font-size:calc(8px * 1.25)}
 .media-cell{transition:.16s ease}.media-cell:hover{transform:translateY(-1px);background:rgba(255,255,255,.07)!important;color:#d8e0ee}
 @media(max-width:1050px){.dm-shell>.dm-list .dm-item{min-height:64px}.presence-dot{left:39px;bottom:16px}}
 @media(max-width:700px){.message-actions{position:static;opacity:1;transform:none;pointer-events:auto;margin-top:8px;background:transparent;border:0;padding:0;box-shadow:none}.chat-head{padding:0 14px!important}.reply-bar{margin-left:12px;margin-right:12px}}
+
+
+/* ORBIT 3.0 REACTIONS */
+.reaction-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.msg-reaction{height:25px;padding:0 7px;border:1px solid rgba(255,255,255,.08);border-radius:999px;background:rgba(255,255,255,.035);color:#dce4f2;font-size:8px;cursor:pointer}
+.msg-reaction:hover{background:rgba(129,105,255,.14);border-color:rgba(129,145,255,.25)}
+.msg-reaction b{font-size:7px;color:var(--muted);margin-left:2px}
+.reaction-menu{position:fixed;z-index:5000;display:flex;gap:4px;padding:6px;border:1px solid rgba(255,255,255,.1);border-radius:13px;background:rgba(7,12,20,.94);backdrop-filter:blur(20px);box-shadow:0 18px 55px rgba(0,0,0,.35)}
+.reaction-menu button{width:32px;height:32px;border:0;border-radius:9px;background:transparent;font-size:16px;cursor:pointer}
+.reaction-menu button:hover{background:rgba(255,255,255,.08)}
