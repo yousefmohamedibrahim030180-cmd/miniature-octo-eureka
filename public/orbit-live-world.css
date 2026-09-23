@@ -198,3 +198,44 @@
   .orbit-world-orbit{width:88%;height:190px}
   .orbit-world-orbit.two{width:95%;height:220px}
 }
+
+/* Smooth-motion patch */
+.orbit-live-world,
+.orbit-live-world *{
+  -webkit-transform-style:preserve-3d;
+  transform-style:preserve-3d;
+}
+.orbit-world-core,
+.orbit-world-core:before,
+.orbit-world-core:after,
+.orbit-world-orbit,
+.orbit-world-node{
+  will-change:transform;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+.orbit-world-node{
+  transition:
+    left 900ms cubic-bezier(.22,.61,.36,1),
+    top 900ms cubic-bezier(.22,.61,.36,1),
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+.orbit-world-node.moving{animation:none!important}
+.orbit-world-core:before{animation:worldRing 18s linear infinite!important}
+.orbit-world-core:after{animation:worldRingRev 26s linear infinite!important}
+.orbit-world-orbit{will-change:transform}
+.orbit-world-orbit{animation:worldOrbitOne 34s linear infinite}
+.orbit-world-orbit.two{animation:worldOrbitTwo 42s linear infinite}
+@keyframes worldOrbitOne{
+  from{transform:translate3d(-50%,-50%,0) rotate(-9deg)}
+  to{transform:translate3d(-50%,-50%,0) rotate(351deg)}
+}
+@keyframes worldOrbitTwo{
+  from{transform:translate3d(-50%,-50%,0) rotate(32deg)}
+  to{transform:translate3d(-50%,-50%,0) rotate(-328deg)}
+}
+@media(prefers-reduced-motion:reduce){
+  .orbit-world-core:before,.orbit-world-core:after,.orbit-world-orbit,.orbit-world-orbit.two{animation:none!important}
+}
