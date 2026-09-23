@@ -1,0 +1,177 @@
+/* ORBIT — Living Atmosphere Engine */
+:root{
+  --orbit-mx:0px;
+  --orbit-my:0px;
+  --orbit-speed:1;
+  --orbit-stars-opacity:.68;
+  --orbit-glow-strength:.66;
+}
+html,body{background:#050812!important}
+body{--orbit-space-transition:900ms}
+.orbit-space-bg{
+  position:fixed;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 42%,rgba(82,98,255,.07),transparent 35%),
+    #050812;
+  isolation:isolate;
+}
+.orbit-space-bg>*{position:absolute;inset:0;pointer-events:none}
+.orbit-space-nebula{
+  background:
+    radial-gradient(ellipse at 19% 22%,rgba(137,83,255,.16),transparent 33%),
+    radial-gradient(ellipse at 78% 25%,rgba(50,214,255,.12),transparent 30%),
+    radial-gradient(ellipse at 65% 82%,rgba(151,68,255,.12),transparent 34%),
+    radial-gradient(ellipse at 25% 78%,rgba(42,163,255,.08),transparent 28%);
+  filter:blur(36px);
+  transform:translate3d(var(--orbit-mx),var(--orbit-my),0) scale(1.08);
+  transition:background var(--orbit-space-transition) ease;
+}
+.orbit-space-glow{filter:blur(70px);opacity:calc(.45 * var(--orbit-glow-strength));mix-blend-mode:screen}
+.orbit-glow-a{
+  width:48vw;height:48vw;inset:auto auto 8vh 4vw;
+  background:radial-gradient(circle,rgba(99,86,255,.28),transparent 68%);
+  animation:orbitFloatA calc(15s / var(--orbit-speed)) ease-in-out infinite alternate;
+}
+.orbit-glow-b{
+  width:44vw;height:44vw;inset:5vh 3vw auto auto;
+  background:radial-gradient(circle,rgba(53,212,255,.22),transparent 68%);
+  animation:orbitFloatB calc(18s / var(--orbit-speed)) ease-in-out infinite alternate;
+}
+.orbit-space-ring{
+  width:72vw;height:28vw;
+  border:1px solid rgba(133,165,255,.11);
+  border-radius:50%;
+  left:50%;top:51%;
+  transform:translate(-50%,-50%) rotate(-18deg) translate3d(var(--orbit-mx),var(--orbit-my),0);
+  box-shadow:0 0 50px rgba(103,103,255,.05),inset 0 0 50px rgba(103,103,255,.025);
+}
+.orbit-ring-b{width:62vw;height:20vw;transform:translate(-50%,-50%) rotate(34deg)}
+.orbit-ring-c{width:92vw;height:38vw;transform:translate(-50%,-50%) rotate(7deg);opacity:.55}
+.orbit-space-stars{opacity:var(--orbit-stars-opacity)}
+.orbit-space-stars i{
+  position:absolute;
+  left:var(--x);top:var(--y);
+  width:var(--size);height:var(--size);
+  border-radius:50%;
+  background:rgba(255,255,255,var(--alpha));
+  box-shadow:0 0 9px rgba(135,193,255,.25);
+  animation:orbitTwinkle var(--dur) ease-in-out var(--delay) infinite;
+}
+.orbit-space-dust i{
+  left:var(--x);top:var(--y);
+  width:var(--r);height:var(--r);
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(117,180,255,.07),transparent 68%);
+  filter:blur(1px);
+  animation:orbitDust 12s linear var(--delay) infinite;
+}
+.orbit-space-vignette{
+  background:
+    radial-gradient(circle at center,transparent 26%,rgba(1,3,8,.18) 72%,rgba(1,2,6,.72) 100%);
+}
+body[data-orbit-light="light"] .orbit-space-vignette{background:radial-gradient(circle at center,transparent 34%,rgba(1,3,8,.08) 75%,rgba(1,2,6,.32) 100%)}
+body[data-orbit-light="balanced"] .orbit-space-vignette{background:radial-gradient(circle at center,transparent 31%,rgba(1,3,8,.12) 73%,rgba(1,2,6,.48) 100%)}
+
+/* Atmosphere identities */
+body[data-orbit-atmosphere="void"] .orbit-space-nebula{background:radial-gradient(ellipse at 53% 50%,rgba(115,72,255,.16),transparent 34%)}
+body[data-orbit-atmosphere="nebula"] .orbit-space-nebula{background:radial-gradient(ellipse at 23% 23%,rgba(155,76,255,.25),transparent 34%),radial-gradient(ellipse at 76% 33%,rgba(47,215,255,.18),transparent 30%),radial-gradient(ellipse at 62% 78%,rgba(145,59,255,.18),transparent 36%)}
+body[data-orbit-atmosphere="aurora"] .orbit-space-nebula{background:radial-gradient(ellipse at 22% 35%,rgba(54,247,191,.22),transparent 34%),radial-gradient(ellipse at 75% 25%,rgba(105,91,255,.21),transparent 33%),radial-gradient(ellipse at 45% 76%,rgba(49,209,255,.13),transparent 35%)}
+body[data-orbit-atmosphere="solar"] .orbit-space-nebula{background:radial-gradient(ellipse at 80% 35%,rgba(255,182,67,.23),transparent 34%),radial-gradient(ellipse at 24% 74%,rgba(255,90,64,.13),transparent 31%)}
+body[data-orbit-atmosphere="eclipse"] .orbit-space-nebula{background:radial-gradient(circle at 50% 44%,rgba(238,188,115,.18),transparent 15%),radial-gradient(ellipse at 18% 78%,rgba(88,96,255,.10),transparent 32%)}
+body[data-orbit-atmosphere="galaxy"] .orbit-space-nebula{background:radial-gradient(ellipse at 70% 28%,rgba(97,112,255,.22),transparent 31%),radial-gradient(ellipse at 32% 68%,rgba(165,73,255,.21),transparent 34%)}
+body[data-orbit-atmosphere="plasma"] .orbit-space-nebula{background:radial-gradient(ellipse at 36% 35%,rgba(25,218,255,.27),transparent 30%),radial-gradient(ellipse at 79% 70%,rgba(104,78,255,.22),transparent 31%)}
+body[data-orbit-atmosphere="ice"] .orbit-space-nebula{background:radial-gradient(ellipse at 24% 24%,rgba(155,227,255,.25),transparent 30%),radial-gradient(ellipse at 80% 65%,rgba(107,177,255,.18),transparent 33%)}
+body[data-orbit-atmosphere="moon"] .orbit-space-nebula{background:radial-gradient(circle at 74% 28%,rgba(225,235,255,.20),transparent 22%),radial-gradient(ellipse at 25% 78%,rgba(101,130,197,.12),transparent 35%)}
+body[data-orbit-atmosphere="prism"] .orbit-space-nebula{background:linear-gradient(120deg,rgba(255,125,195,.14),transparent 35%),radial-gradient(ellipse at 70% 30%,rgba(64,226,255,.16),transparent 31%),radial-gradient(ellipse at 30% 75%,rgba(146,103,255,.18),transparent 33%)}
+body[data-orbit-atmosphere="cyber"] .orbit-space-nebula{background:radial-gradient(ellipse at 20% 20%,rgba(51,219,255,.17),transparent 29%),radial-gradient(ellipse at 80% 80%,rgba(127,74,255,.17),transparent 34%)}
+body[data-orbit-atmosphere="redplanet"] .orbit-space-nebula{background:radial-gradient(circle at 72% 37%,rgba(255,119,66,.22),transparent 24%),radial-gradient(ellipse at 24% 77%,rgba(162,54,73,.15),transparent 35%)}
+body[data-orbit-atmosphere="blueplanet"] .orbit-space-nebula{background:radial-gradient(circle at 76% 30%,rgba(73,190,255,.25),transparent 24%),radial-gradient(ellipse at 21% 75%,rgba(55,125,255,.18),transparent 34%)}
+body[data-orbit-atmosphere="wormhole"] .orbit-space-nebula{background:radial-gradient(circle at 50% 50%,rgba(147,82,255,.25),transparent 19%),radial-gradient(circle at 50% 50%,rgba(27,201,255,.09),transparent 38%)}
+body[data-orbit-atmosphere="pearl"] .orbit-space-nebula{background:radial-gradient(ellipse at 30% 26%,rgba(245,249,255,.20),transparent 31%),radial-gradient(ellipse at 76% 74%,rgba(137,197,255,.13),transparent 34%)}
+body[data-orbit-atmosphere="dawn"] .orbit-space-nebula{background:radial-gradient(ellipse at 16% 83%,rgba(255,183,106,.26),transparent 37%),radial-gradient(ellipse at 77% 28%,rgba(255,116,175,.15),transparent 32%)}
+body[data-orbit-atmosphere="singularity"] .orbit-space-nebula{background:radial-gradient(circle at 50% 50%,rgba(255,255,255,.10),transparent 9%),radial-gradient(circle at 50% 50%,rgba(124,83,255,.30),transparent 30%)}
+body[data-orbit-atmosphere="ocean"] .orbit-space-nebula{background:radial-gradient(ellipse at 21% 70%,rgba(28,137,220,.19),transparent 35%),radial-gradient(ellipse at 78% 22%,rgba(84,224,255,.14),transparent 30%)}
+body[data-orbit-atmosphere="horizon"] .orbit-space-nebula{background:linear-gradient(180deg,transparent 0 52%,rgba(89,174,255,.15) 64%,transparent 78%),radial-gradient(ellipse at 55% 68%,rgba(194,238,255,.19),transparent 24%)}
+body[data-orbit-atmosphere="lavender"] .orbit-space-nebula{background:radial-gradient(ellipse at 27% 26%,rgba(213,177,255,.22),transparent 34%),radial-gradient(ellipse at 78% 73%,rgba(133,116,255,.18),transparent 34%)}
+body[data-orbit-atmosphere="midnight"] .orbit-space-nebula{background:radial-gradient(ellipse at 70% 26%,rgba(76,109,255,.12),transparent 30%),radial-gradient(ellipse at 24% 77%,rgba(64,77,143,.08),transparent 31%)}
+
+body[data-orbit-light="light"] .orbit-space-ring{border-color:rgba(145,193,255,.18)}
+body[data-orbit-light="light"] .orbit-space-stars{filter:brightness(1.18)}
+body[data-orbit-light="dark"] .orbit-space-stars{filter:brightness(.9)}
+
+.orbit-atmosphere-static .orbit-space-glow,
+.orbit-atmosphere-static .orbit-space-ring,
+.orbit-atmosphere-static .orbit-space-stars i,
+.orbit-atmosphere-static .orbit-space-dust i{animation:none!important}
+.orbit-reduce-motion .orbit-space-glow,
+.orbit-reduce-motion .orbit-space-ring,
+.orbit-reduce-motion .orbit-space-stars i,
+.orbit-reduce-motion .orbit-space-dust i{animation:none!important}
+
+/* Pull the product above the atmosphere while keeping the background alive */
+#app,.call,.incoming,.modal-bg,.toast-stack{position:relative;z-index:2}
+#app{background:transparent!important}
+.rail,.context,.top,.main,.dm-left,.dm-right,.chat,.call-win{
+  background:rgba(7,11,19,.72)!important;
+  backdrop-filter:blur(22px) saturate(130%);
+}
+.surface{background:transparent!important}
+.top{box-shadow:0 1px 0 rgba(255,255,255,.035),0 16px 50px rgba(0,0,0,.14)}
+.rail,.context{box-shadow:inset -1px 0 rgba(255,255,255,.035)}
+.card,.settings-card,.settings-shell,.workspace,.composer,.dm-item,.chat-action,.btn,.ctx-action{
+  box-shadow:0 10px 45px rgba(0,0,0,.12);
+}
+.card:hover,.dm-item:hover{box-shadow:0 16px 55px rgba(0,0,0,.16)}
+.nav button.active,.channel.active{
+  box-shadow:0 0 0 1px rgba(142,108,255,.16),0 0 28px rgba(114,103,255,.12);
+}
+body[data-orbit-light="light"] .rail,
+body[data-orbit-light="light"] .context,
+body[data-orbit-light="light"] .top,
+body[data-orbit-light="light"] .main,
+body[data-orbit-light="light"] .dm-left,
+body[data-orbit-light="light"] .dm-right,
+body[data-orbit-light="light"] .chat{
+  background:rgba(16,23,33,.68)!important;
+}
+@keyframes orbitFloatA{from{transform:translate3d(calc(var(--orbit-mx) - 2vw),calc(var(--orbit-my) + 1vh),0) scale(.96)}to{transform:translate3d(calc(var(--orbit-mx) + 3vw),calc(var(--orbit-my) - 2vh),0) scale(1.06)}}
+@keyframes orbitFloatB{from{transform:translate3d(calc(var(--orbit-mx) + 2vw),calc(var(--orbit-my) + 1vh),0) scale(1.02)}to{transform:translate3d(calc(var(--orbit-mx) - 3vw),calc(var(--orbit-my) - 2vh),0) scale(.95)}}
+@keyframes orbitTwinkle{0%,100%{opacity:.35;transform:scale(.72)}50%{opacity:1;transform:scale(1.16)}}
+@keyframes orbitDust{0%{transform:translate3d(0,0,0)}50%{transform:translate3d(18px,-12px,0)}100%{transform:translate3d(0,0,0)}}
+@media(max-width:900px){
+  .orbit-space-ring{opacity:.65}
+}
+@media(max-width:700px){
+  .orbit-space-ring{opacity:.45}
+}
+
+/* Experience Lab cards */
+.atmosphere-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:13px}
+.atmosphere-option{border:1px solid rgba(255,255,255,.08);border-radius:15px;padding:0;background:rgba(255,255,255,.025);overflow:hidden;text-align:left;cursor:pointer;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.atmosphere-option:hover{transform:translateY(-2px);border-color:rgba(151,130,255,.34);box-shadow:0 15px 50px rgba(0,0,0,.2)}
+.atmosphere-option.active{border-color:rgba(112,190,255,.48);box-shadow:0 0 0 1px rgba(112,190,255,.15),0 18px 60px rgba(54,111,255,.14)}
+.atmosphere-option .atmosphere-mini-preview{height:96px}
+.atmosphere-option .atmosphere-name{display:block;padding:10px 11px 0;font-weight:700;font-size:10px}
+.atmosphere-option .atmosphere-type{display:block;padding:3px 11px 11px;color:var(--muted);font-size:8px}
+.atmosphere-mini-preview{
+  position:relative;overflow:hidden;
+  background:radial-gradient(circle at 50% 50%,rgba(120,94,255,.28),transparent 23%),linear-gradient(135deg,#070b14,#121c2f);
+  min-height:90px;border-bottom:1px solid rgba(255,255,255,.06);
+}
+.atmosphere-mini-preview:after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,transparent 0 14%,rgba(255,255,255,.03) 15%,transparent 16%),radial-gradient(circle at 18% 80%,rgba(40,210,255,.14),transparent 35%)}
+.mini-core{position:absolute;width:26px;height:26px;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,rgba(119,130,255,.8) 24%,rgba(58,80,170,.16) 70%,transparent 72%);filter:drop-shadow(0 0 14px rgba(101,160,255,.65))}
+.mini-orbit{position:absolute;left:50%;top:50%;width:120px;height:42px;border:1px solid rgba(120,190,255,.42);border-radius:50%;transform:translate(-50%,-50%) rotate(-15deg)}
+.mini-orbit.two{width:100px;height:30px;transform:translate(-50%,-50%) rotate(24deg);border-color:rgba(175,116,255,.42)}
+.mini-star{position:absolute;width:3px;height:3px;border-radius:50%;background:#fff;box-shadow:0 0 9px rgba(150,220,255,.8)}
+.mini-star.s1{left:18%;top:24%}.mini-star.s2{left:78%;top:22%}.mini-star.s3{left:70%;top:76%}
+@media(max-width:1100px){.atmosphere-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.atmosphere-grid{grid-template-columns:1fr}}
+body[data-orbit-atmosphere="solar"] .orbit-space-ring{border-color:rgba(255,190,100,.16)}
+body[data-orbit-atmosphere="solar"] .orbit-space-stars i{background:rgba(255,246,218,var(--alpha))}
+body[data-orbit-atmosphere="ice"] .orbit-space-ring,
+body[data-orbit-atmosphere="moon"] .orbit-space-ring,
+body[data-orbit-atmosphere="pearl"] .orbit-space-ring{border-color:rgba(205,232,255,.20)}
