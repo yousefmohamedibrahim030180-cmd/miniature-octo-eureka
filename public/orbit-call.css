@@ -29,3 +29,97 @@
 .video-tile:not(.is-video-off) .call-avatar .avatar{width:104px;height:104px;min-width:104px;border-radius:32px;font-size:28px;box-shadow:0 0 0 2px #ffffff18,0 0 45px #8f6fff35,0 18px 45px #0008}
 .video-tile.is-video-off .call-avatar{opacity:1}
 @media(max-width:700px){.video-tile .call-avatar .avatar{width:96px;height:96px;min-width:96px;border-radius:29px;font-size:26px}.video-tile:not(.is-video-off) .call-avatar .avatar{width:82px;height:82px;min-width:82px}}
+
+/* ORBIT Screen Share presentation mode */
+.video-tile.screen-share{
+  position:relative!important;
+  overflow:hidden!important;
+  background:#02050a!important;
+  min-height:360px!important;
+  border-color:rgba(125,105,255,.32)!important;
+}
+.video-tile.screen-share video{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+  background:#02050a!important;
+  z-index:2!important;
+  transform-origin:center center!important;
+  transition:transform .16s cubic-bezier(.2,.8,.2,1)!important;
+  image-rendering:auto;
+  backface-visibility:hidden;
+  will-change:transform;
+}
+.video-tile.screen-share .call-avatar{display:none!important}
+.video-tile.screen-share .video-label{z-index:7!important}
+.screen-share-head{
+  position:absolute;
+  top:10px;
+  left:10px;
+  right:10px;
+  z-index:8;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  pointer-events:none;
+}
+.screen-share-head span,
+.screen-share-head strong{
+  padding:6px 8px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:8px;
+  background:rgba(3,6,12,.68);
+  backdrop-filter:blur(12px);
+}
+.screen-share-head span{
+  color:#8ee9ff;
+  font-size:6px;
+  letter-spacing:.12em;
+}
+.screen-share-head strong{
+  color:#dce7f7;
+  font-size:7px;
+  font-weight:600;
+}
+.screen-share-zoom{
+  position:absolute;
+  right:12px;
+  bottom:12px;
+  z-index:10;
+  display:flex;
+  align-items:center;
+  gap:4px;
+  padding:4px;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:11px;
+  background:rgba(4,8,15,.76);
+  backdrop-filter:blur(16px);
+  box-shadow:0 10px 28px rgba(0,0,0,.30);
+}
+.screen-share-zoom button{
+  width:30px;
+  height:30px;
+  border:0;
+  border-radius:8px;
+  background:rgba(255,255,255,.045);
+  color:#dfe8f5;
+  font-size:12px;
+  display:grid;
+  place-items:center;
+}
+.screen-share-zoom button:hover{
+  background:rgba(126,100,255,.18);
+  color:#fff;
+}
+.screen-share-zoom [data-zoom-reset]{
+  width:42px;
+  font-size:7px;
+  letter-spacing:.02em;
+}
+@media(max-width:700px){
+  .video-tile.screen-share{min-height:250px!important}
+  .screen-share-zoom button{width:28px;height:28px}
+}
