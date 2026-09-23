@@ -20,7 +20,7 @@ const JWT_SECRET=String(process.env.JWT_SECRET||"orbit-guest-dev-secret");
 const memory={
  users:new Map(),sessions:new Map(),communities:new Map(),members:new Map(),channels:new Map(),
  conversations:new Map(),convMembers:new Map(),messages:new Map(),notifications:new Map(),
- inventory:new Map(),missionClaims:new Set(),missionProgress:new Map(),daily:new Set(),friends:new Set(),audit:[]
+ inventory:new Map(),missionClaims:new Set(),missionProgress:new Map(),wishlist:new Map(),frameStock:new Map(),customFrames:[],daily:new Set(),friends:new Set(),audit:[]
 };
 let persistTimer=null,persistBusy=false,persistPending=false,persistMode="memory";
 
@@ -50,6 +50,9 @@ function serialize(){
   messages:[...memory.messages],
   notifications:[...memory.notifications],
   inventory:[...memory.inventory].map(([k,v])=>[k,[...v]]),
+  wishlist:[...memory.wishlist].map(([k,v])=>[k,[...v]]),
+  frameStock:[...memory.frameStock],
+  customFrames:memory.customFrames,
   missionClaims:[...memory.missionClaims],
   missionProgress:[...memory.missionProgress],
   daily:[...memory.daily],
@@ -62,6 +65,9 @@ function restore(data){
  const map=(name)=>memory[name]=new Map(Array.isArray(data[name])?data[name]:[]);
  map("users");map("sessions");map("communities");map("members");map("channels");map("conversations");map("convMembers");map("messages");map("notifications");
  memory.inventory=new Map((data.inventory||[]).map(x=>[x[0],new Set(x[1]||[])]));
+ memory.wishlist=new Map((data.wishlist||[]).map(x=>[x[0],new Set(x[1]||[])]));
+ memory.frameStock=new Map(data.frameStock||[]);
+ memory.customFrames=Array.isArray(data.customFrames)?data.customFrames:[];
  memory.missionClaims=new Set(data.missionClaims||[]);
  memory.missionProgress=new Map(data.missionProgress||[]);
  memory.daily=new Set(data.daily||[]);
@@ -211,17 +217,68 @@ function ensureUserDefaults(u){
 }
 for(const u of memory.users.values())ensureUserDefaults(u);
 
-const SHOP=[
- {id:"frame-orbit",type:"frame",name:"Orbit Core",price:0,rarity:"Core",css:"orbit"},
- {id:"frame-nebula",type:"frame",name:"Nebula",price:450,rarity:"Epic",css:"nebula"},
- {id:"frame-cyber",type:"frame",name:"Cyber Pulse",price:600,rarity:"Epic",css:"cyber"},
- {id:"frame-royal",type:"frame",name:"Royal Halo",price:850,rarity:"Legendary",css:"royal"},
- {id:"frame-ice",type:"frame",name:"Ice Crystal",price:700,rarity:"Legendary",css:"ice"},
- {id:"frame-plasma",type:"frame",name:"Plasma Surge",price:950,rarity:"Epic",css:"plasma"},
- {id:"frame-hologram",type:"frame",name:"Hologram Circuit",price:1100,rarity:"Epic",css:"hologram"},
- {id:"frame-quantum",type:"frame",name:"Quantum Ring",price:1350,rarity:"Legendary",css:"quantum"},
- {id:"frame-quasar",type:"frame",name:"Quasar Crown",price:1600,rarity:"Legendary",css:"quasar"},
- {id:"frame-singularity",type:"frame",name:"Singularity",price:2200,rarity:"Mythic",css:"singularity"},
+const RARITY_PRICE={Common:100,Uncommon:220,Rare:450,Epic:800,Legendary:1600,Mythic:3200,Ancient:5200,Divine:7600,Celestial:9500,LIMITED:4500};
+const FRAME_CATEGORIES={
+ Cosmic:["Galaxy Ring","Black Hole","Nebula","Supernova","Solar Eclipse","Starfield","Cosmic Energy","Astral Portal","Moon Orbit","Space Rift"],
+ Legendary:["Inferno Crown","Dragon Flame","Phoenix","Hellfire","Molten Core","Burning Soul","Eternal Flame","Crimson Dragon","Firestorm","Apocalypse"],
+ Ice:["Frozen Crown","Ice Crystal","Arctic Aura","Frost Dragon","Frozen Galaxy","Blizzard","Diamond Ice","Glacier","Snowfall","Eternal Winter"],
+ Energy:["Lightning","Plasma","Electric Pulse","Thunder Core","Energy Reactor","Voltage","Neon Shock","Arc Energy","Power Surge","Overcharge"],
+ Royal:["Golden Crown","Imperial Gold","Royal Emerald","Royal Sapphire","Black Gold","Diamond King","Platinum","Emperor","Sovereign","Royal Eclipse"],
+ Fantasy:["Dragon","Dark Dragon","Ancient Rune","Magic Portal","Mystic Crystal","Demon Gate","Elven Aura","Arcane Circle","Wizard","Mythic Beast"],
+ Cyber:["Cyber Core","Cyberpunk","Hologram","Digital Matrix","Quantum","AI Core","Cyber Grid","Neon Circuit","System Override","Digital Portal"],
+ Elemental:["Water","Fire","Earth","Wind","Lightning","Shadow","Light","Void","Nature","Plasma"],
+ Dark:["Skull","Shadow","Dark Matter","Void","Grim","Black Flame","Phantom","Dark Portal","Soul Reaper","Nightfall"],
+ Nature:["Forest","Sakura","Ancient Tree","Emerald Leaf","Nature Spirit","Floral","Ocean","Aurora","Wild Garden","Mystic Forest"],
+ Gaming:["Victory","Ranked","Champion","Boss","Level Up","Critical Hit","Game Master","XP","GG","Ultimate"],
+ Competitive:["Challenger","Elite","Master","Grandmaster","Champion","Tournament","MVP","Victory","Top 1","Hall of Fame"],
+ Events:["Halloween","Christmas","New Year","Valentine","Ramadan","Eid","Summer","Winter","Anniversary","ORBIT Birthday"],
+ Tech:["Quantum Mesh","Neural Link","Core Reactor","Signal Bloom","Photon Grid","Data Halo","Nano Pulse","Circuit Crown","Protocol Zero","Hyperlink"],
+ Retro:["Pixel Orbit","Arcade Nova","Synthwave","CRT Pulse","8Bit Crown","Vector Ring","Retro Grid","Cassette Core","Vapor Drive","Neon Memory"],
+ Monochrome:["Obsidian","Silverline","Whiteout","Graphite","Chrome","Pearl Black","Polar Ink","Steel Halo","Mono Rift","Carbon"],
+ Mythic:["Astral Dragon","Divine Rune","Celestial Beast","Eternal Gate","Ancient Sun","Godforge","Star Titan","Mythic Crown","Primordial","Worldbreaker"],
+ Seasonal:["Autumn Moon","Spring Bloom","Summer Solstice","Winter Solstice","Meteor Season","Solar Season","Moon Festival","Aurora Season","Rainfall","Harvest Night"],
+ Founder:["Genesis","First Flight","Ascension","APEX","Founders Ring","Origin Core","Legacy","Pioneer","First Orbit","Prime Signal"],
+ Abyss:["Void Walker","Void King","Event Horizon","Singularity","Abyss","Shadow Rift","Void Emperor","Absolute Zero","Black Star","Deep Space"]
+};
+const COLLECTION_NAMES=["THE VOID","CELESTIAL","DRAGONFIRE","FROSTBORN","ELECTRIC AGE","ROYAL DYNASTY","ARCANE RIFT","CYBER NEXUS","ELEMENTAL REIGN","WILD ORBIT","ARENA ELITE","EVENT HORIZON","GENESIS ARCHIVE","SYNTH MEMORY","OBSIDIAN CODE","MYTHIC AGE","SEASONAL SKIES","FOUNDER'S VAULT","ABYSSAL RIFT","ORBIT APEX"];
+const SLUG=v=>String(v).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+const RARITIES=["Common","Uncommon","Rare","Epic","Legendary","Mythic","Ancient","Divine","Celestial","LIMITED"];
+const GENERATED_FRAMES=[];
+const categoryNames=Object.entries(FRAME_CATEGORIES);
+for(let i=0;i<200;i++){
+ const [category,names]=categoryNames[i%categoryNames.length],name=names[i%names.length],variant=Math.floor(i/categoryNames.length)+1;
+ const rarity=RARITIES[(i*7+Math.floor(i/13))%RARITIES.length];
+ const animated=(i%3)!==0;
+ const limited=rarity==="LIMITED"||i%47===0;
+ const collectionIndex=Math.floor(i/10)%COLLECTION_NAMES.length;
+ const slug=SLUG(name)+"-"+variant;
+ const css=SLUG(category)+"-"+slug+"-"+SLUG(rarity)+(animated?"-animated":"");
+ GENERATED_FRAMES.push({
+  id:"frame-"+String(i+1).padStart(3,"0"),type:"frame",name:variant>1?name+" "+variant:name,
+  slug,description:"A collectible ORBIT identity frame from the "+COLLECTION_NAMES[collectionIndex]+" collection.",
+  category,rarity,price:limited?Math.max(2500,RARITY_PRICE[rarity]||4500):(RARITY_PRICE[rarity]||450),
+  currency:"coins",css,animated,animationType:animated?["orbit","pulse","spark","portal","scan"][i%5]:"none",
+  collectionId:"collection-"+String(collectionIndex+1).padStart(2,"0"),collection:COLLECTION_NAMES[collectionIndex],
+  limited,stock:limited?500+((i*17)%4500):null,remainingStock:limited?500+((i*17)%4500):null,
+  releaseDate:new Date(Date.UTC(2026,0,1+(i%365))).toISOString(),expirationDate:limited?new Date(Date.UTC(2027,0,1+(i%180))).toISOString():null,
+  featured:i<24||i%17===0,popularity:1000-i*3+(i%29)*17,
+  levelCap:(i%5===0)?5:1
+ });
+}
+GENERATED_FRAMES[0]={...GENERATED_FRAMES[0],id:"frame-orbit",name:"Orbit Core",slug:"orbit-core",category:"Cosmic",rarity:"Common",price:0,css:"orbit",animated:false,animationType:"none",collectionId:"collection-01",collection:"THE VOID",limited:false};
+const EXTRA_FRAME_IDS=[
+ ["frame-nebula","Nebula","Cosmic","Epic","nebula"],["frame-cyber","Cyber Pulse","Cyber","Epic","cyber"],["frame-royal","Royal Halo","Royal","Legendary","royal"],
+ ["frame-ice","Ice Crystal","Ice","Legendary","ice"],["frame-plasma","Plasma Surge","Energy","Epic","plasma"],["frame-hologram","Hologram Circuit","Cyber","Epic","hologram"],
+ ["frame-quantum","Quantum Ring","Cyber","Legendary","quantum"],["frame-quasar","Quasar Crown","Cosmic","Legendary","quasar"],["frame-singularity","Singularity","Dark","Mythic","singularity"]
+];
+for(const [id,name,category,rarity,css] of EXTRA_FRAME_IDS){
+ const idx=GENERATED_FRAMES.findIndex(x=>x.id===id);
+ const frame={id,type:"frame",name,slug:SLUG(name),description:"Legacy ORBIT frame preserved in the legendary catalog.",category,rarity,price:rarity==="Mythic"?2200:rarity==="Legendary"?850:450,currency:"coins",css,animated:!["nebula","cyber","royal","ice"].includes(css),animationType:"orbit",collectionId:"collection-01",collection:"THE VOID",limited:false,stock:null,remainingStock:null,releaseDate:"2026-01-01T00:00:00.000Z",expirationDate:null,featured:true,popularity:5000,levelCap:3};
+ if(idx>=0)GENERATED_FRAMES[idx]={...GENERATED_FRAMES[idx],...frame};
+}
+const COLLECTIONS=COLLECTION_NAMES.map((name,i)=>({id:"collection-"+String(i+1).padStart(2,"0"),name,description:"A curated ORBIT identity collection built around a distinct visual universe.",banner:"",totalFrames:10,reward:i%3===0?"Collector Badge":i%3===1?"Unique Title":"Cosmetic Token",rewardType:"badge"}));
+let SHOP=[
+ ...GENERATED_FRAMES,
  {id:"effect-none",type:"effect",name:"None",price:0,rarity:"Core",css:"none"},
  {id:"effect-spark",type:"effect",name:"Spark Field",price:300,rarity:"Rare",css:"spark"},
  {id:"effect-orbit",type:"effect",name:"Orbiting Lights",price:700,rarity:"Epic",css:"orbit"},
@@ -231,6 +288,9 @@ const SHOP=[
  {id:"theme-aurora",type:"chat_theme",name:"Aurora",price:550,rarity:"Epic",css:"aurora"},
  {id:"theme-ice",type:"chat_theme",name:"Ice Glass",price:650,rarity:"Epic",css:"ice"}
 ];
+for(const f of GENERATED_FRAMES)memory.frameStock.set(f.id,f.remainingStock);
+const baseShopIds=new Set(SHOP.map(x=>x.id));
+function frameRows(){return SHOP.filter(x=>x.type==="frame"&&x.enabled!==false)}
 const MISSIONS=[
  {id:"daily-signal",title:"Daily Signal",description:"Send 5 messages today.",metric:"messages",target:5,xp:60,coins:45,cadence:"daily"},
  {id:"daily-conversation",title:"Keep It Moving",description:"Send 10 messages today.",metric:"messages",target:10,xp:120,coins:90,cadence:"daily"},
@@ -440,19 +500,70 @@ app.get("/api/search",auth,(req,res)=>{
  res.json({users,communities});
 });
 
-app.get("/api/studio",auth,(req,res)=>{ensureInventory(req.user);const owned=memory.inventory.get(req.user.id);res.json({user:userPublic(req.user),shop:SHOP.map(x=>({...x,owned:owned.has(x.id)}))})});
+app.get("/api/studio",auth,(req,res)=>{
+ ensureInventory(req.user);
+ const owned=memory.inventory.get(req.user.id),wishlist=memory.wishlist.get(req.user.id)||new Set();
+ res.json({user:userPublic(req.user),shop:SHOP.map(x=>({...x,owned:owned.has(x.id),wishlist:wishlist.has(x.id),remainingStock:x.type==="frame"&&x.limited?Number(memory.frameStock.get(x.id)||0):x.remainingStock})),collections:COLLECTIONS});
+});
+app.get("/api/studio/frames",auth,(req,res)=>{
+ ensureInventory(req.user);
+ const q=String(req.query?.q||"").trim().toLowerCase(),category=String(req.query?.category||"").trim(),rarity=String(req.query?.rarity||"").trim();
+ const section=String(req.query?.section||"").trim(),animated=req.query?.animated==="true",limited=req.query?.limited==="true",ownedOnly=req.query?.owned==="true";
+ let rows=frameRows().filter(x=>(!q||[x.name,x.category,x.rarity,x.collection,x.description].join(" ").toLowerCase().includes(q))&&(!category||x.category===category)&&(!rarity||x.rarity===rarity)&&(!animated||x.animated)&&(!limited||x.limited)&&(!ownedOnly||memory.inventory.get(req.user.id).has(x.id)));
+ if(section==="featured")rows=rows.filter(x=>x.featured);
+ if(section==="limited")rows=rows.filter(x=>x.limited);
+ if(section==="animated")rows=rows.filter(x=>x.animated);
+ if(section==="owned")rows=rows.filter(x=>memory.inventory.get(req.user.id).has(x.id));
+ if(section==="wishlist")rows=rows.filter(x=>(memory.wishlist.get(req.user.id)||new Set()).has(x.id));
+ const sort=String(req.query?.sort||"popular");
+ rows.sort((a,b)=>sort==="price-low"?a.price-b.price:sort==="price-high"?b.price-a.price:sort==="newest"?String(b.releaseDate).localeCompare(String(a.releaseDate)):sort==="alpha"?a.name.localeCompare(b.name):Number(b.popularity||0)-Number(a.popularity||0));
+ const page=Math.max(1,Number(req.query?.page||1)),pageSize=Math.min(60,Math.max(12,Number(req.query?.pageSize||36))),start=(page-1)*pageSize;
+ res.json({frames:rows.slice(start,start+pageSize).map(x=>({...x,owned:memory.inventory.get(req.user.id).has(x.id),wishlist:(memory.wishlist.get(req.user.id)||new Set()).has(x.id),remainingStock:x.limited?Number(memory.frameStock.get(x.id)||0):x.remainingStock})),page,pageSize,total:rows.length,categories:[...new Set(frameRows().map(x=>x.category))],rarities:[...new Set(frameRows().map(x=>x.rarity))]});
+});
+app.get("/api/studio/collections",auth,(req,res)=>{
+ ensureInventory(req.user);const inv=memory.inventory.get(req.user.id);
+ res.json({collections:COLLECTIONS.map(c=>({...c,collected:frameRows().filter(f=>f.collectionId===c.id&&inv.has(f.id)).length}))});
+});
+app.post("/api/studio/wishlist",auth,(req,res)=>{
+ const item=getItem(req.body?.itemId);if(!item)return res.status(404).json({error:"Cosmetic not found."});
+ const set=memory.wishlist.get(req.user.id)||new Set();const state=set.has(item.id);if(state)set.delete(item.id);else set.add(item.id);memory.wishlist.set(req.user.id,set);persist();res.json({ok:true,wishlisted:!state});
+});
 app.post("/api/studio/checkin",auth,(req,res)=>{const claimed=daily(req.user);res.json({claimed,user:userPublic(req.user)})});
 app.post("/api/studio/buy",auth,(req,res)=>{
- const x=getItem(req.body?.itemId);if(!x)return res.status(404).json({error:"Item not found."});ensureInventory(req.user);const inv=memory.inventory.get(req.user.id);
+ const x=getItem(req.body?.itemId);if(!x||x.enabled===false)return res.status(404).json({error:"Item not found."});ensureInventory(req.user);const inv=memory.inventory.get(req.user.id);
  if(inv.has(x.id))return res.status(409).json({error:"You already own this item."});
+ if(x.type==="frame"&&x.limited){const remaining=Number(memory.frameStock.get(x.id)||0);if(remaining<=0)return res.status(409).json({error:"This limited edition is sold out."})}
  if(req.user.coins<x.price)return res.status(400).json({error:"Not enough ORBIT Coins."});
- req.user.coins-=x.price;inv.add(x.id);persist();res.json({ok:true,user:userPublic(req.user)})
+ req.user.coins-=x.price;inv.add(x.id);if(x.type==="frame"&&x.limited)memory.frameStock.set(x.id,Math.max(0,Number(memory.frameStock.get(x.id)||0)-1));persist();res.json({ok:true,user:userPublic(req.user),item:{id:x.id,name:x.name}});
 });
 app.post("/api/studio/equip",auth,(req,res)=>{
  const type=String(req.body?.type||""),x=getItem(req.body?.itemId);if(!x||x.type!==type)return res.status(400).json({error:"Invalid item."});ensureInventory(req.user);
  if(!memory.inventory.get(req.user.id).has(x.id))return res.status(403).json({error:"Item is not owned."});
  if(type==="frame")req.user.frame=x.css;if(type==="effect")req.user.effect=x.css;if(type==="nameplate")req.user.nameplate=x.css;if(type==="chat_theme")req.user.chatTheme=x.css;
  persist();res.json({user:userPublic(req.user)})
+});
+
+
+app.get("/api/owner/cosmetics/frames",ownerAuth,(req,res)=>{
+ if(!requireOwner(req,res))return;
+ const page=Math.max(1,Number(req.query?.page||1)),pageSize=Math.min(100,Math.max(20,Number(req.query?.pageSize||50))),rows=frameRows(),start=(page-1)*pageSize;
+ res.json({frames:rows.slice(start,start+pageSize),page,pageSize,total:rows.length,collections:COLLECTIONS});
+});
+app.post("/api/owner/cosmetics/frames",ownerAuth,(req,res)=>{
+ if(!requireOwner(req,res))return;
+ const body=req.body||{},name=cleanName(body.name,"New Frame"),slug=SLUG(body.slug||name);
+ const frame={id:"frame-custom-"+crypto.randomUUID(),type:"frame",name,slug,description:String(body.description||"").slice(0,400),category:String(body.category||"Cosmic").slice(0,40),rarity:RARITIES.includes(String(body.rarity))?String(body.rarity):"Rare",price:Math.max(0,Number(body.price||450)),currency:"coins",css:SLUG(body.css||("custom-"+slug))+"-"+SLUG(body.rarity||"rare"),animated:Boolean(body.animated),animationType:String(body.animationType||"orbit"),collectionId:String(body.collectionId||"collection-01"),collection:COLLECTIONS.find(c=>c.id===String(body.collectionId||"collection-01"))?.name||"THE VOID",limited:Boolean(body.limited),stock:body.limited?Math.max(1,Number(body.stock||500)):null,remainingStock:body.limited?Math.max(1,Number(body.stock||500)):null,releaseDate:body.releaseDate||now(),expirationDate:body.expirationDate||null,featured:Boolean(body.featured),popularity:100,levelCap:Math.max(1,Number(body.levelCap||1)),assetUrl:String(body.assetUrl||""),previewUrl:String(body.previewUrl||"")};
+ SHOP.push(frame);memory.customFrames.push(frame);memory.frameStock.set(frame.id,frame.remainingStock);persist();audit("owner","COSMETIC_FRAME_CREATE",frame.id,{name:frame.name,rarity:frame.rarity});res.status(201).json({frame});
+});
+app.patch("/api/owner/cosmetics/frames/:id",ownerAuth,(req,res)=>{
+ if(!requireOwner(req,res))return;
+ const frame=getItem(req.params.id);if(!frame||frame.type!=="frame")return res.status(404).json({error:"Frame not found."});
+ const b=req.body||{};for(const k of ["name","description","category","animationType","assetUrl","previewUrl","collectionId","collection","releaseDate","expirationDate"]){if(b[k]!==undefined)frame[k]=String(b[k]).slice(0,500)}
+ if(b.rarity&&RARITIES.includes(String(b.rarity)))frame.rarity=String(b.rarity);if(b.price!==undefined)frame.price=Math.max(0,Number(b.price||0));if(b.animated!==undefined)frame.animated=Boolean(b.animated);if(b.limited!==undefined)frame.limited=Boolean(b.limited);if(b.featured!==undefined)frame.featured=Boolean(b.featured);if(b.enabled!==undefined)frame.enabled=Boolean(b.enabled);if(b.stock!==undefined&&frame.limited){frame.stock=Math.max(0,Number(b.stock));memory.frameStock.set(frame.id,frame.stock);frame.remainingStock=frame.stock}persist();audit("owner","COSMETIC_FRAME_UPDATE",frame.id,{name:frame.name});res.json({frame});
+});
+app.post("/api/owner/cosmetics/frames/:id/stock",ownerAuth,(req,res)=>{
+ if(!requireOwner(req,res))return;const frame=getItem(req.params.id);if(!frame||frame.type!=="frame")return res.status(404).json({error:"Frame not found."});
+ const stock=Math.max(0,Number(req.body?.stock||0));frame.limited=true;frame.stock=stock;frame.remainingStock=stock;memory.frameStock.set(frame.id,stock);persist();res.json({frame});
 });
 
 app.get("/api/missions",auth,(req,res)=>{
