@@ -20,7 +20,7 @@ const JWT_SECRET=String(process.env.JWT_SECRET||"orbit-guest-dev-secret");
 const memory={
  users:new Map(),sessions:new Map(),communities:new Map(),members:new Map(),channels:new Map(),
  conversations:new Map(),convMembers:new Map(),messages:new Map(),notifications:new Map(),
- inventory:new Map(),missionClaims:new Set(),missionProgress:new Map(),wishlist:new Map(),frameStock:new Map(),customFrames:[],daily:new Set(),friends:new Set(),audit:[]
+ inventory:new Map(),userFrames:new Map(),missionClaims:new Set(),missionProgress:new Map(),wishlist:new Map(),frameStock:new Map(),customFrames:[],daily:new Set(),friends:new Set(),audit:[]
 };
 let persistTimer=null,persistBusy=false,persistPending=false,persistMode="memory";
 
@@ -50,6 +50,7 @@ function serialize(){
   messages:[...memory.messages],
   notifications:[...memory.notifications],
   inventory:[...memory.inventory].map(([k,v])=>[k,[...v]]),
+  userFrames:[...memory.userFrames],
   wishlist:[...memory.wishlist].map(([k,v])=>[k,[...v]]),
   frameStock:[...memory.frameStock],
   customFrames:memory.customFrames,
@@ -65,6 +66,7 @@ function restore(data){
  const map=(name)=>memory[name]=new Map(Array.isArray(data[name])?data[name]:[]);
  map("users");map("sessions");map("communities");map("members");map("channels");map("conversations");map("convMembers");map("messages");map("notifications");
  memory.inventory=new Map((data.inventory||[]).map(x=>[x[0],new Set(x[1]||[])]));
+ memory.userFrames=new Map(data.userFrames||[]);
  memory.wishlist=new Map((data.wishlist||[]).map(x=>[x[0],new Set(x[1]||[])]));
  memory.frameStock=new Map(data.frameStock||[]);
  memory.customFrames=Array.isArray(data.customFrames)?data.customFrames:[];
@@ -277,7 +279,7 @@ const EXTRA_FRAME_IDS=[
 for(const [id,name,category,rarity,css] of EXTRA_FRAME_IDS){
  const idx=GENERATED_FRAMES.findIndex(x=>x.id===id);
  const frame={id,type:"frame",name,slug:SLUG(name),description:"Legacy ORBIT frame preserved in the legendary catalog.",category,rarity,price:rarity==="Mythic"?2200:rarity==="Legendary"?850:450,currency:"coins",css,animated:!["nebula","cyber","royal","ice"].includes(css),animationType:"orbit",collectionId:"collection-01",collection:"THE VOID",limited:false,stock:null,remainingStock:null,releaseDate:"2026-01-01T00:00:00.000Z",expirationDate:null,featured:true,popularity:5000,levelCap:3};
- if(idx>=0)GENERATED_FRAMES[idx]={...GENERATED_FRAMES[idx],...frame};
+ if(idx>=0)GENERATED_FRAMES[idx]={...GENERATED_FRAMES[idx],...frame};else GENERATED_FRAMES.push(frame);
 }
 const COLLECTIONS=COLLECTION_NAMES.map((name,i)=>({id:"collection-"+String(i+1).padStart(2,"0"),name,description:"A curated ORBIT identity collection built around a distinct visual universe.",banner:"",totalFrames:10,reward:i%3===0?"Collector Badge":i%3===1?"Unique Title":"Cosmetic Token",rewardType:"badge"}));
 let SHOP=[
@@ -531,18 +533,25 @@ app.post("/api/studio/wishlist",auth,(req,res)=>{
  const item=getItem(req.body?.itemId);if(!item)return res.status(404).json({error:"Cosmetic not found."});
  const set=memory.wishlist.get(req.user.id)||new Set();const state=set.has(item.id);if(state)set.delete(item.id);else set.add(item.id);memory.wishlist.set(req.user.id,set);persist();res.json({ok:true,wishlisted:!state});
 });
+app.post("/api/studio/unequip",auth,(req,res)=>{
+ const type=String(req.body?.type||"");if(type!=="frame")return res.status(400).json({error:"Only frame unequip is supported."});
+ req.user.frame="orbit";for(const [key,meta] of memory.userFrames){if(meta.userId===req.user.id)memory.userFrames.set(key,{...meta,equipped:false})}
+ persist();res.json({user:userPublic(req.user)})
+});
 app.post("/api/studio/checkin",auth,(req,res)=>{const claimed=daily(req.user);res.json({claimed,user:userPublic(req.user)})});
 app.post("/api/studio/buy",auth,(req,res)=>{
  const x=getItem(req.body?.itemId);if(!x||x.enabled===false)return res.status(404).json({error:"Item not found."});ensureInventory(req.user);const inv=memory.inventory.get(req.user.id);
  if(inv.has(x.id))return res.status(409).json({error:"You already own this item."});
  if(x.type==="frame"&&x.limited){const remaining=Number(memory.frameStock.get(x.id)||0);if(remaining<=0)return res.status(409).json({error:"This limited edition is sold out."})}
  if(req.user.coins<x.price)return res.status(400).json({error:"Not enough ORBIT Coins."});
- req.user.coins-=x.price;inv.add(x.id);if(x.type==="frame"&&x.limited)memory.frameStock.set(x.id,Math.max(0,Number(memory.frameStock.get(x.id)||0)-1));persist();res.json({ok:true,user:userPublic(req.user),item:{id:x.id,name:x.name}});
+ req.user.coins-=x.price;inv.add(x.id);
+ if(x.type==="frame"){const key=req.user.id+":"+x.id,remaining=x.limited?Math.max(0,Number(memory.frameStock.get(x.id)||0)-1):null;if(x.limited)memory.frameStock.set(x.id,remaining);memory.userFrames.set(key,{userId:req.user.id,frameId:x.id,purchasedAt:now(),edition:x.limited?(Number(x.stock||0)-Number(remaining||0)):null,equipped:false,favorite:false})}
+ persist();res.json({ok:true,user:userPublic(req.user),item:{id:x.id,name:x.name,edition:x.limited?(Number(x.stock||0)-Number(memory.frameStock.get(x.id)||0)):null}});
 });
 app.post("/api/studio/equip",auth,(req,res)=>{
  const type=String(req.body?.type||""),x=getItem(req.body?.itemId);if(!x||x.type!==type)return res.status(400).json({error:"Invalid item."});ensureInventory(req.user);
  if(!memory.inventory.get(req.user.id).has(x.id))return res.status(403).json({error:"Item is not owned."});
- if(type==="frame")req.user.frame=x.css;if(type==="effect")req.user.effect=x.css;if(type==="nameplate")req.user.nameplate=x.css;if(type==="chat_theme")req.user.chatTheme=x.css;
+ if(type==="frame"){req.user.frame=x.css;for(const [key,meta] of memory.userFrames){if(meta.userId===req.user.id)memory.userFrames.set(key,{...meta,equipped:meta.frameId===x.id})}}if(type==="effect")req.user.effect=x.css;if(type==="nameplate")req.user.nameplate=x.css;if(type==="chat_theme")req.user.chatTheme=x.css;
  persist();res.json({user:userPublic(req.user)})
 });
 
