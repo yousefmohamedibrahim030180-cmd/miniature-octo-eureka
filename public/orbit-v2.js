@@ -34,7 +34,7 @@ function drawDmsMain(q=""){const r=$("#dmListMain");if(!r)return;const x=q.toLow
 async function openDm(id){S.activeDm=S.dms.find(x=>x.id===id)||null;if(!S.activeDm)return;S.activeConversation=S.activeDm.id;S.messages=[];await loadConversation();render()}
 function communityChatInfo(){const c=S.channels.find(x=>x.id===S.activeConversation);return c}
 function paintConversation(area){const d=S.activeDm;const u=d?.otherUser||null;area.innerHTML='<div class="chat"><div class="chat-main"><header class="chat-head"><div class="chat-actions"><button class="chat-action" id="voiceBtn">Voice</button><button class="chat-action" id="videoBtn">Video</button></div></header><section class="messages" id="messageList">'+renderMessageHtml()+'</section><div class="composer-wrap"><form class="composer" id="composer"><button class="tool" id="attachBtn" type="button">＋</button><input id="messageInput" placeholder="Write a message…" autocomplete="off"><button class="send">Send</button></form></div></div><aside class="chat-side"><div class="info-card" style="text-align:center">'+avatar(u,"frame-preview")+'<h3 style="margin-top:10px">'+esc(u?.displayName||"")+'</h3><p>@'+esc(u?.username||"")+' · L'+Number(u?.level||1)+'</p></div><div class="info-card"><h3>Shared space</h3><p>Messages, calls, profile identity and future shared media live here without leaving the conversation.</p></div><div class="info-card"><h3>Media</h3><div class="media-grid"><div class="media-cell">Photos</div><div class="media-cell">Files</div><div class="media-cell">Links</div><div class="media-cell">Pinned</div></div></div></aside></div>';wireMessageComposer();$("#voiceBtn").onclick=()=>startCall(S.activeConversation,"voice");$("#videoBtn").onclick=()=>startCall(S.activeConversation,"video");$("#attachBtn").onclick=pickAttachment;$("#messageList").scrollTop=$("#messageList").scrollHeight}
-function renderMessageHtml(){const p=S.me?.preferences||{},showA=p.showAvatars!==false,showT=p.showTimestamps!==false;return S.messages.map(m=>'<article class="msg">'+(showA?avatar({displayName:m.display_name||m.username,avatarUrl:m.avatar_url,equipped:{frame:m.avatar_frame,effect:m.avatar_effect}}):'<span class="avatar message-avatar-hidden" aria-hidden="true"></span>')+'<div class="msg-body"><div class="msg-head"><strong>'+esc(m.display_name||m.username)+'</strong>'+(showT?'<time>'+new Date(m.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})+'</time>':"")+'</div><div class="msg-text">'+esc(m.content)+'</div>'+attachmentHtml(m.metadata)+'<div class="reactions">'+(p.emojiReactions!==false?'<button class="reaction">♡</button>':"")+'<button class="reaction">↩ Reply</button></div></div></article>').join("")||'<div class="empty-state"><div class="empty-box"><h2>Start the conversation</h2><p>Say something. ORBIT will keep it realtime.</p></div></div>'}
+function renderMessageHtml(){const p=S.me?.preferences||{},showA=p.showAvatars!==false,showT=p.showTimestamps!==false;return S.messages.map(m=>{const mine=String(m.sender_id||m.user_id||"")===String(S.me?.id||"");return '<article class="msg '+(mine?"is-mine":"")+'">'+(showA?avatar({displayName:m.display_name||m.username,avatarUrl:m.avatar_url||m.avatarUrl,equipped:{frame:m.avatar_frame,effect:m.avatar_effect}}):'<span class="avatar message-avatar-hidden" aria-hidden="true"></span>')+'<div class="msg-body"><div class="msg-head"><strong>'+esc(m.display_name||m.username)+'</strong>'+(showT?'<time>'+new Date(m.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})+'</time>':"")+'</div><div class="msg-text">'+esc(m.content)+'</div>'+attachmentHtml(m.metadata)+'<div class="reactions">'+(p.emojiReactions!==false?'<button class="reaction">♡</button>':"")+'<button class="reaction">↩ Reply</button></div></div></article>'}).join("")||'<div class="empty-state"><div class="empty-box"><h2>Start the conversation</h2><p>Say something. ORBIT will keep it realtime.</p></div></div>'}
 function attachmentHtml(meta){if(!meta?.attachment)return"";const a=meta.attachment;if(a.kind==="image")return'<div class="msg-attachment"><img src="'+esc(a.dataUrl)+'" alt="'+esc(a.name||"image")+'"></div>';return'<div class="msg-attachment file-card"><span>📎</span><div><strong>'+esc(a.name||"file")+'</strong><span>'+esc(a.sizeLabel||"Attachment")+'</span></div></div>'}
 async function loadConversation(){if(!S.activeConversation){S.messages=[];return}const r=await api("/api/conversations/"+encodeURIComponent(S.activeConversation)+"/messages");S.messages=r.messages||[];S.socket?.emit("conversation:join",S.activeConversation)}
 async function sendMessage(){const i=$("#messageInput");if(!i)return;const text=i.value.trim();if(!text)return;S.socket?.emit("message:send",{conversationId:S.activeConversation,content:text},ack=>{if(!ack?.ok)toast("Message",ack?.error||"Failed")});i.value="";try{if(S.me?.preferences?.saveDrafts&&window.sessionStorage)sessionStorage.removeItem("orbit-draft:"+S.activeConversation)}catch{}i.focus()}
@@ -191,34 +191,36 @@ function settings(r){
    note("Account ID",S.me.id+" · This identifier is safe to use when contacting ORBIT support.")+'</div>';return;
  }
  if(tab==="customization"){
-  r.innerHTML='<div class="page">'+pageHead("PERSONALIZATION","Customization","Turn ORBIT into your own workspace.")+
-   section("Visual system","Choose the atmosphere, surfaces and glow level that follow you on every device.",
-    settingSelect("prefBackground","Background","Animated visual environment.","background",[["nebula","Nebula"],["aurora","Aurora"],["cyber","Cyber"],["grid","Grid"],["plain","Plain"]])+
-    settingSelect("prefSurface","Surface","Panel treatment.","surface",[["glass","Glass"],["frost","Frosted"],["solid","Solid"]])+
-    settingSelect("prefRadius","Corner style","How soft the interface edges feel.","radius",[["sharp","Sharp"],["medium","Medium"],["soft","Soft"]])+
-    settingSelect("prefGlow","Glow","Intensity of ORBIT lighting.","glow",[["low","Low"],["medium","Medium"],["high","High"]])+
-    settingSelect("prefAccent","Accent","Primary interface highlight.","accent",[["violet","Violet"],["cyan","Cyan"],["gold","Gold"],["rose","Rose"]])+
-    settingSelect("prefTheme","Theme","Core color atmosphere.","theme",[["void","Void"],["aurora","Aurora"],["ice","Ice Glass"],["midnight","Midnight"]])
-   )+
-   '<section class="setting-box pref-panel"><div class="pref-panel-head"><div><span class="eyebrow">ORBIT PRESETS</span><h2>One-click styles</h2><p>Apply a complete visual preset, then fine-tune it below.</p></div></div><div class="pref-actions" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">'+
-   '<button class="btn" type="button" data-orbit-preset="nebula">Nebula</button>'+
-   '<button class="btn" type="button" data-orbit-preset="aurora">Aurora</button>'+
-   '<button class="btn" type="button" data-orbit-preset="cyber">Cyber</button>'+
-   '<button class="btn" type="button" data-orbit-preset="clean">Clean</button>'+
-   '</div></section>'+
-   section("Call personalization","Control the sound used when another person joins your live call.",settingToggle("callJoinSound","Call join sound","Play a short sound when a participant enters.","joinSound","calls")+
-   '<div class="pref-actions"><button class="btn" id="previewJoinSound" type="button">▶ Preview join sound</button></div>')+
-   note("Saved to your account","Your customization is persisted with your ORBIT profile and follows you when you sign in again.")+
-   '</div>';
-  bindPreferenceControls();
-  const presets={
-   nebula:{background:"nebula",surface:"glass",radius:"medium",glow:"high",accent:"violet",theme:"void"},
-   aurora:{background:"aurora",surface:"frost",radius:"soft",glow:"high",accent:"cyan",theme:"aurora"},
-   cyber:{background:"cyber",surface:"solid",radius:"sharp",glow:"high",accent:"cyan",theme:"midnight"},
-   clean:{background:"plain",surface:"solid",radius:"medium",glow:"low",accent:"violet",theme:"ice"}
+  const atmos=window.__ORBIT_ATMOSPHERES||[];
+  const current=window.__ORBIT_GET_ATMOSPHERE?window.__ORBIT_GET_ATMOSPHERE():{mode:"nebula",light:"balanced",speed:42,stars:68,glow:66,parallax:true,motion:true};
+  const mini=mode=>window.__ORBIT_ATMOSPHERE_PREVIEW?window.__ORBIT_ATMOSPHERE_PREVIEW(mode):"";
+  const applyAtmos=patch=>{
+   const next={...current,...patch};
+   window.__ORBIT_SET_ATMOSPHERE?.(next);
+   return next;
   };
-  $$("[data-orbit-preset]").forEach(b=>b.onclick=()=>savePreferences(presets[b.dataset.orbitPreset],"Preset"));
-  $("#previewJoinSound")?.addEventListener("click",()=>playCallJoinSound());
+  const lightBtns=["dark","balanced","light"].map(v=>'<button type="button" class="atmos-light '+(current.light===v?"active":"")+'" data-atmos-light="'+v+'">'+(v==="dark"?"Deep":v==="balanced"?"Balanced":"Light")+'</button>').join("");
+  const gallery=atmos.map(m=>'<button type="button" class="atmos-card '+(current.mode===m[0]?"active":"")+'" data-atmos-mode="'+esc(m[0])+'">'+mini(m[0])+'<span class="atmos-card-name">'+esc(m[1])+'</span><span class="atmos-card-desc">'+esc(m[2])+'</span></button>').join("");
+  r.innerHTML='<div class="page">'+pageHead("ORBIT EXPERIENCE LAB","Living Atmosphere","Choose how ORBIT looks, moves and feels. The environment lives behind your content.")+
+   '<section class="setting-box pref-panel atmosphere-panel"><div class="pref-panel-head"><div><span class="eyebrow">LIVING ORBIT</span><h2>Make ORBIT feel alive.</h2><p>Animated space stays behind the chat. Every atmosphere changes the light, depth and orbital mood.</p></div><div class="atmos-current">'+(mini(current.mode)||"")+'<b id="atmosCurrentName">'+esc((atmos.find(x=>x[0]===current.mode)||atmos[0]||[])[1]||"Nebula")+'</b></div></div></section>'+
+   '<section class="setting-box pref-panel"><div class="pref-panel-head"><div><span class="eyebrow">ATMOSPHERE GALLERY</span><h2>24 spatial modes</h2><p>Dark, balanced and bright worlds — each with its own visual identity.</p></div></div><div class="atmos-grid">'+gallery+'</div></section>'+
+   '<section class="setting-box pref-panel"><div class="pref-panel-head"><div><span class="eyebrow">LIGHT BALANCE</span><h2>Keep some light in the room.</h2><p>Choose how bright the overall atmosphere feels.</p></div></div><div class="atmos-light-grid">'+lightBtns+'</div></section>'+
+   '<section class="setting-box pref-panel"><div class="pref-panel-head"><div><span class="eyebrow">MOTION & DEPTH</span><h2>Control the energy</h2><p>Fine-tune the motion without touching your chat readability.</p></div></div>'+
+   settingToggle("atmosMotion","Background motion","Let the environment breathe.","motion")+
+   settingToggle("atmosParallax","Mouse parallax","Move the space slightly with the pointer.","parallax")+
+   '<div class="atmos-range"><label><span>Motion speed</span><input id="atmosSpeed" type="range" min="10" max="90" value="'+Number(current.speed||42)+'"><b id="atmosSpeedValue">'+Number(current.speed||42)+'</b></label>'+
+   '<label><span>Star density</span><input id="atmosStars" type="range" min="15" max="100" value="'+Number(current.stars||68)+'"><b id="atmosStarsValue">'+Number(current.stars||68)+'</b></label>'+
+   '<label><span>Glow intensity</span><input id="atmosGlow" type="range" min="15" max="100" value="'+Number(current.glow||66)+'"><b id="atmosGlowValue">'+Number(current.glow||66)+'</b></label></div></section>'+
+   '<section class="setting-box pref-panel"><div class="pref-actions"><button class="btn" id="atmosReset" type="button">Reset atmosphere</button></div></section></div>';
+
+  $$("[data-atmos-mode]").forEach(b=>b.onclick=async()=>{const n=applyAtmos({mode:b.dataset.atmosMode});try{await savePreferences({background:b.dataset.atmosMode},"Atmosphere")}catch{};render()});
+  $$("[data-atmos-light]").forEach(b=>b.onclick=()=>{applyAtmos({light:b.dataset.atmosLight});render()});
+  $("#atmosMotion")?.addEventListener("click",()=>{applyAtmos({motion:!(current.motion!==false)});render()});
+  $("#atmosParallax")?.addEventListener("click",()=>{applyAtmos({parallax:!(current.parallax!==false)});render()});
+  [["atmosSpeed","speed","atmosSpeedValue"],["atmosStars","stars","atmosStarsValue"],["atmosGlow","glow","atmosGlowValue"]].forEach(([id,key,out])=>{
+    $("#"+id)?.addEventListener("input",e=>{const v=Number(e.target.value);$("#"+out).textContent=v;applyAtmos({[key]:v})});
+  });
+  $("#atmosReset")?.addEventListener("click",()=>{applyAtmos({mode:"nebula",light:"balanced",speed:42,stars:68,glow:66,parallax:true,motion:true});render()});
   return;
  }
  if(tab==="appearance"){
@@ -287,7 +289,16 @@ function calls(r){r.innerHTML='<div class="page"><div class="page-head"><div><sp
 async function newDm(){openModal("New conversation",'<form id="newDmForm" class="form"><label>Username<input id="newDmUser" class="input" placeholder="@username" required></label><button class="btn primary">Open conversation</button></form>');$("#newDmForm").onsubmit=async e=>{e.preventDefault();try{const d=await api("/api/dms",{method:"POST",body:JSON.stringify({username:$("#newDmUser").value})});closeModal();await loadDms();await openDm(d.dmId)}catch(x){toast("Conversation",x.message)}}}
 async function newCommunity(){openModal("Create community",'<form id="newComForm" class="form"><label>Name<input id="comName" class="input" required></label><label>Description<input id="comDesc" class="input"></label><button class="btn primary">Create community</button></form>');$("#newComForm").onsubmit=async e=>{e.preventDefault();try{const d=await api("/api/communities",{method:"POST",body:JSON.stringify({name:$("#comName").value,description:$("#comDesc").value})});closeModal();await loadCommunities();await openCommunity(d.community.id);toast("Community created","Join code: "+d.joinCode)}catch(x){toast("Community",x.message)}}}
 async function joinCommunity(){openModal("Join community",'<form id="joinForm" class="form"><label>Invite code<input id="joinCode" class="input" placeholder="ORB-XXXXXX" required></label><button class="btn primary">Join</button></form>');$("#joinForm").onsubmit=async e=>{e.preventDefault();try{await api("/api/communities/join",{method:"POST",body:JSON.stringify({code:$("#joinCode").value})});closeModal();await loadCommunities();toast("Joined","Community added to your workspace.")}catch(x){toast("Join",x.message)}}}
-async function loadDms(){S.dms=(await api("/api/dms")).dms||[]}
+async function loadDms(){
+ const list=(await api("/api/dms")).dms||[],map=new Map();
+ for(const d of list){
+  const u=d?.otherUser||{};
+  const key=u.id!=null?"id:"+String(u.id):(u.username?"username:"+String(u.username).toLowerCase():"dm:"+String(d.id));
+  const prev=map.get(key);
+  if(!prev||String(d.updatedAt||"").localeCompare(String(prev.updatedAt||""))>0)map.set(key,d);
+ }
+ S.dms=[...map.values()].sort((a,b)=>String(b.updatedAt||"").localeCompare(String(a.updatedAt||"")));
+}
 async function loadCommunities(){S.communities=(await api("/api/communities")).communities||[]}
 async function loadMe(){S.me=(await api("/api/me")).user}
 async function loadStudioInitial(){const d=await api("/api/studio");S.me=d.user;S.shop=d.shop}
