@@ -41,7 +41,9 @@
   }
   function syncLauncher(){
     const active=$("#nav button.active")?.dataset.view;
-    $$(".orbit-launch").forEach(b=>b.classList.toggle("active",b.dataset.orbitRoute===active));
+    const bar=$("#orbitLauncher");
+    if(bar) bar.hidden = active==="messages";
+    $(".orbit-launch").forEach(b=>b.classList.toggle("active",b.dataset.orbitRoute===active));
   }
 
   async function presenceCount(){
