@@ -2057,6 +2057,20 @@ function renderHomePage(){
     const dms=dmData.dms||[];
     dmState.list=dms;
 
+    // Users with an existing DM are rendered only in Direct Messages.
+    const dmUserKeys=new Set();
+    dms.forEach(dm=>{
+      const u=dm?.otherUser||{};
+      if(u.id!=null) dmUserKeys.add("id:"+String(u.id));
+      if(u.username) dmUserKeys.add("username:"+String(u.username).toLowerCase());
+    });
+    const friendsWithoutDM=friends.filter(u=>{
+      if(u?.id!=null && dmUserKeys.has("id:"+String(u.id))) return false;
+      if(u?.username && dmUserKeys.has("username:"+String(u.username).toLowerCase())) return false;
+      return true;
+    });
+    const onlineWithoutDM=friendsWithoutDM.filter(u=>String(u.status||"").toLowerCase()!=="offline");
+
     $("#od-pending-badge").textContent=String(incoming.length);
     $("#od-suggestion-badge").textContent=String(suggestions.length);
 
@@ -2118,11 +2132,11 @@ function renderHomePage(){
         const slot=$("#od-tab-content"); if(!slot)return;
         let html="";
         if(mode==="online"){
-          html='<div class="od-list-heading"><div><strong>Online — '+online.length+'</strong><span>Friends currently online</span></div></div>'+
-            '<div class="od-user-list">'+(online.length?online.map(u=>userRow(u)).join(""):empty("Nobody is online","Your online friends will appear here."))+'</div>';
+          html='<div class="od-list-heading"><div><strong>Online — '+onlineWithoutDM.length+'</strong><span>Friends without an existing DM</span></div></div>'+
+            '<div class="od-user-list">'+(onlineWithoutDM.length?onlineWithoutDM.map(u=>userRow(u)).join(""):empty("All online friends are in Direct Messages","People you already have a conversation with appear only in Direct Messages."))+'</div>';
         }else if(mode==="all"){
-          html='<div class="od-list-heading"><div><strong>All Friends — '+friends.length+'</strong><span>Everyone in your friends list</span></div></div>'+
-            '<div class="od-user-list">'+(friends.length?friends.map(u=>userRow(u)).join(""):empty("No friends yet","Add people to build your Orbit circle."))+'</div>';
+          html='<div class="od-list-heading"><div><strong>Friends — '+friendsWithoutDM.length+'</strong><span>Friends without an existing DM</span></div></div>'+
+            '<div class="od-user-list">'+(friendsWithoutDM.length?friendsWithoutDM.map(u=>userRow(u)).join(""):empty("Your conversations are already organized","Friends who have a DM appear only once in Direct Messages."))+'</div>';
         }else if(mode==="pending"){
           html='<div class="od-list-heading"><div><strong>Pending</strong><span>Requests waiting for your response</span></div></div>'+
             '<section class="od-request-section"><div class="od-subheading">Incoming — '+incoming.length+'</div><div class="od-user-list">'+
