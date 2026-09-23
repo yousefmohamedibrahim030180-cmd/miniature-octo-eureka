@@ -1,0 +1,51 @@
+name: ORBIT Windows Desktop Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "electron/**"
+      - "build/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/orbit-windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Validate source
+        run: npm run build
+
+      - name: Build ORBIT Windows x64
+        run: npm run desktop:dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Upload ORBIT Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ORBIT-Windows-x64
+          path: |
+            dist-desktop/*.exe
+            dist-desktop/*.yml
+          if-no-files-found: error
+          retention-days: 14
