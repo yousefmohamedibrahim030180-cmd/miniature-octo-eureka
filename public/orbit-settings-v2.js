@@ -18,6 +18,7 @@
 
   const tabs=[
     ["profile","◎","Profile","Account"],
+    ["atmosphere","◌","Experience Lab","Atmospheres"],
     ["appearance","✦","Appearance","Interface"],
     ["notifications","♢","Notifications","Alerts"],
     ["privacy","◌","Privacy & Safety","Control"],
@@ -77,6 +78,33 @@
     $("#set-compact").onclick=()=>{prefs.compact=!prefs.compact;savePrefs();applyPrefs();renderAppearance()};
     $("#set-motion").onclick=()=>{prefs.reduceMotion=!prefs.reduceMotion;savePrefs();applyPrefs();renderAppearance()};
     $("#set-glass").onclick=()=>{prefs.glass=prefs.glass===false;savePrefs();document.body.classList.toggle("orbit-no-glass",prefs.glass===false);renderAppearance()};
+  }
+
+  function renderAtmosphere(){
+    const c=settingHeader("atmosphere","Experience Lab","Turn ORBIT into a living space. Choose an atmosphere, lighting balance and motion level.");
+    const current=window.__ORBIT_GET_ATMOSPHERE?.()||{mode:"nebula",light:"balanced",speed:42,stars:68,glow:66,parallax:true,motion:true};
+    const modes=window.__ORBIT_ATMOSPHERES||[];
+    const preview=mode=>window.__ORBIT_ATMOSPHERE_PREVIEW?window.__ORBIT_ATMOSPHERE_PREVIEW(mode):"";
+    c.innerHTML +=
+      '<div class="settings-card atmosphere-hero"><div class="experience-hero-copy"><span class="eyebrow">LIVING ORBIT</span><h3>Make the interface feel alive.</h3><p>Background motion stays behind your content so the chat remains clear. Your atmosphere is remembered on this device.</p></div><div class="experience-current">'+(preview(current.mode)||"")+'<span class="experience-current-label" data-orbit-preview-label></span></div></div>'+
+      '<div class="settings-card" style="margin-top:12px"><h3>Atmosphere Gallery</h3><p>Choose from a large collection of space-inspired scenes.</p><div class="atmosphere-grid">'+modes.map(m=>'<button class="atmosphere-option '+(current.mode===m[0]?"active":"")+'" data-atmosphere="'+m[0]+'">'+preview(m[0])+'<span class="atmosphere-name">'+esc(m[1])+'</span><span class="atmosphere-type">'+esc(m[3])+' balance · '+esc(m[2])+'</span></button>').join("")+'</div></div>'+
+      '<div class="settings-card" style="margin-top:12px"><h3>Light Balance</h3><p>Keep the interface deep, balanced or noticeably brighter without changing the content layout.</p><div class="light-balance">'+["dark","balanced","light"].map(v=>'<button class="'+(current.light===v?"active":"")+'" data-light="'+v+'">'+(v==="dark"?"Deep":v==="balanced"?"Balanced":"Light")+'</button>').join("")+'</div></div>'+
+      '<div class="settings-card" style="margin-top:12px"><h3>Motion & depth</h3><p>Tune the energy level of the environment.</p>'+
+      rowControl("Background motion","Let nebula clouds and orbital glow breathe behind the interface.",toggle("set-atm-motion",current.motion!==false))+
+      rowControl("Mouse parallax","Move the environment subtly with your pointer.",toggle("set-atm-parallax",current.parallax!==false))+
+      '<div class="settings-slider-row"><div><strong>Motion speed</strong><span>Ambient movement intensity.</span></div><input id="atm-speed" type="range" min="10" max="90" value="'+Number(current.speed||42)+'"><output id="atm-speed-value">'+Number(current.speed||42)+'</output></div>'+
+      '<div class="settings-slider-row"><div><strong>Star density</strong><span>More particles create a deeper space field.</span></div><input id="atm-stars" type="range" min="15" max="100" value="'+Number(current.stars||68)+'"><output id="atm-stars-value">'+Number(current.stars||68)+'</output></div>'+
+      '<div class="settings-slider-row"><div><strong>Glow intensity</strong><span>Control ambient light around the orbits.</span></div><input id="atm-glow" type="range" min="15" max="100" value="'+Number(current.glow||66)+'"><output id="atm-glow-value">'+Number(current.glow||66)+'</output></div>'+
+      '</div>';
+
+    const update=patch=>window.__ORBIT_SET_ATMOSPHERE?.({...current,...patch});
+    $("[data-atmosphere]").forEach(b=>b.onclick=()=>{update({mode:b.dataset.atmosphere});renderAtmosphere()});
+    $("[data-light]").forEach(b=>b.onclick=()=>{update({light:b.dataset.light});renderAtmosphere()});
+    $("#set-atm-motion").onclick=()=>{update({motion:!(current.motion!==false)});renderAtmosphere()};
+    $("#set-atm-parallax").onclick=()=>{update({parallax:!(current.parallax!==false)});renderAtmosphere()};
+    [["atm-speed","speed","atm-speed-value"],["atm-stars","stars","atm-stars-value"],["atm-glow","glow","atm-glow-value"]].forEach(([id,key,out])=>{
+      $("#"+id).oninput=e=>{$("#"+out).textContent=e.target.value;update({[key]:Number(e.target.value)})};
+    });
   }
 
   function renderNotifications(){
@@ -146,7 +174,7 @@
   function renderTab(){
     if(!$("#settings-content"))return;
     ({
-      profile:renderProfile,appearance:renderAppearance,notifications:renderNotifications,
+      profile:renderProfile,atmosphere:renderAtmosphere,appearance:renderAppearance,notifications:renderNotifications,
       privacy:renderPrivacy,voice:renderVoice,shortcuts:renderShortcuts,session:renderSession
     }[state.tab]||renderProfile)();
     $$(".settings-tab").forEach(b=>b.classList.toggle("active",b.dataset.settingTab===state.tab));
