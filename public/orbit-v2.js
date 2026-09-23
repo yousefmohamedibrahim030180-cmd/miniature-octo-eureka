@@ -432,7 +432,7 @@ $("#micBtn").onclick=()=>{const t=S.call?.stream?.getAudioTracks?.()[0];if(!t)re
 $("#camBtn").onclick=()=>{const t=S.call?.stream?.getVideoTracks?.()[0];if(!t)return;t.enabled=!t.enabled;const tile=$("#tile-local");if(tile)tile.classList.toggle("is-video-off",!t.enabled);$("#camBtn")?.classList.toggle("active",!t.enabled);const p=$("#localCamState");if(p){p.textContent=t.enabled?"◉":"○";p.classList.toggle("muted",!t.enabled)}};
 $("#screenFocusBtn")?.addEventListener("click",()=>setScreenFocus(!$("#callWindow")?.classList.contains("screen-focus")));
 $("#screenQualityBtn")?.addEventListener("click",(e)=>{e.stopPropagation();toggleScreenQualityMenu()});
-$("[data-screen-quality]").forEach(b=>b.addEventListener("click",()=>{setScreenQuality(b.dataset.screenQuality);$("#screenQualityMenu")?.classList.add("hidden")}));
+$$("[data-screen-quality]").forEach(b=>b.addEventListener("click",()=>{setScreenQuality(b.dataset.screenQuality);$("#screenQualityMenu")?.classList.add("hidden")}));
 document.addEventListener("click",e=>{if(!e.target.closest(".screen-quality-wrap"))$("#screenQualityMenu")?.classList.add("hidden")});
 $("#callModeFocus")?.addEventListener("click",()=>setCallMode("focus"));$("#callModeGallery")?.addEventListener("click",()=>setCallMode("gallery"));$("#callModeCinema")?.addEventListener("click",()=>setCallMode("cinema"));
 $("#callModeFocusBottom")?.addEventListener("click",()=>setCallMode("focus"));$("#callModeGalleryBottom")?.addEventListener("click",()=>setCallMode("gallery"));$("#callModeCinemaBottom")?.addEventListener("click",()=>setCallMode("cinema"));
@@ -443,7 +443,7 @@ async function setScreenQuality(key,notify=true){
   const profile=SCREEN_QUALITY[key]||SCREEN_QUALITY.auto;
   if(!S.call)return;
   S.call.screenQuality=key||"auto";
-  $("[data-screen-quality]").forEach(b=>b.classList.toggle("active",b.dataset.screenQuality===S.call.screenQuality));
+  $$("[data-screen-quality]").forEach(b=>b.classList.toggle("active",b.dataset.screenQuality===S.call.screenQuality));
   const btn=$("#screenQualityBtn");if(btn)btn.textContent="⚙ "+profile.label;
   const track=S.call.screen?.getVideoTracks?.()[0];
   if(track){
