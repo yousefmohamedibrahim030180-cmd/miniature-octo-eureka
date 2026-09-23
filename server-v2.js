@@ -185,7 +185,15 @@ function auth(req,res,next){
  if(u.suspended)return res.status(403).json({error:"Account suspended"+(u.suspendedReason?": "+u.suspendedReason:"")});
  u.status="online";req.user=u;persist();next();
 }
+const STARTER_COINS=10000;
+function ensureStarterCoins(u){
+ if(u.starterCoinsGrantedAt)return;
+ const balance=Number(u.coins||0);
+ if(balance<STARTER_COINS)u.coins=STARTER_COINS;
+ u.starterCoinsGrantedAt=now();
+}
 function ensureUserDefaults(u){
+ ensureStarterCoins(u);
  u.frame=u.frame||"orbit";u.effect=u.effect||"none";u.nameplate=u.nameplate||"orbit";u.chatTheme=u.chatTheme||"orbit-dark";
  u.preferences=u.preferences||{};
  u.preferences.theme=u.preferences.theme||"void";
@@ -394,7 +402,7 @@ app.post("/api/auth/register",async(req,res)=>{
   if(!/^[a-z0-9][a-z0-9._-]{3,19}$/.test(username))return res.status(400).json({error:"Username must be 4-20 characters."});
   if(password.length<8||password.length>72)return res.status(400).json({error:"Password must be 8-72 characters."});
   if([...memory.users.values()].some(u=>u.username===username))return res.status(409).json({error:"Username already exists."});
-  const u={id:id("user"),username,displayName,passwordHash:await bcrypt.hash(password,12),bio:"",avatarUrl:"",frame:"orbit",effect:"none",nameplate:"orbit",chatTheme:"orbit-dark",xp:0,level:1,coins:250,messages:0,callMinutes:0,friends:0,communitiesCreated:0,communitiesJoined:0,status:"online",createdAt:now()};
+  const u={id:id("user"),username,displayName,passwordHash:await bcrypt.hash(password,12),bio:"",avatarUrl:"",frame:"orbit",effect:"none",nameplate:"orbit",chatTheme:"orbit-dark",xp:0,level:1,coins:STARTER_COINS,starterCoinsGrantedAt:now(),messages:0,callMinutes:0,friends:0,communitiesCreated:0,communitiesJoined:0,status:"online",createdAt:now()};
   memory.users.set(u.id,u);ensureInventory(u);ensureHome(u);daily(u);const t=token();memory.sessions.set(hash(t),{userId:u.id,createdAt:Date.now(),expiresAt:Date.now()+2592000000});setCookie(res,t);persist();res.status(201).json({user:userPublic(u)});
  }catch(e){console.error(e);res.status(500).json({error:"Registration failed."})}
 });
@@ -543,7 +551,7 @@ app.post("/api/studio/buy",auth,(req,res)=>{
  const x=getItem(req.body?.itemId);if(!x||x.enabled===false)return res.status(404).json({error:"Item not found."});ensureInventory(req.user);const inv=memory.inventory.get(req.user.id);
  if(inv.has(x.id))return res.status(409).json({error:"You already own this item."});
  if(x.type==="frame"&&x.limited){const remaining=Number(memory.frameStock.get(x.id)||0);if(remaining<=0)return res.status(409).json({error:"This limited edition is sold out."})}
- if(req.user.coins<x.price)return res.status(400).json({error:"Not enough ORBIT Coins."});
+ if(req.user.coins<x.price)return res.status(400).json({error:"Not enough ORBIT Coins. You have ✦ "+Number(req.user.coins||0).toLocaleString()+" but need ✦ "+Number(x.price||0).toLocaleString()+"."});
  req.user.coins-=x.price;inv.add(x.id);
  if(x.type==="frame"){const key=req.user.id+":"+x.id,remaining=x.limited?Math.max(0,Number(memory.frameStock.get(x.id)||0)-1):null;if(x.limited)memory.frameStock.set(x.id,remaining);memory.userFrames.set(key,{userId:req.user.id,frameId:x.id,purchasedAt:now(),edition:x.limited?(Number(x.stock||0)-Number(remaining||0)):null,equipped:false,favorite:false})}
  persist();res.json({ok:true,user:userPublic(req.user),item:{id:x.id,name:x.name,edition:x.limited?(Number(x.stock||0)-Number(memory.frameStock.get(x.id)||0)):null}});
