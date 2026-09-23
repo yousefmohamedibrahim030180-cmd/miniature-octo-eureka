@@ -59,11 +59,9 @@ async function openScreenSourcePicker(){
     thumbnail:s.thumbnail?.toDataURL?.()||"",
     appIcon:s.appIcon?.toDataURL?.()||""
   }));
-  screenPickerWindow.webContents.once("did-finish-load",()=>{
-    screenPickerWindow.webContents.send("orbit-screen-sources",payload);
-    screenPickerWindow.show();
-    screenPickerWindow.focus();
-  });
+  screenPickerWindow.webContents.send("orbit-screen-sources",payload);
+  screenPickerWindow.show();
+  screenPickerWindow.focus();
 }
 
 function createWindow(){
