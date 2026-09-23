@@ -353,10 +353,60 @@ async function createPeer(socketId,initiator,user){if(!S.call)return;const pc=ne
 function ensureRemoteAudio(id,stream){let audio=$("#remote-audio-"+id);if(!audio){audio=document.createElement("audio");audio.id="remote-audio-"+id;audio.autoplay=true;audio.playsInline=true;audio.controls=false;audio.muted=false;audio.volume=1;audio.setAttribute("aria-hidden","true");audio.style.position="fixed";audio.style.width="1px";audio.style.height="1px";audio.style.opacity="0";audio.style.pointerEvents="none";audio.style.left="-9999px";document.body.appendChild(audio)}if(audio.srcObject!==stream)audio.srcObject=stream;const p=audio.play();if(p?.catch)p.catch(()=>{audio.dataset.blocked="1"});return audio}
 function mountRemote(id,stream,user){let tile=$("#tile-"+id);if(!tile){tile=document.createElement("div");tile.className="video-tile";tile.id="tile-"+id;tile.draggable=true;tile.innerHTML='<div class="call-avatar">'+avatar(user||{})+'</div><video autoplay playsinline></video><div class="video-label">'+esc(user?.displayName||user?.username||"Guest")+'</div><div class="call-presence muted">🎙</div>';$("#callStage").appendChild(tile);bindCallVideoTrackUi(tile)}const video=tile.querySelector("video");if(video){video.autoplay=true;video.playsInline=true;video.muted=false;if(video.srcObject!==stream)video.srcObject=stream;video.play?.().catch(()=>{})}ensureRemoteAudio(id,stream)}
 function bindCallVideoTrackUi(tile){const video=tile.querySelector("video");if(!video||video.__orbitBound)return;video.__orbitBound=true;video.addEventListener("playing",()=>tile.classList.remove("is-video-off"));video.addEventListener("pause",()=>tile.classList.add("is-video-off"))}
-function mountRemoteScreen(id,stream,user){let tile=$("#screen-"+id);if(!tile){tile=document.createElement("div");tile.className="video-tile screen-share";tile.id="screen-"+id;tile.innerHTML='<div class="call-avatar">'+avatar(user||{})+'</div><video autoplay playsinline></video><div class="video-label">Screen share · '+esc(user?.displayName||user?.username||"Guest")+'</div>';$("#callStage").appendChild(tile)}const video=tile.querySelector("video");if(video&&video.srcObject!==stream){video.srcObject=stream;video.play?.().catch(()=>{})}tile.classList.remove("hidden")}
+function mountRemoteScreen(id,stream,user){
+  let tile=$("#screen-"+id);
+  if(!tile){
+    tile=document.createElement("div");
+    tile.className="video-tile screen-share";
+    tile.id="screen-"+id;
+    tile.innerHTML='<video autoplay playsinline></video>'+
+      '<div class="screen-share-head"><span>SCREEN SHARE</span><strong>'+esc(user?.displayName||user?.username||"Guest")+'</strong></div>'+
+      '<div class="screen-share-zoom" role="group" aria-label="Screen share zoom">'+
+      '<button type="button" data-zoom-out title="Zoom out">−</button>'+
+      '<button type="button" data-zoom-reset title="Reset zoom">1×</button>'+
+      '<button type="button" data-zoom-in title="Zoom in">+</button>'+
+      '</div>'+
+      '<div class="video-label">Screen share · '+esc(user?.displayName||user?.username||"Guest")+'</div>';
+    $("#callStage").appendChild(tile);
+    const video=tile.querySelector("video");
+    const zoomLabel=tile.querySelector("[data-zoom-reset]");
+    const applyZoom=()=>{
+      const z=Math.max(1,Math.min(2.6,Number(tile.dataset.zoom||1)));
+      video.style.transform="scale("+z+")";
+      video.style.transformOrigin="center center";
+      if(zoomLabel)zoomLabel.textContent=(Number.isInteger(z)?z:z.toFixed(1))+"×";
+    };
+    tile.dataset.zoom="1";
+    tile.querySelector("[data-zoom-out]")?.addEventListener("click",()=>{tile.dataset.zoom=String(Math.max(1,Number(tile.dataset.zoom||1)-.2));applyZoom()});
+    tile.querySelector("[data-zoom-in]")?.addEventListener("click",()=>{tile.dataset.zoom=String(Math.min(2.6,Number(tile.dataset.zoom||1)+.2));applyZoom()});
+    tile.querySelector("[data-zoom-reset]")?.addEventListener("dblclick",()=>{tile.dataset.zoom="1";applyZoom()});
+    tile.addEventListener("wheel",e=>{
+      e.preventDefault();
+      const step=e.deltaY>0?-.12:.12;
+      tile.dataset.zoom=String(Math.max(1,Math.min(2.6,Number(tile.dataset.zoom||1)+step)));
+      applyZoom();
+    },{passive:false});
+    applyZoom();
+  }
+  const video=tile.querySelector("video");
+  if(video&&video.srcObject!==stream){
+    video.srcObject=stream;
+    video.play?.().catch(()=>{});
+  }
+  tile.classList.remove("hidden");
+}
 function setRemoteScreen(id,active){const tile=$("#screen-"+id);if(tile)tile.classList.toggle("hidden",!active)}
 async function handleOffer(d){if(!S.call)return;if(!S.call.peers[d.from])await createPeer(d.from,false,d.fromUser||{});const p=S.call.peers[d.from];await p.pc.setRemoteDescription(d.offer);const ans=await p.pc.createAnswer();await p.pc.setLocalDescription(ans);S.socket.emit("rtc:answer",{to:d.from,answer:ans})}
-async function startScreenPeer(to,track){if(!S.call||!track)return;const old=S.call.screenPeers?.[to];if(old?.pc)try{old.pc.close()}catch{};S.call.screenPeers[to]={pc:null,local:true,pendingIce:[]};const pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});S.call.screenPeers[to].pc=pc;pc.addTrack(track,new MediaStream([track]));pc.onicecandidate=e=>{if(e.candidate)S.socket.emit("screen:ice",{to,candidate:e.candidate})};pc.onconnectionstatechange=()=>{if(["failed","closed"].includes(pc.connectionState)){if(S.call?.screenPeers?.[to]?.pc===pc)delete S.call.screenPeers[to]}};const offer=await pc.createOffer();await pc.setLocalDescription(offer);S.socket.emit("screen:offer",{to,offer:pc.localDescription})}
+async function startScreenPeer(to,track){if(!S.call||!track)return;const old=S.call.screenPeers?.[to];if(old?.pc)try{old.pc.close()}catch{};S.call.screenPeers[to]={pc:null,local:true,pendingIce:[]};const pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});S.call.screenPeers[to].pc=pc;const sender=pc.addTrack(track,new MediaStream([track]));
+try{
+  const params=sender.getParameters?.()||{};
+  params.degradationPreference="maintain-resolution";
+  params.encodings=params.encodings||[{}];
+  params.encodings[0].maxBitrate=12000000;
+  if("maxFramerate" in params.encodings[0])params.encodings[0].maxFramerate=60;
+  await sender.setParameters?.(params);
+}catch{}
+pc.onicecandidate=e=>{if(e.candidate)S.socket.emit("screen:ice",{to,candidate:e.candidate})};pc.onconnectionstatechange=()=>{if(["failed","closed"].includes(pc.connectionState)){if(S.call?.screenPeers?.[to]?.pc===pc)delete S.call.screenPeers[to]}};const offer=await pc.createOffer();await pc.setLocalDescription(offer);S.socket.emit("screen:offer",{to,offer:pc.localDescription})}
 async function handleScreenOffer(d){if(!S.call)return;let p=S.call.screenPeers[d.from];if(!p)p=S.call.screenPeers[d.from]={pc:null,local:false,pendingIce:[]};if(p.pc)try{p.pc.close()}catch{};const pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});p.pc=pc;p.local=false;pc.onicecandidate=e=>{if(e.candidate)S.socket.emit("screen:ice",{to:d.from,candidate:e.candidate})};pc.ontrack=e=>{if(e.track){const stream=e.streams?.[0]||new MediaStream([e.track]);mountRemoteScreen(d.from,stream,d.fromUser||{})}};pc.onconnectionstatechange=()=>{if(["failed","closed"].includes(pc.connectionState))removeRemoteScreen(d.from)};await pc.setRemoteDescription(d.offer);const pending=p.pendingIce.splice(0);for(const candidate of pending){try{await pc.addIceCandidate(candidate)}catch{}};const ans=await pc.createAnswer();await pc.setLocalDescription(ans);S.socket.emit("screen:answer",{to:d.from,answer:pc.localDescription})}
 async function handleScreenAnswer(d){const p=S.call?.screenPeers?.[d.from];if(!p?.pc)return;await p.pc.setRemoteDescription(d.answer);const pending=p.pendingIce?.splice(0)||[];for(const candidate of pending){try{await p.pc.addIceCandidate(candidate)}catch{}}}
 async function handleScreenIce(d){if(!S.call||!d?.from||!d?.candidate)return;const p=S.call.screenPeers[d.from]||(S.call.screenPeers[d.from]={pc:null,local:false,pendingIce:[]});if(!p.pc||!p.pc.remoteDescription?.type){p.pendingIce.push(d.candidate);return}try{await p.pc.addIceCandidate(d.candidate)}catch{}}
@@ -372,7 +422,15 @@ $("#callMinimize")?.addEventListener("click",()=>$("#callWindow")?.classList.tog
 $("#callMaximize")?.addEventListener("click",()=>$("#callWindow")?.classList.toggle("fullscreen"));
 (function bindCallDragResize(){const w=$("#callWindow"),h=$("#callDragHandle"),o=$("#callOverlay");if(!w||!h||!o)return;let drag=false,ox=0,oy=0,sl=0,st=0;h.addEventListener("pointerdown",e=>{if(e.target.closest("button"))return;drag=true;w.setPointerCapture?.(e.pointerId);const r=w.getBoundingClientRect();sl=r.left;st=r.top;ox=e.clientX;oy=e.clientY;w.style.left=sl+"px";w.style.top=st+"px";w.style.margin="0";w.style.position="fixed"});h.addEventListener("pointermove",e=>{if(!drag)return;let x=sl+(e.clientX-ox),y=st+(e.clientY-oy);const pad=8,maxX=innerWidth-w.offsetWidth-pad,maxY=innerHeight-w.offsetHeight-pad;x=Math.max(pad,Math.min(maxX,x));y=Math.max(pad,Math.min(maxY,y));w.style.left=x+"px";w.style.top=y+"px"});h.addEventListener("pointerup",()=>drag=false);h.addEventListener("pointercancel",()=>drag=false)})();
 async function stopScreenShare(){if(!S.call?.screen)return;const old=S.call.screen;S.call.screen=null;for(const [id,p] of Object.entries(S.call.screenPeers||{})){if(p.local){if(p.pc)try{p.pc.close()}catch{};S.socket.emit("screen:stop",{to:id});delete S.call.screenPeers[id]}}old.getTracks().forEach(t=>t.stop());localPreview(S.call.stream)}
-$("#screenBtn").onclick=async()=>{if(!S.call)return;try{if(!navigator.mediaDevices?.getDisplayMedia)throw new Error("Screen sharing is not supported in this browser.");if(!S.call.screen){const shared=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:30,max:60},cursor:"always"},audio:false,selfBrowserSurface:"exclude",surfaceSwitching:"include"});const screen=shared.getVideoTracks()[0];if(!screen)throw new Error("No screen video track was returned.");S.call.screen=shared;localPreview(shared);const peers=Object.values(S.call.peers||{});await Promise.all(peers.map(p=>startScreenPeer(p.socketId,screen)));screen.onended=()=>{if(S.call?.screen)stopScreenShare()};toast("Screen share",peers.length?"Your screen is being shared with the call.":"Screen sharing is ready — waiting for participants.")}else await stopScreenShare()}catch(e){if(e.name!=="AbortError")toast("Screen share",e.name==="NotAllowedError"?"Screen sharing permission was denied or blocked.":e.message||"Screen sharing failed")}};
+$("#screenBtn").onclick=async()=>{if(!S.call)return;try{if(!navigator.mediaDevices?.getDisplayMedia)throw new Error("Screen sharing is not supported in this browser.");if(!S.call.screen){const shared=await navigator.mediaDevices.getDisplayMedia({video:{width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:60,max:60},cursor:"always",displaySurface:"monitor"},audio:false,selfBrowserSurface:"exclude",surfaceSwitching:"include"});const screen=shared.getVideoTracks()[0];if(!screen)throw new Error("No screen video track was returned.");
+try{
+  screen.contentHint="detail";
+  const s=screen.getSettings?.()||{};
+  const targetW=Math.min(Number(s.width||2560),2560);
+  const targetH=Math.min(Number(s.height||1440),1440);
+  if(screen.applyConstraints)await screen.applyConstraints({width:{ideal:targetW,max:2560},height:{ideal:targetH,max:1440},frameRate:{ideal:60,max:60}});
+}catch{}
+S.call.screen=shared;localPreview(shared);const peers=Object.values(S.call.peers||{});await Promise.all(peers.map(p=>startScreenPeer(p.socketId,screen)));screen.onended=()=>{if(S.call?.screen)stopScreenShare()};toast("Screen share",peers.length?"Your screen is being shared with the call.":"Screen sharing is ready — waiting for participants.")}else await stopScreenShare()}catch(e){if(e.name!=="AbortError")toast("Screen share",e.name==="NotAllowedError"?"Screen sharing permission was denied or blocked.":e.message||"Screen sharing failed")}};
 
 function endCall(){if(!S.call)return;S.socket.emit("call:leave");Object.values(S.call.peers).forEach(p=>p.pc.close());Object.values(S.call.screenPeers||{}).forEach(p=>{try{p.pc?.close()}catch{}});Object.values(S.call.audioMonitors||{}).forEach(m=>{try{m.source?.disconnect();m.analyser?.disconnect()}catch{}});cancelAnimationFrame(S.call.speakerFrame);S.call.audioContext?.close?.();S.call.stream.getTracks().forEach(t=>t.stop());S.call.screen?.getTracks().forEach(t=>t.stop());clearInterval(S.call.durationTimer);S.call=null;$("#callOverlay").classList.add("hidden");$("#callStage").innerHTML="";const w=$("#callWindow");if(w){w.classList.remove("minimized","fullscreen");w.style.left="";w.style.top="";w.style.position=""}}
 $("#leaveCallBtn").onclick=endCall;$("#callClose").onclick=endCall;
