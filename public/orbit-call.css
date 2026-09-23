@@ -123,3 +123,5 @@
   .video-tile.screen-share{min-height:250px!important}
   .screen-share-zoom button{width:28px;height:28px}
 }
+
+.video-tile.screen-presenting .call-avatar{display:none!important}
