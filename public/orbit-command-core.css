@@ -176,3 +176,6 @@
 @media(prefers-reduced-motion:reduce){
   .orbit-core:before,.orbit-core:after,.orbit-core-live i{animation:none!important}
 }
+
+/* Chat-only hide: bottom ORBIT launcher must not cover the Messages view */
+#orbitLauncher[hidden]{display:none!important;}
