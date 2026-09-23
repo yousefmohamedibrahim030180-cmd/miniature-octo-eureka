@@ -39,7 +39,7 @@
   function openModal(title,body){$("#modal-root").innerHTML='<div class="modal-bg" id="modal-bg"><div class="modal"><div class="modal-head"><strong>'+esc(title)+'</strong><button class="icon" id="modal-x">×</button></div><div class="modal-body">'+body+'</div></div></div>';$("#modal-x").onclick=closeModal;$("#modal-bg").onclick=e=>{if(e.target.id==="modal-bg")closeModal()}}
   function closeModal(){$("#modal-root").innerHTML=""}
   function empty(t,p){return'<div class="empty"><div class="empty-box"><h2>'+esc(t)+'</h2><p>'+esc(p)+'</p></div></div>'}
-  function msg(m){return'<article class="msg">'+avatar({username:m.username})+'<div class="msg-body"><div class="msg-head"><strong>'+esc(m.username||"Guest")+'</strong><time>'+esc(time(m.created_at))+'</time></div><div class="msg-text">'+esc(m.content||"")+'</div></div></article>'}
+  function msg(m){const mine=String(m.senderId||m.user_id||"")===String(S.user?.id||"");const cls=mine?"msg is-mine":"msg";return'<article class="'+cls+'">'+avatar({username:m.username,avatarUrl:m.avatarUrl,avatar_url:m.avatar_url})+'<div class="msg-body"><div class="msg-head"><strong>'+esc(m.username||"Guest")+'</strong><time>'+esc(time(m.created_at))+'</time></div><div class="msg-text">'+esc(m.content||"")+'</div></div></article>'}
   function row(u,action){return'<div class="row">'+avatar(u)+'<span class="row-main"><strong>'+esc(u.display_name||u.username||"Guest")+'</strong><span>@'+esc(u.username||"")+" · "+esc(u.status||"offline")+'</span></span>'+(action?'<div class="row-actions">'+action+"</div>":"")+"</div>"}
 
   function renderNav(){
@@ -55,7 +55,7 @@
   }
   function chrome(){
     const u=S.user||{};
-    $("#rail-avatar").outerHTML='<span class="avatar" id="rail-avatar">'+(u.avatar_url?'<img src="'+esc(u.avatar_url)+'" alt="">':esc(letter(u)))+'</span>';
+    const railSrc=avatarSource(u);$("#rail-avatar").outerHTML='<span class="avatar" id="rail-avatar">'+(railSrc?'<img src="'+esc(railSrc)+'" alt="">':esc(letter(u)))+'</span>';
     $("#rail-name").textContent=u.display_name||u.username||"Guest";$("#rail-handle").textContent="@"+(u.username||"guest");
     const unread=S.dms.reduce((a,d)=>a+Number(d.unreadCount||0),0),notes=S.notifications.filter(n=>!n.read).length;
     $("#message-count").textContent=unread||"";$("#notification-count").textContent=notes||"";
