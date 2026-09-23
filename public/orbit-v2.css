@@ -614,3 +614,16 @@ html[data-orbitFontScale="125"] .ctx-item strong{font-size:calc(8px * 1.25)}
   .chat{grid-template-columns:minmax(0,1fr) 200px!important}
   .messages{padding-left:42px!important;padding-right:42px!important}
 }
+
+
+/* ORBIT VOICE MESSAGES — 2026-09-23 */
+.voice-tool{position:relative;transition:.18s ease}
+.voice-tool.recording{background:linear-gradient(135deg,#ff4f78,#ff8a5c)!important;color:#fff;box-shadow:0 0 28px rgba(255,79,120,.35);animation:orbitVoicePulse 1s ease-in-out infinite}
+.voice-status{min-height:16px;padding:4px 3px 0;color:#8f9bb0;font-size:7px;text-align:left}
+.voice-status:empty{display:none}
+.voice-message{display:grid!important;grid-template-columns:34px minmax(90px,1fr) minmax(180px,280px);align-items:center;gap:9px;max-width:min(100%,520px)!important;padding:9px 10px!important}
+.voice-icon{width:32px;height:32px;display:grid;place-items:center;border-radius:10px;background:linear-gradient(135deg,rgba(155,109,255,.22),rgba(82,223,255,.12));font-size:15px}
+.voice-copy strong,.voice-copy span{display:block}.voice-copy strong{font-size:8px}.voice-copy span{font-size:6px;color:var(--muted);margin-top:2px}
+.voice-message audio{width:100%;height:34px;accent-color:#9b6dff}
+@keyframes orbitVoicePulse{50%{transform:scale(1.05);box-shadow:0 0 34px rgba(255,79,120,.55)}}
+@media(max-width:700px){.voice-message{grid-template-columns:34px 1fr}.voice-message audio{grid-column:1 / -1}.voice-status{font-size:6px}}
