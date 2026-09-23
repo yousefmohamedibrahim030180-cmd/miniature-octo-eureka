@@ -510,3 +510,35 @@ body[data-orbit-light="light"] .composer{background:rgba(242,247,252,.80)!import
 body[data-orbit-light="light"] .composer input{color:#182234}
 @media(max-width:1050px){.chat{grid-template-columns:minmax(0,1fr)}.chat-side{display:none}}
 @media(max-width:800px){.dm-shell{grid-template-columns:1fr}.dm-shell>.dm-list{display:none}.messages{padding:18px 13px!important}.messages .msg-body{max-width:86%}.composer-wrap{padding:0 13px 16px!important}}
+
+
+/* Real V2 Experience Lab controls */
+.atmos-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.atmos-card{
+  position:relative;overflow:hidden;padding:0;text-align:left;cursor:pointer;
+  border:1px solid rgba(255,255,255,.07);border-radius:15px;
+  background:rgba(255,255,255,.025);color:var(--text);
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.atmos-card:hover{transform:translateY(-2px);border-color:rgba(139,156,255,.30);box-shadow:0 16px 50px rgba(0,0,0,.18)}
+.atmos-card.active{border-color:rgba(107,190,255,.42);box-shadow:0 0 0 1px rgba(107,190,255,.13),0 18px 60px rgba(55,112,255,.14)}
+.atmos-card .atmosphere-mini-preview{height:96px}
+.atmos-card-name{display:block;padding:10px 11px 0;font-weight:800;font-size:10px}
+.atmos-card-desc{display:block;padding:3px 11px 12px;color:var(--muted);font-size:8px;line-height:1.45}
+.atmosphere-panel .pref-panel-head{align-items:stretch}
+.atmos-current{width:210px;min-width:210px;position:relative}
+.atmos-current .atmosphere-mini-preview{height:100%;min-height:125px;border:1px solid rgba(255,255,255,.07);border-radius:15px}
+.atmos-current>b{position:absolute;left:11px;bottom:9px;padding:6px 9px;border-radius:8px;background:rgba(3,7,14,.72);font-size:9px;backdrop-filter:blur(12px)}
+.atmos-light-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.atmos-light{
+  height:44px;border:1px solid rgba(255,255,255,.07);border-radius:11px;
+  background:rgba(255,255,255,.025);color:var(--text);cursor:pointer;font-size:9px
+}
+.atmos-light.active{background:linear-gradient(135deg,rgba(114,102,255,.20),rgba(58,208,255,.09));border-color:rgba(125,153,255,.28);box-shadow:0 0 24px rgba(78,116,255,.12)}
+.atmos-range{display:grid;gap:11px;margin-top:11px}
+.atmos-range label{display:grid;grid-template-columns:120px 1fr 42px;gap:12px;align-items:center}
+.atmos-range label>span{font-size:9px;color:var(--muted)}
+.atmos-range input{width:100%;accent-color:#7f85ff}
+.atmos-range b{display:grid;place-items:center;height:30px;border:1px solid rgba(255,255,255,.07);border-radius:8px;background:rgba(255,255,255,.03);font-size:9px}
+@media(max-width:1050px){.atmos-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.atmos-current{width:180px;min-width:180px}}
+@media(max-width:780px){.atmos-grid{grid-template-columns:1fr}.atmos-current{width:100%;min-width:0}.atmos-panel .pref-panel-head{display:grid}.atmos-range label{grid-template-columns:1fr}.atmos-range b{width:44px}}
