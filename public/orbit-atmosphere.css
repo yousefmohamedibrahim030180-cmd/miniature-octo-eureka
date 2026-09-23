@@ -113,7 +113,7 @@ body[data-orbit-light="dark"] .orbit-space-stars{filter:brightness(.9)}
 .orbit-reduce-motion .orbit-space-dust i{animation:none!important}
 
 /* Pull the product above the atmosphere while keeping the background alive */
-#app,.call,.incoming,.modal-bg,.toast-stack{position:relative;z-index:2}
+#app{position:relative;z-index:2}.call,.incoming,.modal-bg,.toast-stack{z-index:2}
 #app{background:transparent!important}
 .rail,.context,.top,.main,.dm-left,.dm-right,.chat,.call-win{
   background:rgba(7,11,19,.72)!important;
