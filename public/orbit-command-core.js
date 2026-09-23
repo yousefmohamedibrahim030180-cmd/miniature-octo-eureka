@@ -85,10 +85,14 @@
     presenceCount().then(n=>{if(n!=null){const e=$("#orbitPresenceCount");if(e)e.textContent=n}});
   }
 
+  function isHome(){return $("#viewTitle")?.textContent?.trim()==="Home" && !!$("#surface .page");}
+  function removeCore(){
+    const el=$("#orbitCore");
+    if(el)el.remove();
+  }
   function boot(){
     launcher();
-    const active=$("#surface .page");
-    if(active&&$("#viewTitle")?.textContent?.trim()==="Home")core();
+    if(isHome())core(); else removeCore();
     syncLauncher();
   }
 
@@ -102,7 +106,7 @@
     const b=e.target.closest("#nav [data-view]");
     if(b){
       curtain();
-      setTimeout(()=>{syncLauncher();if(b.dataset.view==="home")core()},120);
+      setTimeout(()=>{syncLauncher();if(b.dataset.view==="home")core();else removeCore()},120);
     }
   },true);
 
