@@ -14,10 +14,8 @@ async function openScreenSourcePicker(){
     screenPickerWindow.focus();
     return;
   }
-  if(pendingDisplayMediaCallback){
-    try{pendingDisplayMediaCallback(null)}catch{}
-    pendingDisplayMediaCallback=null;
-  }
+  // Keep the active getDisplayMedia callback alive until the user picks a source.
+  // Cancelling it here makes every picker selection fail with "Screen source unavailable.".
   const sources=await desktopCapturer.getSources({
     types:["screen","window"],
     thumbnailSize:{width:360,height:220},
