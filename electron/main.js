@@ -3,8 +3,68 @@ const path = require("path");
 
 const ORBIT_URL = process.env.ORBIT_DESKTOP_URL || "https://miniature-octo-eureka-production.up.railway.app/";
 let mainWindow = null;
+let screenPickerWindow = null;
+let pendingDisplayMediaCallback = null;
+let pendingDisplaySources = new Map();
 
 app.setAppUserModelId("com.orbit.chat");
+
+async function openScreenSourcePicker(){
+  if(screenPickerWindow && !screenPickerWindow.isDestroyed()){
+    screenPickerWindow.focus();
+    return;
+  }
+  if(pendingDisplayMediaCallback){
+    try{pendingDisplayMediaCallback(null)}catch{}
+    pendingDisplayMediaCallback=null;
+  }
+  const sources=await desktopCapturer.getSources({
+    types:["screen","window"],
+    thumbnailSize:{width:360,height:220},
+    fetchWindowIcons:true
+  });
+  pendingDisplaySources=new Map(sources.map(s=>[s.id,s]));
+
+  screenPickerWindow=new BrowserWindow({
+    width:980,
+    height:700,
+    minWidth:760,
+    minHeight:520,
+    parent:mainWindow||undefined,
+    modal:false,
+    show:false,
+    title:"ORBIT — Choose what to share",
+    backgroundColor:"#050811",
+    autoHideMenuBar:true,
+    resizable:true,
+    webPreferences:{
+      contextIsolation:false,
+      nodeIntegration:true,
+      sandbox:false
+    }
+  });
+  screenPickerWindow.on("closed",()=>{
+    screenPickerWindow=null;
+    pendingDisplaySources=new Map();
+    if(pendingDisplayMediaCallback){
+      try{pendingDisplayMediaCallback(null)}catch{}
+      pendingDisplayMediaCallback=null;
+    }
+  });
+  await screenPickerWindow.loadFile(path.join(__dirname,"screen-picker.html"));
+  const payload=sources.map(s=>({
+    id:s.id,
+    name:s.name,
+    type:s.id.startsWith("window:")?"window":"screen",
+    thumbnail:s.thumbnail?.toDataURL?.()||"",
+    appIcon:s.appIcon?.toDataURL?.()||""
+  }));
+  screenPickerWindow.webContents.once("did-finish-load",()=>{
+    screenPickerWindow.webContents.send("orbit-screen-sources",payload);
+    screenPickerWindow.show();
+    screenPickerWindow.focus();
+  });
+}
 
 function createWindow(){
   mainWindow = new BrowserWindow({
@@ -85,6 +145,26 @@ function createWindow(){
   mainWindow.loadURL(ORBIT_URL);
 }
 
+ipcMain.on("orbit-screen-picker-select",(event,sourceId)=>{
+  const source=pendingDisplaySources.get(String(sourceId||""));
+  const cb=pendingDisplayMediaCallback;
+  pendingDisplayMediaCallback=null;
+  if(!source || !cb){
+    try{event.sender.send("orbit-screen-picker-error","Screen source unavailable.")}catch{}
+    return;
+  }
+  try{cb({video:source,audio:false})}catch{}
+  pendingDisplaySources=new Map();
+  if(screenPickerWindow && !screenPickerWindow.isDestroyed())screenPickerWindow.close();
+});
+ipcMain.on("orbit-screen-picker-cancel",()=>{
+  const cb=pendingDisplayMediaCallback;
+  pendingDisplayMediaCallback=null;
+  if(cb)try{cb(null)}catch{}
+  pendingDisplaySources=new Map();
+  if(screenPickerWindow && !screenPickerWindow.isDestroyed())screenPickerWindow.close();
+});
+
 ipcMain.on("orbit-window-control",(_event,action)=>{
   if(!mainWindow)return;
   if(action==="minimize")mainWindow.minimize();
@@ -101,11 +181,13 @@ app.whenReady().then(()=>{
   });
 
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-    desktopCapturer.getSources({ types: ["screen", "window"] }).then((sources) => {
-      if (!sources.length) return callback(null);
-      callback({ video: sources[0] });
-    }).catch(() => callback(null));
-  }, { useSystemPicker: true });
+    pendingDisplayMediaCallback=callback;
+    openScreenSourcePicker().catch(()=>{
+      const cb=pendingDisplayMediaCallback;
+      pendingDisplayMediaCallback=null;
+      if(cb)try{cb(null)}catch{}
+    });
+  }, { useSystemPicker: false });
 
   Menu.setApplicationMenu(null);
   createWindow();
