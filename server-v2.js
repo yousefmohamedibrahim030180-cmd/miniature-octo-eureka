@@ -20,7 +20,7 @@ const JWT_SECRET=String(process.env.JWT_SECRET||"orbit-guest-dev-secret");
 const memory={
  users:new Map(),sessions:new Map(),communities:new Map(),members:new Map(),channels:new Map(),
  conversations:new Map(),convMembers:new Map(),messages:new Map(),notifications:new Map(),
- inventory:new Map(),missionClaims:new Set(),daily:new Set(),friends:new Set(),audit:[]
+ inventory:new Map(),missionClaims:new Set(),missionProgress:new Map(),daily:new Set(),friends:new Set(),audit:[]
 };
 let persistTimer=null,persistBusy=false,persistPending=false,persistMode="memory";
 
@@ -51,6 +51,7 @@ function serialize(){
   notifications:[...memory.notifications],
   inventory:[...memory.inventory].map(([k,v])=>[k,[...v]]),
   missionClaims:[...memory.missionClaims],
+  missionProgress:[...memory.missionProgress],
   daily:[...memory.daily],
   friends:[...memory.friends],
   audit:memory.audit.slice(0,500)
@@ -62,6 +63,7 @@ function restore(data){
  map("users");map("sessions");map("communities");map("members");map("channels");map("conversations");map("convMembers");map("messages");map("notifications");
  memory.inventory=new Map((data.inventory||[]).map(x=>[x[0],new Set(x[1]||[])]));
  memory.missionClaims=new Set(data.missionClaims||[]);
+ memory.missionProgress=new Map(data.missionProgress||[]);
  memory.daily=new Set(data.daily||[]);
  memory.friends=new Set(data.friends||[]);
  memory.audit=Array.isArray(data.audit)?data.audit.slice(0,500):[];
@@ -230,13 +232,38 @@ const SHOP=[
  {id:"theme-ice",type:"chat_theme",name:"Ice Glass",price:650,rarity:"Epic",css:"ice"}
 ];
 const MISSIONS=[
- {id:"first-message",title:"First Signal",description:"Send your first message.",metric:"messages",target:1,xp:50,coins:40,cadence:"lifetime"},
- {id:"ten-messages",title:"Conversation Starter",description:"Send 10 messages.",metric:"messages",target:10,xp:150,coins:100,cadence:"daily"},
- {id:"join-community",title:"Join the Orbit",description:"Join a community.",metric:"communitiesJoined",target:1,xp:100,coins:80,cadence:"lifetime"},
- {id:"create-community",title:"Build a World",description:"Create a community.",metric:"communitiesCreated",target:1,xp:300,coins:180,cadence:"lifetime"},
- {id:"voice-explorer",title:"Voice Explorer",description:"Reach 15 minutes in calls.",metric:"callMinutes",target:15,xp:200,coins:120,cadence:"daily"},
- {id:"profile-crafted",title:"Profile Crafted",description:"Add a bio and customize your profile.",metric:"profile",target:1,xp:120,coins:90,cadence:"lifetime"}
+ {id:"daily-signal",title:"Daily Signal",description:"Send 5 messages today.",metric:"messages",target:5,xp:60,coins:45,cadence:"daily"},
+ {id:"daily-conversation",title:"Keep It Moving",description:"Send 10 messages today.",metric:"messages",target:10,xp:120,coins:90,cadence:"daily"},
+ {id:"daily-call",title:"Live Orbit",description:"Spend 5 minutes in a call today.",metric:"callMinutes",target:5,xp:90,coins:70,cadence:"daily"},
+ {id:"weekly-social",title:"Social Orbit",description:"Send 50 messages this week.",metric:"messages",target:50,xp:320,coins:240,cadence:"weekly"},
+ {id:"weekly-voice",title:"Voice Run",description:"Spend 30 minutes in calls this week.",metric:"callMinutes",target:30,xp:450,coins:320,cadence:"weekly"},
+ {id:"join-community",title:"Enter a World",description:"Join your first community.",metric:"communitiesJoined",target:1,xp:100,coins:80,cadence:"lifetime"},
+ {id:"create-community",title:"Build a World",description:"Create your first community.",metric:"communitiesCreated",target:1,xp:300,coins:180,cadence:"lifetime"},
+ {id:"profile-crafted",title:"Identity Complete",description:"Add a bio and customize your ORBIT identity.",metric:"profile",target:1,xp:120,coins:90,cadence:"lifetime"}
 ];
+function missionCycle(m){
+ if(m.cadence==="lifetime")return "lifetime";
+ const d=new Date();
+ if(m.cadence==="weekly"){
+  const day=(d.getUTCDay()+6)%7,monday=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()-day));
+  return monday.toISOString().slice(0,10);
+ }
+ return d.toISOString().slice(0,10);
+}
+function missionProgressKey(user,metric,cycle){return String(user.id)+":"+metric+":"+cycle}
+function trackMissionProgress(user,metric,amount=1){
+ const value=Number(amount||0);if(!value)return;
+ for(const m of MISSIONS){
+  if(m.metric!==metric||m.cadence==="lifetime")continue;
+  const key=missionProgressKey(user,metric,missionCycle(m));
+  memory.missionProgress.set(key,Number(memory.missionProgress.get(key)||0)+value);
+ }
+}
+function missionValue(user,m){
+ if(m.metric==="profile")return user.bio?1:0;
+ if(m.cadence==="lifetime")return Number(user[m.metric]||0);
+ return Number(memory.missionProgress.get(missionProgressKey(user,m.metric,missionCycle(m)))||0);
+}
 function getItem(itemId){return SHOP.find(x=>x.id===itemId)||null}
 function levelFor(xp){return Math.max(1,Math.floor(Number(xp||0)/500)+1)}
 function award(u,xp,coins){u.xp+=Number(xp||0);u.level=levelFor(u.xp);u.coins+=Number(coins||0);persist()}
@@ -429,20 +456,20 @@ app.post("/api/studio/equip",auth,(req,res)=>{
 });
 
 app.get("/api/missions",auth,(req,res)=>{
- const today=new Date().toISOString().slice(0,10);
  const list=MISSIONS.map(m=>{
-  const value=m.metric==="profile"?(req.user.bio?1:0):Number(req.user[m.metric]||0);
-  const cycle=m.cadence==="lifetime"?"lifetime":today;
-  return {...m,progress:Math.min(m.target,value),claimed:memory.missionClaims.has(req.user.id+":"+m.id+":"+cycle)}
+  const cycle=missionCycle(m),value=missionValue(req.user,m);
+  return {...m,progress:Math.min(m.target,value),cycle,claimed:memory.missionClaims.has(req.user.id+":"+m.id+":"+cycle)}
  });
  res.json({missions:list})
 });
 app.post("/api/missions/:id/claim",auth,(req,res)=>{
  const m=MISSIONS.find(x=>x.id===req.params.id);if(!m)return res.status(404).json({error:"Mission not found."});
- const value=m.metric==="profile"?(req.user.bio?1:0):Number(req.user[m.metric]||0);if(value<m.target)return res.status(400).json({error:"Mission is not complete yet."});
- const cycle=m.cadence==="lifetime"?"lifetime":new Date().toISOString().slice(0,10),key=req.user.id+":"+m.id+":"+cycle;
+ const cycle=missionCycle(m),value=missionValue(req.user,m);
+ if(value<m.target)return res.status(400).json({error:"Mission is not complete yet."});
+ const key=req.user.id+":"+m.id+":"+cycle;
  if(memory.missionClaims.has(key))return res.status(409).json({error:"Mission already claimed."});
- memory.missionClaims.add(key);award(req.user,m.xp,m.coins);res.json({ok:true,user:userPublic(req.user),reward:{xp:m.xp,coins:m.coins}})
+ memory.missionClaims.add(key);award(req.user,m.xp,m.coins);persist();
+ res.json({ok:true,user:userPublic(req.user),reward:{xp:m.xp,coins:m.coins},mission:{id:m.id,cycle,progress:value}})
 });
 
 app.get("/api/communities",auth,(req,res)=>{
@@ -453,11 +480,11 @@ app.post("/api/communities",auth,(req,res)=>{
  const c={id:id("com"),name:cleanName(req.body?.name,"New Community"),description:String(req.body?.description||"").slice(0,300),iconUrl:avatarField(req.body?.iconUrl),accent:["violet","cyan","gold","rose"].includes(String(req.body?.accent))?String(req.body.accent):"violet",verificationLevel:"standard",joinCode:"ORB-"+crypto.randomBytes(4).toString("hex").toUpperCase(),ownerId:req.user.id,createdAt:now()};
  memory.communities.set(c.id,c);memory.members.set(c.id,new Map([[req.user.id,"owner"]]));const conv={id:id("conv"),kind:"channel",createdAt:now()};memory.conversations.set(conv.id,conv);memory.convMembers.set(conv.id,new Set());
  memory.channels.set(id("ch"),{id:id("ch"),communityId:c.id,name:"general",type:"text",topic:"Welcome to your new ORBIT server.",conversationId:conv.id,createdAt:now()});
- req.user.communitiesCreated++;req.user.communitiesJoined++;award(req.user,100,0);persist();res.status(201).json({community:c,joinCode:c.joinCode})
+ req.user.communitiesCreated++;req.user.communitiesJoined++;trackMissionProgress(req.user,"communitiesCreated",1);trackMissionProgress(req.user,"communitiesJoined",1);award(req.user,100,0);persist();res.status(201).json({community:c,joinCode:c.joinCode})
 });
 app.post("/api/communities/join",auth,(req,res)=>{
  const code=String(req.body?.code||"").trim().toUpperCase(),c=[...memory.communities.values()].find(x=>x.joinCode===code);if(!c)return res.status(404).json({error:"Community code not found."});
- const m=memory.members.get(c.id)||new Map();const was=m.has(req.user.id);if(!was){m.set(req.user.id,"member");req.user.communitiesJoined++;award(req.user,75,0);memory.members.set(c.id,m);persist()}res.json({community:c})
+ const m=memory.members.get(c.id)||new Map();const was=m.has(req.user.id);if(!was){m.set(req.user.id,"member");req.user.communitiesJoined++;trackMissionProgress(req.user,"communitiesJoined",1);award(req.user,75,0);memory.members.set(c.id,m);persist()}res.json({community:c})
 });
 function communityRole(communityId,userId){return (memory.members.get(communityId)||new Map()).get(userId)||null}
 function canManageCommunity(communityId,userId){const r=communityRole(communityId,userId);return r==="owner"||r==="admin"}
@@ -573,7 +600,7 @@ app.post("/api/conversations/:id/messages",auth,(req,res)=>{
  if(!conversationAccess(req.params.id,req.user.id))return res.status(403).json({error:"Conversation access denied."});
  const text=escString(req.body?.content).trim();if(!text&&!req.body?.metadata?.attachment)return res.status(400).json({error:"Message is empty."});
  const m=pushMessage(req.params.id,createMessage(req.params.id,req.user,text,req.body?.replyToId,req.body?.metadata));
- req.user.messages++;award(req.user,10,0);persist();io.to("conversation:"+req.params.id).emit("message:new",m);res.status(201).json({message:m});
+ req.user.messages++;trackMissionProgress(req.user,"messages",1);award(req.user,10,0);persist();io.to("conversation:"+req.params.id).emit("message:new",m);res.status(201).json({message:m});
 });
 app.patch("/api/conversations/:id/messages/:messageId",auth,(req,res)=>{
  if(!conversationAccess(req.params.id,req.user.id))return res.status(403).json({error:"Conversation access denied."});
@@ -639,7 +666,7 @@ io.on("connection",socket=>{
   socket.on("screen:stop",({to}={})=>{if(!to||!socket.callRoom||!conversationAccess(String(socket.callRoom).slice(7),socket.userId))return;const target=io.sockets.sockets.get(String(to));if(target&&target.callRoom===socket.callRoom)target.emit("screen:stop",{from:socket.id})});
   socket.on("call:leave",()=>{
   if(!socket.callRoom)return;socket.leave(socket.callRoom);socket.to(socket.callRoom).emit("call:participant-left",{socketId:socket.id,userId:socket.userId});
-  if(socket.callStarted){socket.user.callMinutes+=Math.max(1,Math.round((Date.now()-socket.callStarted)/60000));award(socket.user,10,0)}socket.callRoom=null;socket.callStarted=null;persist()
+  if(socket.callStarted){const mins=Math.max(1,Math.round((Date.now()-socket.callStarted)/60000));socket.user.callMinutes+=mins;trackMissionProgress(socket.user,"callMinutes",mins);award(socket.user,10,0)}socket.callRoom=null;socket.callStarted=null;persist()
  });
  socket.on("rtc:offer",d=>{const s=io.sockets.sockets.get(d?.to);if(s)s.emit("rtc:offer",{from:socket.id,offer:d.offer,fromUser:userPublic(socket.user)})});
  socket.on("rtc:answer",d=>{const s=io.sockets.sockets.get(d?.to);if(s)s.emit("rtc:answer",{from:socket.id,answer:d.answer})});
