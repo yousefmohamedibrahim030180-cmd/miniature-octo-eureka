@@ -46,16 +46,17 @@ async function recordVoiceMessage(){
  try{
   stream=await navigator.mediaDevices.getUserMedia({audio:true});
   const preferred=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"].find(t=>MediaRecorder.isTypeSupported?.(t));
-  recorder=new MediaRecorder(stream,preferred?{mimeType:preferred}:undefined);S.voiceRecorder=recorder;start=Date.now();
+  recorder=new MediaRecorder(stream,preferred?{mimeType:preferred,audioBitsPerSecond:48000}:{audioBitsPerSecond:48000});S.voiceRecorder=recorder;start=Date.now();
   btn?.classList.add("recording");if(status)status.textContent="● Recording 0:00 — click the microphone to stop";
   timer=setInterval(()=>{const s=Math.floor((Date.now()-start)/1000);if(status)status.textContent="● Recording "+String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")+" — click the microphone to stop";if(s>=60&&recorder.state==="recording"){try{recorder.stop()}catch{}}},250);
   recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data)};
   recorder.onstop=async()=>{
    clearInterval(timer);stream.getTracks().forEach(t=>t.stop());S.voiceRecorder=null;btn?.classList.remove("recording");
    const duration=Math.max(1,Math.round((Date.now()-start)/1000));const blob=new Blob(chunks,{type:recorder.mimeType||"audio/webm"});
-   if(blob.size>1900000)return status&&(status.textContent="Voice message is too large. Please record a shorter message.");
+   if(blob.size>3500000)return status&&(status.textContent="Voice message is too large. Please record a shorter message.");
    const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error("Could not prepare voice message."));reader.readAsDataURL(blob)});
-   S.socket?.emit("message:send",{conversationId:S.activeConversation,content:"",metadata:{attachment:{kind:"voice",name:"voice-message.webm",size:blob.size,sizeLabel:(blob.size/1024).toFixed(0)+" KB",duration,durationLabel:Math.floor(duration/60)+":"+String(duration%60).padStart(2,"0"),mime:blob.type||"audio/webm",dataUrl}}},ack=>{if(!ack?.ok)toast("Voice message",ack?.error||"Send failed")});
+   if(!S.socket?.connected){if(status)status.textContent="Not connected to ORBIT. Try again.";return}
+   S.socket.emit("message:send",{conversationId:S.activeConversation,content:"",metadata:{attachment:{kind:"voice",name:"voice-message.webm",size:blob.size,sizeLabel:(blob.size/1024).toFixed(0)+" KB",duration,durationLabel:Math.floor(duration/60)+":"+String(duration%60).padStart(2,"0"),mime:blob.type||"audio/webm",dataUrl}}},ack=>{if(!ack?.ok){if(status)status.textContent=ack?.error||"Send failed";toast("Voice message",ack?.error||"Send failed")}});
    if(status)status.textContent="Voice message sent";setTimeout(()=>{if(status)status.textContent=""},1800);
   };
   recorder.onerror=()=>{clearInterval(timer);stream.getTracks().forEach(t=>t.stop());S.voiceRecorder=null;btn?.classList.remove("recording");if(status)status.textContent="Recording failed";};
