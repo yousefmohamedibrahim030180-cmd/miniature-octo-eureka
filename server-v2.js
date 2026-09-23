@@ -102,6 +102,9 @@ async function bootPersistence(){
    if(Array.isArray(legacy.users)&&legacy.users.length&&!legacy.v2){
     restoreLegacy(legacy);
    }else restore(legacy);
+   for(const custom of memory.customFrames||[]){if(!SHOP.some(x=>x.id===custom.id))SHOP.push(custom)}
+   for(const frame of GENERATED_FRAMES){if(frame.limited&&!memory.frameStock.has(frame.id))memory.frameStock.set(frame.id,Number(frame.remainingStock||0))}
+   for(const frame of memory.customFrames||[]){if(frame.limited&&!memory.frameStock.has(frame.id))memory.frameStock.set(frame.id,Number(frame.remainingStock||0))}
    console.log("[orbit-v2] sidecar state restored.");
   }
   persistMode="sidecar";await persistNow();
@@ -503,7 +506,7 @@ app.get("/api/search",auth,(req,res)=>{
 app.get("/api/studio",auth,(req,res)=>{
  ensureInventory(req.user);
  const owned=memory.inventory.get(req.user.id),wishlist=memory.wishlist.get(req.user.id)||new Set();
- res.json({user:userPublic(req.user),shop:SHOP.map(x=>({...x,owned:owned.has(x.id),wishlist:wishlist.has(x.id),remainingStock:x.type==="frame"&&x.limited?Number(memory.frameStock.get(x.id)||0):x.remainingStock})),collections:COLLECTIONS});
+ res.json({user:userPublic(req.user),shop:SHOP.map(x=>({...x,owned:owned.has(x.id),wishlist:wishlist.has(x.id),remainingStock:x.type==="frame"&&x.limited?Number(memory.frameStock.get(x.id)||0):x.remainingStock})),collections:COLLECTIONS.map(c=>({...c,collected:frameRows().filter(f=>f.collectionId===c.id&&owned.has(f.id)).length}))});
 });
 app.get("/api/studio/frames",auth,(req,res)=>{
  ensureInventory(req.user);
