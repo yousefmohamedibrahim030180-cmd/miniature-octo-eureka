@@ -135,9 +135,47 @@
   }
 
   async function renderHome(root){
-    root.innerHTML='<div class="page"><section class="card hero"><span class="eyebrow">ORBIT COMMAND CENTER</span><h1>A completely rebuilt application surface.</h1><p>One shell, one active view, one navigation system. Communities, messages, realtime and calls stay on the existing backend.</p><div class="actions"><button class="btn primary" id="home-open-chat">Open chat</button><button class="btn" id="home-communities">Communities</button><button class="btn" id="home-settings">Settings</button></div></section><div class="grid g3" style="margin-top:12px"><div class="card pad"><span class="eyebrow">COMMUNITIES</span><div class="metric">'+S.servers.length+'</div><span class="muted" style="font-size:8px">Available workspaces</span></div><div class="card pad"><span class="eyebrow">CONVERSATIONS</span><div class="metric">'+S.dms.length+'</div><span class="muted" style="font-size:8px">Direct messages</span></div><div class="card pad"><span class="eyebrow">REALTIME</span><div class="metric" style="font-size:21px">'+(S.socket?.connected?"ONLINE":"CONNECTING")+'</div><span class="muted" style="font-size:8px">Socket connection</span></div></div><div class="grid g2" style="margin-top:12px"><section class="card"><div class="ctx-row"><span>RECENT DMS</span><button class="tiny" id="home-new-dm">+</button></div><div id="home-dm-list" class="list" style="padding:0 12px 12px"></div></section><section class="card"><div class="ctx-row"><span>ACTIVE PEOPLE</span><button class="tiny" id="home-refresh">↻</button></div><div id="home-people" class="list" style="padding:0 12px 12px"></div></section></div></div>';
-    $("#home-open-chat").onclick=()=>{const ch=S.channels.find(c=>c.type==="text");if(ch)openChannel(ch.id);else setView("communities")};$("#home-communities").onclick=()=>setView("communities");$("#home-settings").onclick=()=>setView("settings");$("#home-new-dm").onclick=openNewDM;$("#home-refresh").onclick=loadPeople;
-    renderHomeDMs();loadPeople()
+    const online=S.socket?.connected;
+    const firstDM=S.dms?.[0];
+    root.innerHTML='<div class="orbit3-home page">'+
+      '<section class="orbit3-welcome">'+
+        '<div class="orbit3-welcome-copy">'+
+          '<span class="eyebrow">ORBIT / YOUR SPACE</span>'+
+          '<h1>Everything you need.<br><span>One clear place.</span></h1>'+
+          '<p>Jump into a conversation, open a server, or start a call without digging through menus.</p>'+
+          '<div class="orbit3-quick">'+
+            '<button class="orbit3-action primary" id="home-open-chat"><span>◈</span><b>Open Messages</b><small>Go straight to your conversations</small></button>'+
+            '<button class="orbit3-action" id="home-communities"><span>◎</span><b>Open Servers</b><small>Choose a community to enter</small></button>'+
+            '<button class="orbit3-action" id="home-new-dm"><span>＋</span><b>New Message</b><small>Start a private conversation</small></button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="orbit3-status">'+
+          '<div class="orbit3-orb"><span></span></div>'+
+          '<div><small>ORBIT STATUS</small><strong>'+(online?'All systems online':'Connecting to ORBIT')+'</strong><span>'+S.servers.length+' servers · '+S.dms.length+' conversations</span></div>'+
+        '</div>'+
+      '</section>'+
+      '<section class="orbit3-strip">'+
+        '<div><small>RECENT</small><strong>'+(firstDM?(esc(firstDM.otherUser?.display_name||firstDM.otherUser?.username||"Conversation")):'No conversation yet')+'</strong><span>'+(firstDM?esc(firstDM.lastMessage?.content||"Open the conversation"):'Start your first message')+'</span></div>'+
+        '<button class="orbit3-strip-btn" id="home-settings">Customize ORBIT <span>→</span></button>'+
+      '</section>'+
+      '<div class="orbit3-columns">'+
+        '<section class="orbit3-panel">'+
+          '<header><div><span class="eyebrow">RECENT MESSAGES</span><h2>Your conversations</h2></div><button class="orbit3-link" id="home-all-messages">View all →</button></header>'+
+          '<div id="home-dm-list" class="orbit3-list"></div>'+
+        '</section>'+
+        '<section class="orbit3-panel">'+
+          '<header><div><span class="eyebrow">AVAILABLE NOW</span><h2>People & spaces</h2></div><button class="orbit3-link" id="home-refresh">Refresh</button></header>'+
+          '<div id="home-people" class="orbit3-list"></div>'+
+        '</section>'+
+      '</div>'+
+    '</div>';
+    $("#home-open-chat").onclick=()=>{const ch=S.channels.find(c=>c.type==="text");if(ch)openChannel(ch.id);else setView("messages")};
+    $("#home-communities").onclick=()=>setView("communities");
+    $("#home-new-dm").onclick=openNewDM;
+    $("#home-settings").onclick=()=>setView("settings");
+    $("#home-all-messages").onclick=()=>setView("messages");
+    $("#home-refresh").onclick=loadPeople;
+    renderHomeDMs();loadPeople();
   }
   function renderHomeDMs(){const r=$("#home-dm-list");if(!r)return;r.innerHTML=S.dms.slice(0,5).map(d=>'<button class="row" data-home-dm="'+esc(d.id)+'">'+avatar(d.otherUser||{})+'<span class="row-main"><strong>'+esc(d.otherUser?.display_name||d.otherUser?.username||"Conversation")+'</strong><span>'+esc(d.lastMessage?.content||"No messages yet")+'</span></span></button>').join("")||'<span class="muted" style="font-size:8px;padding:10px">No direct messages yet.</span>';$$("[data-home-dm]").forEach(b=>b.onclick=()=>openDM(b.dataset.homeDm))}
   async function loadPeople(){
@@ -175,9 +213,25 @@
   function sendChannel(){const i=$("#channel-input"),c=i?.value.trim();if(!c||!S.socket||!S.channel)return;S.socket.emit("message:send",{channelId:S.channel.id,content:c});i.value="";i.focus()}
 
   function renderMessages(root){
-    root.innerHTML='<div class="dm"><aside class="dm-left"><div class="dm-search"><input id="dm-filter" placeholder="Find a conversation"></div><div id="dm-list" class="dm-list"></div></aside><section class="dm-right"><header class="dm-head"><div id="dm-avatar">'+avatar({username:"O"})+'</div><div class="dm-head-main"><strong id="dm-name">Select a conversation</strong><span id="dm-status">Private conversation</span></div><div class="chat-actions"><button id="dm-voice" class="chat-action">Voice</button><button id="dm-video" class="chat-action">Video</button></div></header><section id="dm-body" class="dm-body">'+empty("No conversation selected","Choose someone from the left.")+'</section><div class="composer-wrap"><form class="composer" id="dm-form"><input id="dm-input" placeholder="Write a message…"><button class="send">Send</button></form></div></section></div>';
-    $("#dm-form").onsubmit=e=>{e.preventDefault();sendDM()};$("#dm-filter").oninput=e=>drawDms(e.target.value);$("#dm-voice").onclick=()=>startCall("dm","voice");$("#dm-video").onclick=()=>startCall("dm","video");drawDms("");
-    if(S.dm)paintDM(S.dm.id)
+    root.innerHTML='<div class="orbit3-messages">'+
+      '<aside class="orbit3-dm-rail">'+
+        '<div class="orbit3-dm-top"><div><span class="eyebrow">MESSAGES</span><h1>Conversations</h1></div><button class="orbit3-new-btn" id="dm-new">＋</button></div>'+
+        '<div class="orbit3-search"><span>⌕</span><input id="dm-filter" placeholder="Search people or messages"></div>'+
+        '<div id="dm-list" class="orbit3-dm-list"></div>'+
+      '</aside>'+
+      '<section class="orbit3-conversation">'+
+        '<header class="orbit3-conv-head"><div class="orbit3-conv-person"><div id="dm-avatar">'+avatar({username:"O"})+'</div><div><strong id="dm-name">Select a conversation</strong><span id="dm-status">Private conversation</span></div></div><div class="orbit3-conv-actions"><button id="dm-voice">Voice</button><button id="dm-video" class="primary">Video</button></div></header>'+
+        '<section id="dm-body" class="orbit3-message-body">'+empty("Pick a conversation","Your messages will appear here.")+'</section>'+
+        '<div class="orbit3-composer"><form id="dm-form"><input id="dm-input" placeholder="Write a message to this conversation…"><button>Send</button></form></div>'+
+      '</section>'+
+    '</div>';
+    $("#dm-form").onsubmit=e=>{e.preventDefault();sendDM()};
+    $("#dm-filter").oninput=e=>drawDms(e.target.value);
+    $("#dm-new").onclick=openNewDM;
+    $("#dm-voice").onclick=()=>startCall("dm","voice");
+    $("#dm-video").onclick=()=>startCall("dm","video");
+    drawDms("");
+    if(S.dm)paintDM(S.dm.id);
   }
   function drawDms(q){const r=$("#dm-list");if(!r)return;q=(q||"").toLowerCase();r.innerHTML=S.dms.filter(d=>(d.otherUser?.display_name||d.otherUser?.username||"").toLowerCase().includes(q)).map(d=>'<button class="dm-item '+(String(S.dm?.id)===String(d.id)?"active":"")+'" data-open-dm="'+esc(d.id)+'">'+avatar(d.otherUser||{})+'<span class="dm-copy"><strong>'+esc(d.otherUser?.display_name||d.otherUser?.username||"Conversation")+'</strong><span>'+esc(d.lastMessage?.content||"No messages yet")+'</span></span></button>').join("")||'<span class="muted" style="padding:10px;font-size:8px">No conversations.</span>';$$("[data-open-dm]").forEach(b=>b.onclick=()=>openDM(b.dataset.openDm))}
   async function openDM(id){const d=S.dms.find(x=>String(x.id)===String(id));if(!d)return;S.dm=d;setView("messages");await paintDM(d.id)}
