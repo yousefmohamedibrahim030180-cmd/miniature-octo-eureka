@@ -7,8 +7,12 @@
   const S={token:readStoredToken(),user:null,servers:[],server:null,channels:[],channel:null,dms:[],dm:null,friends:{friends:[],incoming:[],outgoing:[]},notifications:[],view:"home",socket:null,typing:null,call:null};
 
   const NAV=[
-    ["home","⌂","Home"],["space","✦","Network"],["messages","◈","Messages"],["communities","◎","Communities"],
-    ["live","◉","Live"],["discover","⌁","Explore"],["events","▣","Events"],["projects","◇","Projects"],["files","▱","Files"],["ai","✧","AI Assistant"],["settings","⚙","Settings"]
+    ["home","⌂","Home"],["messages","◈","Messages"],["communities","◎","Servers"],
+    ["live","◉","Live"],["ai","✧","AI"],["settings","⚙","Settings"]
+  ];
+  const ADVANCED_NAV=[
+    ["space","✦","Network"],["discover","⌁","Explore"],["events","▣","Events"],
+    ["projects","◇","Projects"],["files","▱","Files"],["friends","◎","Friends"],["notifications","♢","Notifications"]
   ];
   const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
   const letter=u=>String(u?.display_name||u?.username||"G").slice(0,1).toUpperCase();
@@ -203,7 +207,7 @@
   function openEvent(){if(!S.server)return;openModal("Create event",'<form class="form" id="event-form"><label>Title<input class="input" id="event-title"></label><label>When<input class="input" id="event-when" type="datetime-local"></label><label>Type<select class="select" id="event-type"><option>Community</option><option>Gaming</option><option>Class</option><option>Meeting</option><option>Watch party</option><option>Voice</option><option>Video</option></select></label><button class="btn primary">Create</button></form>');$("#event-form").onsubmit=async e=>{e.preventDefault();try{await api("/api/servers/"+S.server.id+"/events",{method:"POST",body:JSON.stringify({title:$("#event-title").value,when:new Date($("#event-when").value).toISOString(),type:$("#event-type").value})});closeModal();renderEvents($("#surface"));toast("Event created","Added to the schedule.","success")}catch(x){toast("Event",x.message,"error")}}}
   function openProject(){if(!S.server)return;openModal("Create project",'<form class="form" id="project-form"><label>Name<input class="input" id="project-name"></label><label>Description<textarea class="textarea" id="project-desc"></textarea></label><button class="btn primary">Create</button></form>');$("#project-form").onsubmit=async e=>{e.preventDefault();try{await api("/api/servers/"+S.server.id+"/projects",{method:"POST",body:JSON.stringify({name:$("#project-name").value,description:$("#project-desc").value})});closeModal();renderProjects($("#surface"));toast("Project created","Shared project ready.","success")}catch(x){toast("Project",x.message,"error")}}}
   function openSearch(){openModal("Search ORBIT",'<input class="input" id="search-input" placeholder="Search users, channels and content"><div id="search-out" style="margin-top:10px"></div>');$("#search-input").oninput=async e=>{const q=e.target.value.trim(),out=$("#search-out");if(!q){out.innerHTML="";return}try{const d=await api("/api/search?q="+encodeURIComponent(q));out.innerHTML=(d.results||d.hits||d.users||[]).map(x=>'<div class="row"><span class="row-main"><strong>'+esc(x.username||x.name||x.title||"Result")+'</strong><span>'+esc(x.content||x.preview||"Orbit result")+'</span></span></div>').join("")||'<span class="muted" style="font-size:8px">No results.</span>'}catch(x){out.innerHTML='<span class="muted" style="font-size:8px">'+esc(x.message)+'</span>'}};$("#search-input").focus()}
-  function openCommand(){openModal("Command center",'<div class="list">'+NAV.concat([["friends","◎","Friends"],["notifications","♢","Notifications"]]).map(n=>'<button class="row" data-command="'+n[0]+'"><span class="row-main"><strong>'+n[1]+" "+n[2]+'</strong><span>Open surface</span></span></button>').join("")+"</div>");$$("[data-command]").forEach(b=>b.onclick=()=>{closeModal();setView(b.dataset.command)})}
+  function openCommand(){openModal("More in ORBIT",'<div class="list">'+ADVANCED_NAV.map(n=>'<button class="row" data-command="'+n[0]+'"><span class="row-main"><strong>'+n[1]+" "+n[2]+'</strong><span>Open surface</span></span></button>').join("")+"</div>");$$("[data-command]").forEach(b=>b.onclick=()=>{closeModal();setView(b.dataset.command)})}
 
   async function loadServers(){const d=await api("/api/servers");S.servers=d.servers||[];renderServerDock()}
   async function selectServer(id){const s=S.servers.find(x=>String(x.id)===String(id));if(!s)return;S.server=s;const d=await api("/api/servers/"+encodeURIComponent(s.id)+"/channels");S.channels=d.channels||[];S.channel=S.channels.find(c=>c.type==="text")||S.channels[0]||null;renderContext()}
