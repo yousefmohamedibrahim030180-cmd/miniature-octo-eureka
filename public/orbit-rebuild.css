@@ -198,3 +198,272 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;background:rad
   .call-stage{grid-template-columns:1fr;padding:10px}
   .call-stage .tile{min-height:210px}
 }
+
+/* =========================================================
+   ORBIT 3.0 — SIMPLE POWERFUL EXPERIENCE
+   One clear hierarchy. Fewer visible decisions. Larger content.
+   ========================================================= */
+:root{
+  --easy-bg:#070a0f;
+  --easy-rail:#0b1017;
+  --easy-panel:#0d141d;
+  --easy-panel2:#111a25;
+  --easy-border:rgba(255,255,255,.075);
+  --easy-border-strong:rgba(255,255,255,.12);
+  --easy-text:#f4f7fb;
+  --easy-muted:#9aa6b8;
+  --easy-dim:#667386;
+  --easy-purple:#8e6bff;
+  --easy-cyan:#4cdbff;
+  --easy-green:#45dfaa;
+}
+html,body{background:var(--easy-bg)}
+body:before{
+  background:
+    radial-gradient(circle at 82% -8%,rgba(142,107,255,.13),transparent 31%),
+    radial-gradient(circle at -10% 92%,rgba(76,219,255,.06),transparent 28%);
+}
+.app.easy-shell{
+  grid-template-columns:210px 246px minmax(0,1fr);
+  background:var(--easy-bg);
+}
+.app.easy-shell .rail{
+  padding:16px 10px;
+  background:linear-gradient(180deg,#0b1017f5,#090d14f5);
+  border-right:1px solid var(--easy-border);
+}
+.app.easy-shell .context{
+  background:#0a1017f7;
+  border-right:1px solid var(--easy-border);
+}
+.app.easy-shell .main{background:#080c12}
+.app.easy-shell .brand{padding:5px 8px 16px}
+.app.easy-shell .brand-mark{
+  width:40px;height:40px;border-radius:13px;
+  box-shadow:0 0 28px rgba(142,107,255,.28);
+}
+.app.easy-shell .brand strong{font-size:15px;letter-spacing:.14em}
+.app.easy-shell .brand small{font-size:6px;letter-spacing:.12em;color:#7d8a9e}
+.app.easy-shell .search{
+  height:42px;margin-bottom:14px;border-radius:10px;
+  background:rgba(255,255,255,.035);
+  border-color:var(--easy-border);
+}
+.app.easy-shell .search span:nth-child(2){font-size:9px}
+.app.easy-shell .label{
+  padding:12px 10px 7px;font-size:6px;color:#687588;
+}
+.app.easy-shell .nav{gap:2px}
+.app.easy-shell .nav button{
+  height:40px;border-radius:9px;padding:0 10px;gap:9px;color:#9ca8b8;
+}
+.app.easy-shell .nav button:hover{background:rgba(255,255,255,.045);color:#fff}
+.app.easy-shell .nav button.active{
+  background:linear-gradient(90deg,rgba(142,107,255,.17),rgba(76,219,255,.035));
+  box-shadow:inset 2px 0 var(--easy-purple);
+  color:#fff;
+}
+.app.easy-shell .nav-text{font-size:9px}
+.app.easy-shell .nav button[data-view="missions"],
+.app.easy-shell .nav button[data-view="studio"]{display:none}
+
+.app.easy-shell .spacer{min-height:12px}
+.app.easy-shell .status-card{
+  margin:6px 0 8px;padding:9px;border-radius:10px;
+  background:rgba(255,255,255,.018);
+}
+.app.easy-shell .status-card strong{font-size:8px}
+.app.easy-shell .status-card span{font-size:6px}
+.app.easy-shell .profile{
+  min-height:52px;padding:8px;border-radius:11px;
+  background:rgba(255,255,255,.022);
+}
+.app.easy-shell .profile-copy strong{font-size:9px}
+.app.easy-shell .profile-copy span{font-size:7px}
+
+.app.easy-shell .ctx-head{
+  height:66px;min-height:66px;padding:14px 15px;
+  background:rgba(10,16,23,.72);
+}
+.app.easy-shell .ctx-head h2{font-size:14px}
+.app.easy-shell .ctx-body{padding:10px}
+.app.easy-shell .ctx-section{margin-bottom:12px}
+.app.easy-shell .ctx-input{height:38px;font-size:9px}
+.app.easy-shell .ctx-item{
+  min-height:42px;height:auto;padding:7px 9px;border-radius:9px;
+}
+.app.easy-shell .ctx-item strong{font-size:9px}
+.app.easy-shell .ctx-item span{font-size:6px}
+.app.easy-shell .channel{min-height:38px;border-radius:8px}
+.app.easy-shell .channel span:nth-child(2){font-size:9px}
+
+.app.easy-shell .top{
+  height:58px;min-height:58px;
+  padding:0 17px;
+  background:rgba(8,12,18,.9);
+  border-bottom:1px solid var(--easy-border);
+}
+.app.easy-shell .crumb{gap:7px}
+.app.easy-shell .crumb span{font-size:6px}
+.app.easy-shell .crumb strong{font-size:14px}
+.app.easy-shell .top-actions{gap:5px}
+.app.easy-shell .top-btn,
+.app.easy-shell .circle,
+.app.easy-shell .status-btn{height:34px}
+.app.easy-shell .top-btn{font-size:8px}
+.app.easy-shell .status-btn{font-size:7px}
+
+.app.easy-shell .surface{background:#080c12}
+.app.easy-shell .page{padding:24px 26px 32px}
+.app.easy-shell .page-head{margin-bottom:18px}
+.app.easy-shell .page-head h1{font-size:31px}
+.app.easy-shell .page-head p{font-size:10px;max-width:720px}
+
+.app.easy-shell .hero{
+  min-height:250px;padding:28px;border-radius:18px;
+  background:
+    radial-gradient(circle at 84% 0,rgba(76,219,255,.09),transparent 29%),
+    radial-gradient(circle at 71% 0,rgba(142,107,255,.12),transparent 27%),
+    #0d141d;
+}
+.app.easy-shell .hero h1{font-size:38px;line-height:1.08;max-width:760px}
+.app.easy-shell .hero p{font-size:12px;max-width:710px;line-height:1.72;color:#afb9c8}
+.app.easy-shell .btn{
+  height:38px;border-radius:10px;font-size:9px;padding:0 13px;
+}
+.app.easy-shell .card{
+  border-color:var(--easy-border);
+  background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
+  border-radius:15px;
+}
+.app.easy-shell .pad{padding:17px}
+
+.app.easy-shell .dm{
+  grid-template-columns:300px minmax(0,1fr);
+  background:#090e15;
+}
+.app.easy-shell .dm-left{
+  background:#0a1017;
+  border-right:1px solid var(--easy-border);
+}
+.app.easy-shell .dm-search{padding:12px}
+.app.easy-shell .dm-search input{
+  height:40px;border-radius:10px;font-size:9px;
+  background:rgba(255,255,255,.025);
+}
+.app.easy-shell .dm-list{padding:4px 8px 12px}
+.app.easy-shell .dm-item{
+  min-height:60px;padding:10px 10px;gap:11px;
+  border-radius:10px;
+}
+.app.easy-shell .dm-item .avatar{width:42px;height:42px;min-width:42px;border-radius:12px}
+.app.easy-shell .dm-item.active{background:rgba(142,107,255,.10)}
+.app.easy-shell .dm-copy strong{font-size:10px}
+.app.easy-shell .dm-copy span{font-size:7px}
+.app.easy-shell .dm-right{background:#090e15}
+.app.easy-shell .dm-head{
+  height:68px;min-height:68px;padding:0 20px;
+  background:#0b1119;border-bottom:1px solid var(--easy-border);
+}
+.app.easy-shell .dm-head .avatar{width:42px;height:42px;min-width:42px}
+.app.easy-shell .dm-head-main strong{font-size:13px}
+.app.easy-shell .dm-head-main span{font-size:8px}
+.app.easy-shell .chat-action{height:35px;font-size:8px;padding:0 11px}
+.app.easy-shell .dm-body{padding:24px 28px}
+.app.easy-shell .dm-body .msg{gap:12px;padding:10px 0}
+.app.easy-shell .dm-body .msg .avatar{width:40px;height:40px;min-width:40px}
+.app.easy-shell .dm-body .msg-head strong{font-size:10px}
+.app.easy-shell .dm-body .msg-text{font-size:13px;line-height:1.72}
+.app.easy-shell .composer-wrap{padding:0 22px 20px}
+.app.easy-shell .composer{
+  min-height:52px;padding:8px 9px;border-radius:14px;
+  background:#0d151f;border-color:var(--easy-border-strong);
+}
+.app.easy-shell .composer input{font-size:12px}
+.app.easy-shell .tool,.app.easy-shell .send{height:40px}
+.app.easy-shell .tool{width:40px}
+.app.easy-shell .send{font-size:9px;padding:0 15px}
+
+.app.easy-shell .chat{
+  background:#090e15;
+}
+.app.easy-shell .chat-head{
+  height:68px;min-height:68px;padding:0 20px;background:#0b1119;
+}
+.app.easy-shell .chat-head-main strong{font-size:13px}
+.app.easy-shell .chat-head-main span{font-size:8px}
+.app.easy-shell .messages{padding:22px 28px}
+.app.easy-shell .msg{padding:10px 0}
+.app.easy-shell .msg .avatar{width:40px;height:40px;min-width:40px}
+.app.easy-shell .msg-head strong{font-size:10px}
+.app.easy-shell .msg-head time{font-size:7px}
+.app.easy-shell .msg-text{font-size:13px;line-height:1.72}
+.app.easy-shell .chat-side{
+  width:250px;background:#0b1119;border-left:1px solid var(--easy-border);
+}
+.app.easy-shell .composer input{font-size:12px}
+
+.app.easy-shell .call{
+  background:rgba(2,4,8,.48);
+  backdrop-filter:blur(8px);
+  place-items:end;
+  padding:24px;
+  pointer-events:none;
+}
+.app.easy-shell .call-win{
+  pointer-events:auto;
+  width:min(720px,calc(100vw - 48px));
+  height:min(560px,calc(100vh - 48px));
+  margin:0;
+  justify-self:end;
+  align-self:end;
+  border-radius:18px;
+  background:#080d14f5;
+  border-color:rgba(255,255,255,.11);
+  box-shadow:0 30px 90px rgba(0,0,0,.48),0 0 50px rgba(142,107,255,.08);
+}
+.app.easy-shell .call-top{height:62px;min-height:62px;padding:0 15px}
+.app.easy-shell .call-stage{
+  padding:12px;gap:9px;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+}
+.app.easy-shell .call-stage .tile{min-height:150px}
+.app.easy-shell .call-bar{height:62px;min-height:62px;padding:0 12px}
+.app.easy-shell .call-btn{height:36px;border-radius:9px}
+.app.easy-shell .leave{height:36px;border-radius:9px}
+
+.app.easy-shell .incoming{
+  top:16px;right:16px;
+  width:min(400px,calc(100vw - 32px));
+  border-radius:14px;
+}
+
+.app.easy-shell #toastStack,
+.app.easy-shell .toast-stack{right:16px;bottom:16px}
+
+@media(max-width:1150px){
+  .app.easy-shell{grid-template-columns:196px 220px minmax(0,1fr)}
+  .app.easy-shell .dm{grid-template-columns:270px minmax(0,1fr)}
+  .app.easy-shell .chat-side{display:none}
+}
+@media(max-width:900px){
+  .app.easy-shell{grid-template-columns:72px minmax(0,1fr)}
+  .app.easy-shell .context{display:none}
+  .app.easy-shell .dm{grid-template-columns:290px minmax(0,1fr)}
+}
+@media(max-width:700px){
+  .app.easy-shell .dm{grid-template-columns:1fr}
+  .app.easy-shell .dm-left{display:none}
+  .app.easy-shell .page{padding:15px}
+  .app.easy-shell .hero{padding:20px;min-height:220px}
+  .app.easy-shell .hero h1{font-size:27px}
+  .app.easy-shell .hero p{font-size:10px}
+  .app.easy-shell .call{padding:8px}
+  .app.easy-shell .call-win{width:100%;height:100%;border-radius:13px}
+  .app.easy-shell .call-stage{grid-template-columns:1fr}
+}
+
+/* clean message list: one account, one row */
+.app.easy-shell .dm-item .dm-copy{min-width:0}
+.app.easy-shell .dm-item .dm-copy strong{display:block}
+.app.easy-shell .dm-item .dm-copy span:empty{display:none}
